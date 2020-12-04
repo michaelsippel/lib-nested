@@ -1,0 +1,14 @@
+
+[package]
+authors = ["Michael Sippel <m.sippel@hzdr.de>"]
+edition = "2018"
+name = "NeStEd"
+version = "0.1.0"
+
+[dependencies]
+cgmath = "*"
+termion = "*"
+
+[dependencies.async-std]
+version = "1.7.0"
+features = ["unstable", "attributes"]
