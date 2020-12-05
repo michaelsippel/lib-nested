@@ -55,26 +55,9 @@ impl<T: Eq + Hash> ChannelData for HashSet<T> {
              Singleton Channel
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                     \*/
-pub struct SingletonChannel<T>(Option<T>);
-
-impl<T> Default for SingletonChannel<T> {
-    fn default() -> Self {
-        SingletonChannel(None)
-    }
-}
-
-impl<T> IntoIterator for SingletonChannel<T> {
-    type Item = T;
-    type IntoIter = std::iter::Once<T>;
-
-    fn into_iter(mut self) -> Self::IntoIter {
-        std::iter::once(self.0.take().unwrap())
-    }
-}
-
-impl<T> ChannelData for SingletonChannel<T> {
+impl<T> ChannelData for Option<T> {
     fn channel_insert(&mut self, x: T) {
-        self.0 = Some(x);
+        *self = Some(x);
     }
 }
 
@@ -184,11 +167,11 @@ pub fn set_channel<T: Eq + Hash>() -> (ChannelSender<HashSet<T>>, ChannelReceive
     channel::<HashSet<T>>()
 }
 
-pub fn queue_channel<T: Eq + Hash>() -> (ChannelSender<Vec<T>>, ChannelReceiver<Vec<T>>) {
+pub fn queue_channel<T>() -> (ChannelSender<Vec<T>>, ChannelReceiver<Vec<T>>) {
     channel::<Vec<T>>()
 }
 
-pub fn singleton_channel<T: Eq + Hash>() -> (ChannelSender<SingletonChannel<T>>, ChannelReceiver<SingletonChannel<T>>) {
-    channel::<SingletonChannel<T>>()
+pub fn singleton_channel<T>() -> (ChannelSender<Option<T>>, ChannelReceiver<Option<T>>) {
+    channel::<Option<T>>()
 }
 
