@@ -95,6 +95,63 @@ where T: Send + Sync,
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
+use std::ops::Deref;
+use std::sync::{Arc, RwLock};
+
+impl<T: View> View for RwLock<T> {
+    type Key = T::Key;
+    type Value = T::Value;
+
+    fn view(&self, key: T::Key) -> Option<T::Value> {
+        self.read().unwrap().view(key)
+    }
+}
+
+impl<T: Observer> Observer for RwLock<T> {
+    type Msg = T::Msg;
+
+    fn notify(&self, msg: T::Msg) {
+        self.read().unwrap().notify(msg)
+    }
+}
+
+impl<T: View> View for Arc<T> {
+    type Key = T::Key;
+    type Value = T::Value;
+
+    fn view(&self, key: T::Key) -> Option<T::Value> {
+        self.deref().view(key)
+    }
+}
+
+impl<T: Observer> Observer for Arc<T> {
+    type Msg = T::Msg;
+
+    fn notify(&self, msg: T::Msg) {
+        self.deref().notify(msg)
+    }
+}
+
+impl<K, V> View for Arc<dyn View<Key = K, Value = V>>
+where K: Send + Sync,
+      V: Send + Sync {
+    type Key = K;
+    type Value = V;
+
+    fn view(&self, key: K) -> Option<V> {
+        self.deref().view(key)
+    }
+}
+
+impl<T> Observer for Arc<dyn Observer<Msg = T>>
+where T:  Send + Sync {
+    type Msg = T;
+
+    fn notify(&self, msg: T) {
+        self.deref().notify(msg)
+    }
+}
+
 impl<T: View> View for Option<T> {
     type Key = T::Key;
     type Value = T::Value;
@@ -115,44 +172,6 @@ impl<T: Observer> Observer for Option<T> {
         if let Some(obs) = self.as_ref() {
             obs.notify(msg);
         }
-    }
-}
-
-//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
-
-impl<T: View> View for std::sync::RwLock<T> {
-    type Key = T::Key;
-    type Value = T::Value;
-
-    fn view(&self, key: T::Key) -> Option<T::Value> {
-        self.read().unwrap().view(key)
-    }
-}
-
-impl<T: Observer> Observer for std::sync::RwLock<T> {
-    type Msg = T::Msg;
-
-    fn notify(&self, msg: T::Msg) {
-        self.read().unwrap().notify(msg)
-    }
-}
-
-use std::ops::Deref;
-
-impl<T: View> View for std::sync::Arc<T> {
-    type Key = T::Key;
-    type Value = T::Value;
-
-    fn view(&self, key: T::Key) -> Option<T::Value> {
-        self.deref().view(key)
-    }
-}
-
-impl<T: Observer> Observer for std::sync::Arc<T> {
-    type Msg = T::Msg;
-
-    fn notify(&self, msg: T::Msg) {
-        self.deref().notify(msg)
     }
 }
 

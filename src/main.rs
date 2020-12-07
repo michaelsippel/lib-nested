@@ -59,7 +59,7 @@ async fn main() {
 
     let view = view_port.outer().get_view();
     let mut stream = view_port.outer().stream().map({
-        move |_| view.read().unwrap().as_ref().unwrap().view(()).unwrap()
+        move |_| view.view(()).unwrap()
     });
 
     let fut = task::spawn({
