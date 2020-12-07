@@ -1,17 +1,17 @@
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-pub trait View {
+pub trait View : Send + Sync {
     type Key;
     type Value;
 
     fn view(&self, key: Self::Key) -> Option<Self::Value>;
 }
 
-pub trait Observer {
+pub trait Observer : Send + Sync {
     type Msg;
 
-    fn notify(&mut self, key: Self::Msg);
+    fn notify(&self, key: Self::Msg);
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
@@ -29,14 +29,19 @@ pub trait GridObserver = Observer<Msg = Vector2<i16>>;
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-pub struct FnView<K, V, F: Fn(K) -> Option<V>> {
+pub struct FnView<K, V, F>
+where K: Send + Sync,
+      V: Send + Sync,
+      F: Fn(K) -> Option<V> + Send + Sync {
     f: F,
     _phantom0: std::marker::PhantomData<K>,
     _phantom1: std::marker::PhantomData<V>
 }
 
 impl<K, V, F> FnView<K, V, F>
-where F: Fn(K) -> Option<V> {
+where K: Send + Sync,
+      V: Send + Sync,
+      F: Fn(K) -> Option<V> + Send + Sync {
     pub fn new(f: F) -> Self {
         FnView {
             f,
@@ -47,7 +52,9 @@ where F: Fn(K) -> Option<V> {
 }
 
 impl<K, V, F> View for FnView<K, V, F>
-where F: Fn(K) -> Option<V> {
+where K: Send + Sync,
+      V: Send + Sync,
+      F: Fn(K) -> Option<V> + Send + Sync {
     type Key = K;
     type Value = V;
 
@@ -58,13 +65,16 @@ where F: Fn(K) -> Option<V> {
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-pub struct FnObserver<T, F: FnMut(T)> {
+pub struct FnObserver<T, F>
+where T: Send + Sync,
+      F: Fn(T) + Send + Sync {
     f: F,
     _phantom: std::marker::PhantomData<T>
 }
 
 impl<T, F> FnObserver<T, F>
-where F: FnMut(T) {
+where T: Send + Sync,
+      F: Fn(T) + Send + Sync {
     pub fn new(f: F) -> Self {
         FnObserver {
             f,
@@ -74,11 +84,75 @@ where F: FnMut(T) {
 }
 
 impl<T, F> Observer for FnObserver<T, F>
-where F: FnMut(T) {
+where T: Send + Sync,
+      F: Fn(T) + Send + Sync {
     type Msg = T;
 
-    fn notify(&mut self, key: T) {
-        (self.f)(key);
+    fn notify(&self, msg: T) {
+        (self.f)(msg);
+    }
+}
+
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+
+impl<T: View> View for Option<T> {
+    type Key = T::Key;
+    type Value = T::Value;
+
+    fn view(&self, key: T::Key) -> Option<T::Value> {
+        if let Some(view) = self.as_ref() {
+            view.view(key)
+        } else {
+            None
+        }
+    }
+}
+
+impl<T: Observer> Observer for Option<T> {
+    type Msg = T::Msg;
+
+    fn notify(&self, msg: T::Msg) {
+        if let Some(obs) = self.as_ref() {
+            obs.notify(msg);
+        }
+    }
+}
+
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+
+impl<T: View> View for std::sync::RwLock<T> {
+    type Key = T::Key;
+    type Value = T::Value;
+
+    fn view(&self, key: T::Key) -> Option<T::Value> {
+        self.read().unwrap().view(key)
+    }
+}
+
+impl<T: Observer> Observer for std::sync::RwLock<T> {
+    type Msg = T::Msg;
+
+    fn notify(&self, msg: T::Msg) {
+        self.read().unwrap().notify(msg)
+    }
+}
+
+use std::ops::Deref;
+
+impl<T: View> View for std::sync::Arc<T> {
+    type Key = T::Key;
+    type Value = T::Value;
+
+    fn view(&self, key: T::Key) -> Option<T::Value> {
+        self.deref().view(key)
+    }
+}
+
+impl<T: Observer> Observer for std::sync::Arc<T> {
+    type Msg = T::Msg;
+
+    fn notify(&self, msg: T::Msg) {
+        self.deref().notify(msg)
     }
 }
 

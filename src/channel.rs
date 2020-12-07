@@ -23,7 +23,7 @@ use {
                   Traits
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                     \*/
-pub trait ChannelData : Default + IntoIterator {
+pub trait ChannelData : Default + IntoIterator + Send + Sync {
     fn channel_insert(&mut self, x: Self::Item);
 }
 
@@ -33,7 +33,8 @@ pub trait ChannelData : Default + IntoIterator {
                Queue Channel
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                     \*/
-impl<T> ChannelData for Vec<T> {
+impl<T> ChannelData for Vec<T>
+where T: Send + Sync {
     fn channel_insert(&mut self, x: T) {
         self.push(x);
     }
@@ -44,7 +45,8 @@ impl<T> ChannelData for Vec<T> {
                  Set Channel
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                     \*/
-impl<T: Eq + Hash> ChannelData for HashSet<T> {
+impl<T> ChannelData for HashSet<T>
+where T: Eq + Hash + Send + Sync {
     fn channel_insert(&mut self, x: T) {
         self.insert(x);
     }
@@ -55,7 +57,8 @@ impl<T: Eq + Hash> ChannelData for HashSet<T> {
              Singleton Channel
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                     \*/
-impl<T> ChannelData for Option<T> {
+impl<T> ChannelData for Option<T>
+where T: Send + Sync {
     fn channel_insert(&mut self, x: T) {
         *self = Some(x);
     }
@@ -80,10 +83,11 @@ pub struct ChannelReceiver<Data: ChannelData>(Arc<Mutex<ChannelState<Data>>>);
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-impl<Data: ChannelData> Observer for ChannelSender<Data> {
+impl<Data: ChannelData> Observer for ChannelSender<Data>
+where Data::IntoIter: Send + Sync {
     type Msg = Data::Item;
 
-    fn notify(&mut self, msg: Data::Item) {
+    fn notify(&self, msg: Data::Item) {
         let mut state =  self.0.lock().unwrap();
 
         if state.send_buf.is_none() {
@@ -163,15 +167,15 @@ pub fn channel<Data: ChannelData>() -> (ChannelSender<Data>, ChannelReceiver<Dat
     (ChannelSender(state.clone()), ChannelReceiver(state))
 }
 
-pub fn set_channel<T: Eq + Hash>() -> (ChannelSender<HashSet<T>>, ChannelReceiver<HashSet<T>>) {
+pub fn set_channel<T: Eq + Hash + Send + Sync>() -> (ChannelSender<HashSet<T>>, ChannelReceiver<HashSet<T>>) {
     channel::<HashSet<T>>()
 }
 
-pub fn queue_channel<T>() -> (ChannelSender<Vec<T>>, ChannelReceiver<Vec<T>>) {
+pub fn queue_channel<T: Send + Sync>() -> (ChannelSender<Vec<T>>, ChannelReceiver<Vec<T>>) {
     channel::<Vec<T>>()
 }
 
-pub fn singleton_channel<T>() -> (ChannelSender<Option<T>>, ChannelReceiver<Option<T>>) {
+pub fn singleton_channel<T: Send + Sync>() -> (ChannelSender<Option<T>>, ChannelReceiver<Option<T>>) {
     channel::<Option<T>>()
 }
 
