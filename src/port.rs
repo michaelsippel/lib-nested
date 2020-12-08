@@ -1,6 +1,6 @@
 use {
     std::{
-        sync::{Arc, Weak, RwLock},
+        sync::{Arc, RwLock},
         collections::HashSet,
         hash::Hash,
     },
@@ -80,6 +80,43 @@ impl<K: Eq + Hash + Send + Sync + 'static, V: Send + Sync + 'static> OuterViewPo
         r
     }
 }
+
+impl<K: Clone + Eq + Hash + Send + Sync + 'static, V: Send + Sync + 'static> OuterViewPort<K, V> {   
+    pub fn map_value<
+        V2: Clone + Send + Sync + 'static,
+        F: Fn(Option<V>) -> Option<V2> + Send + Sync + 'static
+    >(
+        self,
+        f: F
+    ) -> OuterViewPort<K, V2> {
+        let port = ViewPort::new();
+        let view = self.add_observer_fn({
+            let dst = port.inner();
+            move |key| dst.notify(key)
+        });
+        port.inner().set_view_fn(move |key| f(view.view(key)));
+        port.outer()
+    }
+ 
+    pub fn map_key<
+        K2: Clone + Send + Sync + 'static,
+        F1: Fn(K) -> K2 + Send + Sync + 'static,
+        F2: Fn(K2) -> K + Send + Sync + 'static
+    >(
+        self,
+        f1: F1,
+        f2: F2
+    ) -> OuterViewPort<K2, V> {
+        let port = ViewPort::new();
+        let view = self.add_observer_fn({
+            let dst = port.inner();
+            move |key| dst.notify(f1(key))
+        });
+        port.inner().set_view_fn(move |key| view.view(f2(key)));
+        port.outer()
+    }
+}
+
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 

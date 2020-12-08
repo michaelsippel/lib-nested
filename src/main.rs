@@ -1,5 +1,6 @@
 
 #![feature(trait_alias)]
+#![feature(assoc_char_funcs)]
 
 pub mod view;
 pub mod port;
@@ -32,7 +33,7 @@ impl<T: Clone + Eq + Send + Sync + 'static> SingletonBuffer<T> {
 
         port.set_view_fn({
             let data = data.clone();
-            move |new_val| data.read().unwrap().clone()
+            move |_| data.read().unwrap().clone()
         });
 
         SingletonBuffer {
@@ -51,36 +52,88 @@ impl<T: Clone + Eq + Send + Sync + 'static> SingletonBuffer<T> {
     }
 }
 
+
+
+impl<T: Clone + Send + Sync> View for Vec<T> {
+    type Key = usize;
+    type Value = T;
+
+    fn view(&self, key: usize) -> Option<T> {
+        self.get(key).cloned()
+    }
+}
+
+
+struct VecBuffer<T: Clone + Eq + Send + Sync + 'static> {
+    data: Arc<RwLock<Vec<T>>>,
+    port: InnerViewPort<usize, T>
+}
+
+impl<T: Clone + Eq + Send + Sync + 'static> VecBuffer<T> {
+    fn new(port: InnerViewPort<usize, T>) -> Self {
+        let data = Arc::new(RwLock::new(Vec::new()));
+        port.set_view(data.clone());
+        VecBuffer { data, port }
+    }
+
+    fn push(&mut self, val: T) {
+        self.port.notify({
+            let mut d = self.data.write().unwrap();
+            let len = d.len();
+            d.push(val);
+            len
+        });
+    }
+}
+
 #[async_std::main]
 async fn main() {
-    let view_port = port::ViewPort::<(), char>::new();
+    let digits = port::ViewPort::new();
+    let mut buf = VecBuffer::new(digits.inner());
 
-    let mut buf = SingletonBuffer::new(view_port.inner());
+    let digit_view = digits.outer()
 
-    let view = view_port.outer().get_view();
-    let mut stream = view_port.outer().stream().map({
-        move |_| view.view(()).unwrap()
+        // digit encoding
+        .map_value(
+            |digit|
+            if let Some(digit) = digit {
+                char::from_digit(digit, 16)
+            } else {
+                None
+            }
+        )
+
+        // simple horizontal layout
+        .map_key(
+            |idx| Vector2::<i16>::new(idx as i16, 0),
+            |pos| pos.x as usize
+        );
+
+    let view = digit_view.get_view();
+    let mut stream = digit_view.stream().map({
+        move |idx| (idx, view.view(idx))
     });
 
     let fut = task::spawn({
         async move {
-            while let Some(val) = stream.next().await {
-                println!("{}", val);
+            while let Some((idx, val)) = stream.next().await {
+                println!("v[{:?}] = {:?}", idx, val);
             }
             println!("end print task");
         }
     });
 
-    buf.update('a');
-    buf.update('b');
+    buf.push(0);
+    buf.push(1);
     task::sleep(std::time::Duration::from_secs(1)).await;
-    buf.update('c');
-    buf.update('d');
+    buf.push(2);
+    buf.push(3);
     task::sleep(std::time::Duration::from_secs(1)).await;
-    buf.update('e');
+    buf.push(4);
 
     drop(buf);
-    drop(view_port);
+    drop(digits);
+    drop(digit_view);
 
     fut.await;
 }
