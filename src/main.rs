@@ -5,6 +5,8 @@
 pub mod view;
 pub mod port;
 pub mod channel;
+pub mod singleton_buffer;
+pub mod vec_buffer;
 
 use {
     async_std::{
@@ -16,75 +18,11 @@ use {
     cgmath::{Vector2},
     crate::{
         view::{View, Observer},
-        port::{InnerViewPort, OuterViewPort}
+        port::{InnerViewPort, OuterViewPort},
+        singleton_buffer::SingletonBuffer,
+        vec_buffer::VecBuffer
     }
 };
-
-struct SingletonBuffer<T: Clone + Eq + Send + Sync + 'static> {
-    data: Arc<RwLock<Option<T>>>,
-    port: InnerViewPort<(), T>
-}
-
-impl<T: Clone + Eq + Send + Sync + 'static> SingletonBuffer<T> {
-    fn new(
-        port: InnerViewPort<(), T>
-    ) -> Self {
-        let data = Arc::new(RwLock::new(None));
-
-        port.set_view_fn({
-            let data = data.clone();
-            move |_| data.read().unwrap().clone()
-        });
-
-        SingletonBuffer {
-            data,
-            port
-        }
-    }
-
-    fn update(&mut self, new_value: T) {
-        let mut data = self.data.write().unwrap();
-        if *data != Some(new_value.clone()) {
-            *data = Some(new_value);
-            drop(data);
-            self.port.notify(());
-        }
-    }
-}
-
-
-
-impl<T: Clone + Send + Sync> View for Vec<T> {
-    type Key = usize;
-    type Value = T;
-
-    fn view(&self, key: usize) -> Option<T> {
-        self.get(key).cloned()
-    }
-}
-
-
-struct VecBuffer<T: Clone + Eq + Send + Sync + 'static> {
-    data: Arc<RwLock<Vec<T>>>,
-    port: InnerViewPort<usize, T>
-}
-
-impl<T: Clone + Eq + Send + Sync + 'static> VecBuffer<T> {
-    fn new(port: InnerViewPort<usize, T>) -> Self {
-        let data = Arc::new(RwLock::new(Vec::new()));
-        port.set_view(data.clone());
-        VecBuffer { data, port }
-    }
-
-    fn push(&mut self, val: T) {
-        self.port.notify({
-            let mut d = self.data.write().unwrap();
-            let len = d.len();
-            d.push(val);
-            len
-        });
-    }
-}
 
 #[async_std::main]
 async fn main() {
