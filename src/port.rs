@@ -31,6 +31,13 @@ where K: Send + Sync + 'static,
         }
     }
 
+    pub fn with_view(view: Arc<dyn View<Key = K, Value = V>>) -> Self {
+        ViewPort {
+            view: Arc::new(RwLock::new(Some(view))),
+            observers: Arc::new(RwLock::new(Vec::new()))
+        }
+    }
+
     pub fn set_view(&self, view: Arc<dyn View<Key = K, Value = V>>) {
         *self.view.write().unwrap() = Some(view);
     }
@@ -44,6 +51,14 @@ where K: Send + Sync + 'static,
     }
 
     pub fn outer(&self) -> OuterViewPort<K, V> {
+        OuterViewPort(ViewPort{ view: self.view.clone(), observers: self.observers.clone() })
+    }
+
+    pub fn into_inner(self) -> InnerViewPort<K, V> {
+        InnerViewPort(ViewPort{ view: self.view.clone(), observers: self.observers.clone() })
+    }
+
+    pub fn into_outer(self) -> OuterViewPort<K, V> {
         OuterViewPort(ViewPort{ view: self.view.clone(), observers: self.observers.clone() })
     }
 }
@@ -74,7 +89,7 @@ impl<K: Send + Sync + 'static, V: Send + Sync + 'static> OuterViewPort<K, V> {
 }
 
 impl<K: Eq + Hash + Send + Sync + 'static, V: Send + Sync + 'static> OuterViewPort<K, V> {
-    pub fn stream(&self) -> ChannelReceiver<HashSet<K>> {
+    pub fn stream(self) -> ChannelReceiver<HashSet<K>> {
         let (s, r) = crate::channel::set_channel();
         self.0.add_observer(Arc::new(s));
         r
