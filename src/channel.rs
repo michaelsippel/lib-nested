@@ -121,6 +121,31 @@ impl<Data: ChannelData> Drop for ChannelSender<Data> {
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
+impl<Data: ChannelData> ChannelReceiver<Data> {
+    pub async fn recv(&self) -> Option<Data> {
+        ChannelRead(self.0.clone()).await
+    }
+}
+
+struct ChannelRead<Data: ChannelData>(Arc<Mutex<ChannelState<Data>>>);
+impl<Data: ChannelData> std::future::Future for ChannelRead<Data> {
+    type Output = Option<Data>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+        let mut state = self.0.lock().unwrap();
+        if let Some(buf) = state.send_buf.take() {
+            Poll::Ready(Some(buf))
+        } else if state.num_senders == 0 {
+            Poll::Ready(None)
+        } else {
+            state.waker = Some(cx.waker().clone());
+            Poll::Pending
+        }
+    }
+}
+
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+
 impl<Data: ChannelData> Stream for ChannelReceiver<Data> {
     type Item = Data::Item;
 
