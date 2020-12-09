@@ -10,9 +10,7 @@ pub mod vec_buffer;
 pub mod terminal;
 
 use {
-    async_std::{
-        prelude::*, task, stream
-    },
+    async_std::{task},
     std::{
         sync::{Arc, RwLock}
     },
@@ -90,12 +88,12 @@ async fn main() {
         buf.remove(2);
         task::sleep(std::time::Duration::from_millis(400)).await;
 
-        for x in 0 .. 4 {
+        for _ in 0 .. 4 {
             buf.remove(0);
             task::sleep(std::time::Duration::from_millis(400)).await;
         }
     });
 
-    Terminal::show(composite_view.into_outer()).await;
+    Terminal::show(composite_view.into_outer()).await.ok();
 }
 

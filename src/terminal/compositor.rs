@@ -2,7 +2,7 @@ use {
     std::sync::{Arc, RwLock},
     cgmath::Vector2,
     crate::{
-        view::{View, Observer},
+        view::{View},
         port::{ViewPort, InnerViewPort, OuterViewPort},
         terminal::{TerminalAtom}
     }

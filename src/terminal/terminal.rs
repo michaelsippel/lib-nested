@@ -1,7 +1,6 @@
 
 use {
     std::io::{Write, stdout, stdin},
-    async_std::stream::{Stream, StreamExt},
     cgmath::Vector2,
     termion::{
         raw::IntoRawMode,
@@ -83,7 +82,7 @@ impl Terminal {
 
                     write!(out, "{}", atom.c.unwrap_or(' '))?;
                 } else {
-                    write!(out, "{} ", termion::style::Reset);
+                    write!(out, "{} ", termion::style::Reset)?;
                 }
             }
 

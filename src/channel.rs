@@ -13,7 +13,7 @@ use {
     },
 
     crate::{
-        view::{View, Observer}
+        view::{Observer}
     }
 };
 
