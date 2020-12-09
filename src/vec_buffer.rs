@@ -32,12 +32,36 @@ impl<T: Clone + Eq + Send + Sync + 'static> VecBuffer<T> {
     pub fn push(&mut self, val: T) {
         self.port.notify({
             let mut d = self.data.write().unwrap();
-            let len = d.len();
+            let idx = d.len();
             d.push(val);
-            len
+            idx
         });
     }
 
-    // TODO: add functions
+    pub fn remove(&mut self, idx: usize) {
+        let len = {
+            let mut d = self.data.write().unwrap();
+            let len = d.len();
+            d.remove(idx);
+            len
+        };
+
+        for i in idx .. len {
+            self.port.notify(i);
+        }
+    }
+
+    pub fn insert(&mut self, idx: usize, val: T) {
+        let len = {
+            let mut d = self.data.write().unwrap();
+            d.insert(idx, val);
+            let len = d.len();
+            len
+        };
+
+        for i in idx .. len {
+            self.port.notify(i);
+        }
+    }
 }
 
