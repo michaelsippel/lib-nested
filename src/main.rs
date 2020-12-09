@@ -7,6 +7,7 @@ pub mod port;
 pub mod channel;
 pub mod singleton_buffer;
 pub mod vec_buffer;
+pub mod terminal;
 
 use {
     async_std::{
@@ -20,7 +21,8 @@ use {
         view::{View, Observer},
         port::{InnerViewPort, OuterViewPort},
         singleton_buffer::SingletonBuffer,
-        vec_buffer::VecBuffer
+        vec_buffer::VecBuffer,
+        terminal::{Terminal, TerminalAtom, TerminalStyle}
     }
 };
 
@@ -30,50 +32,40 @@ async fn main() {
     let mut buf = VecBuffer::new(digits.inner());
 
     let digit_view = digits.outer()
-
         // digit encoding
         .map_value(
             |digit|
             if let Some(digit) = digit {
-                char::from_digit(digit, 16)
+                Some(TerminalAtom::new(char::from_digit(digit, 16).unwrap(), TerminalStyle::bg_color((100,30,30))))
             } else {
                 None
             }
         )
-
         // simple horizontal layout
         .map_key(
             |idx| Vector2::<i16>::new(idx as i16, 0),
             |pos| pos.x as usize
         );
 
-    let view = digit_view.get_view();
-    let mut stream = digit_view.stream().map({
-        move |idx| (idx, view.view(idx))
-    });
+    let fut = task::spawn(Terminal::show(digit_view));
 
-    let fut = task::spawn({
-        async move {
-            while let Some((idx, val)) = stream.next().await {
-                println!("v[{:?}] = {:?}", idx, val);
-            }
-            println!("end print task");
-        }
-    });
-
+    task::sleep(std::time::Duration::from_secs(1)).await;
     buf.push(0);
-    buf.push(1);
+    buf.push(10);
     task::sleep(std::time::Duration::from_secs(1)).await;
     buf.push(2);
     buf.push(3);
     task::sleep(std::time::Duration::from_secs(1)).await;
     buf.push(4);
+    task::sleep(std::time::Duration::from_secs(1)).await;
+    buf.insert(0, 15);
+    task::sleep(std::time::Duration::from_secs(1)).await;
+    buf.remove(2);
+    task::sleep(std::time::Duration::from_secs(1)).await;
 
     drop(buf);
     drop(digits);
-    drop(digit_view);
 
     fut.await;
 }
-
 
