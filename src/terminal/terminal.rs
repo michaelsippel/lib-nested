@@ -65,11 +65,11 @@ impl Terminal {
                    termion::clear::All,
                    termion::cursor::Goto(1, 1),
                    termion::cursor::Hide,
-                   termion::cursor::Goto(1, 1))?;
+                   termion::style::Reset)?;
 
         while let Some(atoms) = recv.recv().await {
             for (pos, atom) in atoms.into_iter() {
-                if pos != cur_pos {
+                if pos != cur_pos+Vector2::new(1,0) {
                     write!(out, "{}", termion::cursor::Goto(pos.x as u16 + 1, pos.y as u16 + 1))?;
                 }
                 cur_pos = pos;
@@ -83,6 +83,7 @@ impl Terminal {
                     write!(out, "{}", atom.c.unwrap_or(' '))?;
                 } else {
                     write!(out, "{} ", termion::style::Reset)?;
+                    cur_style = TerminalStyle::default();
                 }
             }
 
