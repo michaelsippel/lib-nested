@@ -1,6 +1,12 @@
 
 use {
     std::io::{Write, stdout, stdin},
+    async_std::{
+        stream::StreamExt,
+        task
+    },
+    signal_hook,
+    signal_hook_async_std::Signals,
     cgmath::Vector2,
     termion::{
         raw::IntoRawMode,
@@ -15,12 +21,13 @@ use {
 };
 
 pub enum TerminalEvent {
-    Resize((u16, u16)),
+    Resize(Vector2<i16>),
     Input(termion::event::Event)
 }
 
 pub struct Terminal {
-    events: ChannelReceiver<Vec<TerminalEvent>>
+    events: ChannelReceiver<Vec<TerminalEvent>>,
+    signal_handle: signal_hook_async_std::Handle
 }
 
 impl Terminal {
@@ -33,19 +40,36 @@ impl Terminal {
                 input_tx.notify(TerminalEvent::Input(event.unwrap()));
             }
         });
-/*
-        let mut resize_stream = signal(tokio::signal::unix::SignalKind::window_change()).unwrap();
-        let resize_tx = event_tx.clone();
-        tokio::spawn(async move {
-            loop {
-                resize_stream.recv().await;
-                resize_tx.send(TerminalEvent::Resize(termion::terminal_size().unwrap()));
+
+        // send initial teriminal size
+        let (w,h) = termion::terminal_size().unwrap();
+        event_tx.notify(TerminalEvent::Resize(Vector2::new(w as i16, h as i16)));
+
+        // and again on SIGWINCH
+        let signals = Signals::new(&[ signal_hook::SIGWINCH ]).unwrap();
+        let handle = signals.handle();
+
+        task::spawn(async move {
+            let mut signals = signals.fuse();
+            while let Some(signal) = signals.next().await {
+                match signal {
+                    signal_hook::SIGWINCH => {
+                        let (w,h) = termion::terminal_size().unwrap();
+                        event_tx.notify(TerminalEvent::Resize(Vector2::new(w as i16, h as i16)));
+                    },
+                    _ => unreachable!(),
+                }
             }
         });
-*/
+
         Terminal {
-            events: event_rx
+            events: event_rx,
+            signal_handle: handle
         }
+    }
+
+    pub async fn next_event(&mut self) -> TerminalEvent {
+        self.events.next().await.unwrap()
     }
 
     pub async fn show(view_port: OuterViewPort<Vector2<i16>, TerminalAtom>) -> std::io::Result<()> {

@@ -8,6 +8,8 @@ version = "0.1.0"
 [dependencies]
 cgmath = "*"
 termion = "*"
+signal-hook = "*"
+signal-hook-async-std = "*"
 
 [dependencies.async-std]
 version = "1.7.0"
