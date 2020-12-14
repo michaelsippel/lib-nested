@@ -14,6 +14,18 @@ pub trait Observer : Send + Sync {
     fn notify(&self, key: Self::Msg);
 }
 
+pub trait ObserverExt : Observer {
+    fn notify_each(&self, it: impl IntoIterator<Item = Self::Msg>);
+}
+
+impl<T: Observer> ObserverExt for T {
+    fn notify_each(&self, it: impl IntoIterator<Item = Self::Msg>) {
+        for msg in it {
+            self.notify(msg);
+        }
+    }
+}
+
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 use cgmath::Vector2;
