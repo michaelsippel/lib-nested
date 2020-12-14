@@ -8,6 +8,7 @@ pub mod channel;
 pub mod singleton_buffer;
 pub mod vec_buffer;
 pub mod terminal;
+pub mod string_editor;
 
 use {
     async_std::{task},
@@ -20,8 +21,15 @@ use {
         port::{ViewPort, InnerViewPort, OuterViewPort},
         singleton_buffer::SingletonBuffer,
         vec_buffer::VecBuffer,
-        terminal::{Terminal, TerminalAtom, TerminalStyle, TerminalCompositor}
-    }
+        terminal::{
+            Terminal,
+            TerminalAtom,
+            TerminalStyle,
+            TerminalCompositor,
+            TerminalEvent
+        }
+    },
+    termion::event::{Event, Key}
 };
 
 struct Fill(TerminalAtom);
@@ -40,60 +48,51 @@ async fn main() {
     let mut compositor = TerminalCompositor::new(composite_view.inner());
 
     task::spawn(async move {
-        // background
+                            /*\
+        <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+                        Setup Views
+        <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+                            \*/
         let fp = port::ViewPort::with_view(Arc::new(Fill(TerminalAtom::new('.', TerminalStyle::fg_color((50,50,50))))));
         compositor.push(fp.outer());
 
-        // view of Vec<u32>
-        let digits = port::ViewPort::new();
-        let mut buf = VecBuffer::new(digits.inner());
-        compositor.push(
-            digits.outer()
-                .map_value( // digit encoding
-                    |digit|
-                    if let Some(digit) = digit {
-                        Some(TerminalAtom::new(
-                            char::from_digit(digit, 16).unwrap(),
-                            TerminalStyle::bg_color((100,30,30)).add(
-                                TerminalStyle::fg_color((255,255,255)))))
-                    } else {
-                        None
+        let ep = port::ViewPort::new();
+        let mut editor = string_editor::StringEditor::new(ep.inner());
+        compositor.push(ep.outer());
+
+                            /*\
+        <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+                        Event Loop
+        <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+                            \*/
+        let mut term = Terminal::new();
+        loop {
+            match term.next_event().await {
+                TerminalEvent::Resize(size) => {
+                    for x in 0 .. size.x {
+                        for y in 0 .. size.y {
+                            fp.inner().notify(Vector2::new(x,y));
+                        }
                     }
-                )
-                .map_key( // a lightly tilted layout
-                    // mapping from index to position in 2D-grid
-                    |idx| Vector2::<i16>::new(idx as i16, idx as i16 / 2),
-                    // reverse mapping from position to idx
-                    |pos| pos.x as usize
-                ));
-
-        // TODO: use the real terminal size...
-        for x in 0 .. 10 {
-            for y in 0 .. 10 {
-                fp.inner().notify(Vector2::new(x,y));
+                },
+                TerminalEvent::Input(Event::Key(Key::Left)) => editor.prev(),
+                TerminalEvent::Input(Event::Key(Key::Right)) => editor.next(),
+                TerminalEvent::Input(Event::Key(Key::Home)) => editor.goto(0),
+                TerminalEvent::Input(Event::Key(Key::End)) => editor.goto_end(),
+                TerminalEvent::Input(Event::Key(Key::Char(c))) => editor.insert(c),
+                TerminalEvent::Input(Event::Key(Key::Delete)) => editor.delete(),
+                TerminalEvent::Input(Event::Key(Key::Backspace)) => { editor.prev(); editor.delete(); },
+                TerminalEvent::Input(Event::Key(Key::Ctrl('c'))) => break,
+                _ => {}
             }
-        }
-
-        // now some modifications on our VecBuffer, which will automatically update the View
-        buf.push(0);
-        buf.push(10);
-        task::sleep(std::time::Duration::from_millis(400)).await;
-        buf.push(2);
-        buf.push(3);
-        task::sleep(std::time::Duration::from_millis(400)).await;
-        buf.push(4);
-        task::sleep(std::time::Duration::from_millis(400)).await;
-        buf.insert(0, 15);
-        task::sleep(std::time::Duration::from_millis(400)).await;
-        buf.remove(2);
-        task::sleep(std::time::Duration::from_millis(400)).await;
-
-        for _ in 0 .. 4 {
-            buf.remove(0);
-            task::sleep(std::time::Duration::from_millis(400)).await;
         }
     });
 
+                        /*\
+    <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+                 Terminal Rendering
+    <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+                        \*/
     Terminal::show(composite_view.into_outer()).await.ok();
 }
 
