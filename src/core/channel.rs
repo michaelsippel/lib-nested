@@ -13,7 +13,7 @@ use {
     },
 
     crate::{
-        view::{Observer}
+        core::{Observer}
     }
 };
 
@@ -83,11 +83,9 @@ pub struct ChannelReceiver<Data: ChannelData>(Arc<Mutex<ChannelState<Data>>>);
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-impl<Data: ChannelData> Observer for ChannelSender<Data>
+impl<Data: ChannelData> ChannelSender<Data>
 where Data::IntoIter: Send + Sync {
-    type Msg = Data::Item;
-
-    fn notify(&self, msg: Data::Item) {
+    pub fn send(&self, msg: Data::Item) {
         let mut state =  self.0.lock().unwrap();
 
         if state.send_buf.is_none() {
@@ -99,6 +97,14 @@ where Data::IntoIter: Send + Sync {
         if let Some(waker) = state.waker.take() {
             waker.wake();
         }
+    }
+}
+
+use crate::core::View;
+impl<V: View + ?Sized, Data: ChannelData<Item = V::Msg>> Observer<V> for ChannelSender<Data>
+where V::Msg: Clone, Data::IntoIter: Send + Sync {
+    fn notify(&self, msg: &V::Msg) {
+        self.send(msg.clone());
     }
 }
 

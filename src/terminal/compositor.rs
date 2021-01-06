@@ -1,53 +1,175 @@
 use {
-    std::sync::{Arc, RwLock},
-    cgmath::Vector2,
+    std::{
+        sync::{Arc, Weak, RwLock},
+        collections::HashMap,
+        ops::Range,
+        cmp::{min, max}
+    },
+    cgmath::Point2,
     crate::{
-        view::{View},
-        port::{ViewPort, InnerViewPort, OuterViewPort},
-        terminal::{TerminalAtom}
+        core::{View, ViewPort, InnerViewPort, OuterViewPort, Observer, ObserverExt, ObserverBroadcast},
+        view::{ImplIndexView, grid::GridWindowIterator},
+        terminal::{TerminalAtom, TerminalView}
     }
 };
 
-pub struct TerminalCompositor {
-    layers: Arc<RwLock<Vec<Arc<dyn View<Key = Vector2<i16>, Value = TerminalAtom>>>>>,
-    port: Arc<InnerViewPort<Vector2<i16>, TerminalAtom>>
+struct CompositeLayer {
+    comp: Weak<RwLock<TerminalCompositeView>>,
+    idx: usize,
+    view: RwLock<Option<Arc<dyn TerminalView>>>
 }
 
-impl TerminalCompositor {
-    pub fn new(port: InnerViewPort<Vector2<i16>, TerminalAtom>) -> Self {
-        let layers = Arc::new(RwLock::new(Vec::<Arc<dyn View<Key = Vector2<i16>, Value = TerminalAtom>>>::new()));
+impl Observer<dyn TerminalView> for CompositeLayer {
+    fn reset(&self, view: Option<Arc<dyn TerminalView>>) {
+        let comp = self.comp.upgrade().unwrap();
+        let mut c = comp.write().unwrap();
 
-        port.set_view_fn({
-            let layers = layers.clone();
-            move |pos| {
-                let mut atom = None;
+        {
+            let mut v = self.view.write().unwrap();
+            let old_view = v.clone();
+            *v = view.clone();
 
-                for l in layers.read().unwrap().iter() {
-                    match (atom, l.view(pos)) {
+            if let Some(old_view) = old_view {
+                if let Some(range) = old_view.range() {
+                    c.cast.notify_each(GridWindowIterator::from(range));
+                }
+            }
+
+            if let Some(view) = v.as_ref() {
+                if let Some(range) = view.range() {
+                    c.cast.notify_each(GridWindowIterator::from(range));
+                }
+            }
+        }
+
+        c.update_range();
+    }
+
+    fn notify(&self, pos: &Point2<i16>) {
+        self.comp
+            .upgrade().unwrap()
+            .read().unwrap()
+            .cast.notify(pos);
+    }
+}
+
+pub struct TerminalCompositeView {
+    idx_count: usize,
+    layers: HashMap<usize, Arc<CompositeLayer>>,
+    range: Option<Range<Point2<i16>>>,
+    cast: Arc<RwLock<ObserverBroadcast<dyn TerminalView>>>
+}
+
+impl TerminalCompositeView {
+    fn update_range(&mut self) {
+        if self.layers.len() == 0 {
+            self.range = Some(Point2::new(0, 0) .. Point2::new(0, 0))
+        } else {
+            self.range = None;
+
+            for (idx, layer) in self.layers.iter() {
+                self.range =
+                    if let (
+                        Some(new_range),
+                        Some(old_range)
+                    ) = (
+                        if let Some(view) = layer.view.read().unwrap().clone() {
+                            view.range().clone()
+                        } else {
+                            None
+                        },
+                        self.range.as_ref()
+                    ) {
+                        Some(
+                            Point2::new(
+                                min(old_range.start.x, new_range.start.x),
+                                min(old_range.start.y, new_range.start.y)
+                            ) .. Point2::new(
+                                max(old_range.end.x, new_range.end.x),
+                                max(old_range.end.y, new_range.end.y)
+                            )
+                        )
+                    } else {
+                        None
+                    };
+            }
+        }
+    }
+}
+
+impl ImplIndexView for TerminalCompositeView {
+    type Key = Point2<i16>;
+    type Value = Option<TerminalAtom>;
+
+    fn get(&self, pos: &Point2<i16>) -> Option<TerminalAtom> {
+        let mut atom = None;
+
+        for idx in 0 .. self.idx_count {
+            if let Some(l) = self.layers.get(&idx) {
+                if let Some(view) = l.view.read().unwrap().as_ref() {
+                    if let Some(range) = view.range() {
+                        if pos.x < range.start.x ||
+                            pos.x >= range.end.x ||
+                            pos.y < range.start.y ||
+                            pos.y >= range.end.y {
+                                continue;
+                            }
+                    }
+
+                    match (atom, view.get(pos)) {
                         (None, next) => atom = next,
                         (Some(last), Some(next)) => atom = Some(next.add_style_back(last.style)),
                         _ => {}
                     }
                 }
-
-                atom
             }
-        });
-        
-        TerminalCompositor {
-            layers,
-            port: Arc::new(port)
         }
+
+        atom
     }
 
-    pub fn push(&mut self, v: OuterViewPort<Vector2<i16>, TerminalAtom>) {
-        self.layers.write().unwrap().push(v.add_observer(self.port.clone()));
+    fn range(&self) -> Option<Range<Point2<i16>>> {
+        self.range.clone()
     }
-    
-    pub fn make_port(&mut self) -> InnerViewPort<Vector2<i16>, TerminalAtom> {
-        let port = ViewPort::new();
-        self.push(port.outer());
-        port.inner()
+}
+
+pub struct TerminalCompositor {
+    view: Arc<RwLock<TerminalCompositeView>>,
+    port: InnerViewPort<dyn TerminalView>
+}
+
+impl TerminalCompositor {
+    pub fn new(
+        port: InnerViewPort<dyn TerminalView>
+    ) -> Self {
+        let view = Arc::new(RwLock::new(
+            TerminalCompositeView {
+                idx_count: 0,
+                layers: HashMap::new(),
+                range: Some(Point2::new(0, 0) .. Point2::new(0, 0)),
+                cast: port.get_broadcast()
+            }
+        ));
+
+        port.set_view(Some(view.clone()));
+        TerminalCompositor{ view, port }
+    }
+
+    pub fn push(&mut self, v: OuterViewPort<dyn TerminalView>) {        
+        let mut comp = self.view.write().unwrap();
+        let idx = comp.idx_count;
+        comp.idx_count += 1;
+
+        let layer = Arc::new(CompositeLayer {
+            comp: Arc::downgrade(&self.view),
+            idx: idx,
+            view: RwLock::new(None)
+        });
+
+        comp.layers.insert(idx, layer.clone());
+        drop(comp);
+
+        v.add_observer(layer);
     }
 }
 

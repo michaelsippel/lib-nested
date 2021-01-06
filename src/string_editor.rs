@@ -1,40 +1,54 @@
 use {
-    std::sync::{Arc, RwLock},
-    cgmath::Vector2,
+    std::{
+        ops::Range,
+        sync::{Arc, RwLock},
+    },
+    cgmath::Point2,
     crate::{
-        view::{View, Observer, ObserverExt},
-        port::{ViewPort, InnerViewPort, OuterViewPort},
-        terminal::{TerminalAtom, TerminalStyle},
-        vec_buffer::VecBuffer
+        core::{
+            View,
+            Observer,
+            ObserverExt,
+            ObserverBroadcast,
+            ViewPort,
+            InnerViewPort,
+            OuterViewPort
+        },
+        sequence::SequenceView,
+        index::{ImplIndexView},
+        grid::{GridView},
+        terminal::{TerminalAtom, TerminalStyle, TerminalView},
+        //vec_buffer::VecBuffer
     }
 };
+
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub struct StringEditorState {
     cursor: usize,
     data: Arc<RwLock<Vec<char>>>
 }
 
-impl View for StringEditorState {
-    type Key = Vector2<i16>;
-    type Value = TerminalAtom;
+impl ImplIndexView for StringEditorState {
+    type Key = Point2<i16>;
+    type Value = Option<TerminalAtom>;
 
-    fn view(&self, pos: Vector2<i16>) -> Option<TerminalAtom> {
+    fn get(&self, pos: &Point2<i16>) -> Option<TerminalAtom> {
+        let data = self.data.read().unwrap();
+
         if pos.y == 0 {
-            let cur = self.cursor;
-            let data = self.data.read().unwrap();
-
             if pos.x < data.len() as i16 + 3 {
                 let i = pos.x as usize;
                 return Some(
                     if i == 0 {
                         TerminalAtom::new('"', TerminalStyle::fg_color((180,200,130)))
-                    } else if i-1 == cur {
+                    } else if i-1 == self.cursor {
                         TerminalAtom::new('|', TerminalStyle::fg_color((180,200,130)).add(TerminalStyle::bold(true)))
                     } else if i-1 == data.len()+1 {
                         TerminalAtom::new('"', TerminalStyle::fg_color((180,200,130)))
                     } else {
                         TerminalAtom::new(
-                            data.get(i as usize - if i <= cur { 1 } else { 2 }).cloned().unwrap(),
+                            data.get(i as usize - if i <= self.cursor { 1 } else { 2 }).unwrap().clone(),
                             TerminalStyle::fg_color((80,150,80))
                         )
                     }
@@ -43,42 +57,35 @@ impl View for StringEditorState {
         }
 
         None
+    }        
+
+    fn range(&self) -> Option<Range<Point2<i16>>> {
+        Some(
+            Point2::new(0, 0)
+                .. Point2::new(self.data.read().unwrap().len() as i16 + 3, 1)
+        )
     }
 }
 
 pub struct StringEditor {
     state: Arc<RwLock<StringEditorState>>,
-    port: InnerViewPort<Vector2<i16>, TerminalAtom>
+    cast: Arc<RwLock<ObserverBroadcast<dyn TerminalView>>>
 }
 
 impl StringEditor {
     pub fn new(
-        port: InnerViewPort<Vector2<i16>, TerminalAtom>
+        port: InnerViewPort<dyn TerminalView>
     ) -> Self {
         let state = Arc::new(RwLock::new(StringEditorState{
-            cursor: 0,
-            data: Arc::new(RwLock::new(Vec::new()))
+            cursor: 7,
+            data: Arc::new(RwLock::new("edit me".chars().collect()))
         }));
-/*
-        let buf_port = ViewPort::new();
-        let buf = VecBuffer::with_data(data.clone(), buf_port.inner());
 
-        buf_port.outer().add_observer_fn({
-            let port = port.clone();
-            let cursor = cursor.clone();
+        let cast = port.set_view(Some(state.clone()));
 
-            move |idx|
-            if idx < *cursor.read().unwrap() {
-                port.notify(Vector2::new(1 + idx as i16, 0));
-            } else {
-                port.notify(Vector2::new(2 + idx as i16, 0));
-            }
-        });
-*/
-        port.set_view(state.clone());
         StringEditor {
             state,
-            port
+            cast
         }
     }
 
@@ -109,26 +116,26 @@ impl StringEditor {
             old_idx
         };
 
-        self.port.notify_each(
+        self.cast.notify_each(
             (std::cmp::min(old_idx, new_idx) ..= std::cmp::max(old_idx, new_idx))
-            .map(|idx| Vector2::new(1+idx as i16, 0))
+            .map(|idx| Point2::new(1+idx as i16, 0))
         );
     }
 
     pub fn insert(&mut self, c: char) {
-        self.port.notify_each({
+        self.cast.notify_each({
             let mut state = self.state.write().unwrap();
             let mut data = state.data.write().unwrap();
 
             data.insert(state.cursor, c);
             (state.cursor .. data.len()+2)
-        }.map(|idx| Vector2::new(1+idx as i16, 0)));
+        }.map(|idx| Point2::new(1+idx as i16, 0)));
 
         self.next();
     }
 
     pub fn delete(&mut self) {
-        self.port.notify_each({
+        self.cast.notify_each({
             let mut state = self.state.write().unwrap();
             let mut data = state.data.write().unwrap();
 
@@ -136,7 +143,7 @@ impl StringEditor {
                 data.remove(state.cursor);
             }
             (state.cursor .. data.len()+3)
-        }.map(|idx| Vector2::new(1+idx as i16, 0)));
+        }.map(|idx| Point2::new(1+idx as i16, 0)));
     }
 }
 

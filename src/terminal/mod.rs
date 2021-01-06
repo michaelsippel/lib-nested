@@ -7,6 +7,24 @@ pub use {
     style::{TerminalStyle},
     atom::{TerminalAtom},
     terminal::{Terminal, TerminalEvent},
-    compositor::TerminalCompositor
+    compositor::TerminalCompositor,
 };
+
+use {
+    crate::{
+        core::View,
+        view::{
+            IndexView,
+            GridView
+        }
+    },
+    cgmath::Point2,
+    std::ops::Range
+};
+
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+
+pub trait TerminalView = GridView<Item = Option<TerminalAtom>>;
+
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 

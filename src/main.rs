@@ -1,51 +1,104 @@
-
 #![feature(trait_alias)]
 #![feature(assoc_char_funcs)]
 
+pub mod core;
 pub mod view;
-pub mod port;
-pub mod channel;
-pub mod singleton_buffer;
-pub mod vec_buffer;
 pub mod terminal;
+
 pub mod string_editor;
+
+//pub mod singleton_buffer;
+//pub mod vec_buffer;
+//pub mod sequence_element_projection;
 
 use {
     async_std::{task},
     std::{
-        sync::{Arc, RwLock}
+        sync::{Arc, RwLock},
+        ops::Range
     },
-    cgmath::{Vector2},
+    cgmath::{Vector2, Point2},
+    termion::event::{Event, Key},
     crate::{
-        view::{View, Observer},
-        port::{ViewPort, InnerViewPort, OuterViewPort},
-        singleton_buffer::SingletonBuffer,
-        vec_buffer::VecBuffer,
+        core::{View, Observer, ObserverExt, ViewPort},
+        view::{*},
         terminal::{
-            Terminal,
+            TerminalView,
             TerminalAtom,
             TerminalStyle,
-            TerminalCompositor,
-            TerminalEvent
-        }
-    },
-    termion::event::{Event, Key}
+            TerminalEvent,
+            Terminal,
+            TerminalCompositor
+        },
+    }
 };
 
-struct Fill(TerminalAtom);
-impl View for Fill {
-    type Key = Vector2<i16>;
-    type Value = TerminalAtom;
+struct VecSequenceView<T: Send + Sync + Clone>(Arc<RwLock<Vec<T>>>);
+impl<T: Send + Sync + Clone> ImplIndexView for VecSequenceView<T> {
+    type Key = usize;
+    type Value = T;
 
-    fn view(&self, _: Vector2<i16>) -> Option<TerminalAtom> {
-        Some(self.0.clone())
+    fn get(&self, idx: &usize) -> T {
+        self.0.read().unwrap()[*idx].clone()
+    }
+
+    fn range(&self) -> Option<Range<usize>> {
+        Some(0 .. self.0.read().unwrap().len())
+    }
+}
+
+struct Checkerboard;
+impl ImplIndexView for Checkerboard {
+    type Key = Point2<i16>;
+    type Value = Option<TerminalAtom>;
+
+    fn get(&self, pos: &Point2<i16>) -> Option<TerminalAtom> {
+        if pos.x == 0 || pos.x == 1 || pos.x > 17 || pos.y == 0 || pos.y > 8 {
+            // border
+            Some(TerminalAtom::new_bg((20, 10, 10)))
+        } else {
+            // field
+            if ((pos.x/2) % 2 == 0) ^ ( pos.y % 2 == 0 ) {
+                Some(TerminalAtom::new_bg((0, 0, 0)))
+            } else {
+                Some(TerminalAtom::new_bg((200, 200, 200)))
+            }
+        }
+    }
+
+    fn range(&self) -> Option<Range<Point2<i16>>> {
+        Some(Point2::new(0,0) .. Point2::new(20,10))
+    }
+}
+
+struct ScrambleBackground;
+impl ImplIndexView for ScrambleBackground {
+    type Key = Point2<i16>;
+    type Value = Option<TerminalAtom>;
+
+    fn get(&self, pos: &Point2<i16>) -> Option<TerminalAtom> {
+        if ((pos.x/2) % 2 == 0) ^ ( pos.y % 2 == 0 ) {
+            Some(TerminalAtom::new(char::from((35+(5*pos.y+pos.x)%40) as u8), TerminalStyle::fg_color((40, 40, 40))))
+        } else {
+            Some(TerminalAtom::new(char::from((35+(pos.y+9*pos.x)%40) as u8), TerminalStyle::fg_color((90, 90, 90))))
+        }
+    }
+
+    fn range(&self) -> Option<Range<Point2<i16>>> {
+        None
+        //Some(Point2::new(0,0) .. Point2::new(50,30))
     }
 }
 
 #[async_std::main]
 async fn main() {
-    let composite_view = port::ViewPort::new();
-    let mut compositor = TerminalCompositor::new(composite_view.inner());
+    let term_port = ViewPort::<dyn TerminalView>::new();
+
+    let mut compositor = TerminalCompositor::new(term_port.inner());
+    compositor.push(ViewPort::<dyn TerminalView>::with_view(Arc::new(ScrambleBackground)).into_outer());
+    
+    let mut term = Terminal::new(term_port.outer());
+    let term_writer = term.get_writer();
 
     task::spawn(async move {
                             /*\
@@ -53,36 +106,30 @@ async fn main() {
                         Setup Views
         <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                             \*/
-        let fp = port::ViewPort::with_view(Arc::new(Fill(TerminalAtom::new('.', TerminalStyle::fg_color((50,50,50))))));
-        compositor.push(fp.outer());
 
-        let ep = port::ViewPort::new();
-        let mut editor = string_editor::StringEditor::new(ep.inner());
-        compositor.push(ep.outer());
+        compositor.push(ViewPort::<dyn TerminalView>::with_view(Arc::new(Checkerboard)).into_outer());
+        let edit_port = ViewPort::<dyn TerminalView>::new();        
+        let mut editor = string_editor::StringEditor::new(edit_port.inner());
+        compositor.push(edit_port.into_outer());
 
                             /*\
         <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                         Event Loop
         <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                             \*/
-        let mut term = Terminal::new();
         loop {
             match term.next_event().await {
-                TerminalEvent::Resize(size) => {
-                    for x in 0 .. size.x {
-                        for y in 0 .. size.y {
-                            fp.inner().notify(Vector2::new(x,y));
-                        }
-                    }
-                },
                 TerminalEvent::Input(Event::Key(Key::Left)) => editor.prev(),
                 TerminalEvent::Input(Event::Key(Key::Right)) => editor.next(),
                 TerminalEvent::Input(Event::Key(Key::Home)) => editor.goto(0),
                 TerminalEvent::Input(Event::Key(Key::End)) => editor.goto_end(),
+                TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {},
                 TerminalEvent::Input(Event::Key(Key::Char(c))) => editor.insert(c),
                 TerminalEvent::Input(Event::Key(Key::Delete)) => editor.delete(),
                 TerminalEvent::Input(Event::Key(Key::Backspace)) => { editor.prev(); editor.delete(); },
-                TerminalEvent::Input(Event::Key(Key::Ctrl('c'))) => break,
+                TerminalEvent::Input(Event::Key(Key::Ctrl('c'))) => {
+                    break
+                }
                 _ => {}
             }
         }
@@ -93,6 +140,6 @@ async fn main() {
                  Terminal Rendering
     <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                         \*/
-    Terminal::show(composite_view.into_outer()).await.ok();
+    term_writer.show().await.ok();
 }
 
