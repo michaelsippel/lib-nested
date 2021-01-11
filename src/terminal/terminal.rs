@@ -44,7 +44,7 @@ pub enum TerminalEvent {
 
 pub struct Terminal {
     writer: Arc<TermOutWriter>,
-    observer: Arc<TermOutObserver>,
+    observer: Arc<RwLock<TermOutObserver>>,
 
     events: ChannelReceiver<Vec<TerminalEvent>>,
     _signal_handle: signal_hook_async_std::Handle
@@ -62,10 +62,10 @@ impl Terminal {
             view: port.get_view_arc()
         });
 
-        let observer = Arc::new(TermOutObserver {
+        let observer = Arc::new(RwLock::new(TermOutObserver {
             dirty_pos_tx,
             writer: writer.clone()
-        });
+        }));
 
         port.add_observer(observer.clone());
 
@@ -122,7 +122,7 @@ struct TermOutObserver {
 }
 
 impl Observer<dyn TerminalView> for TermOutObserver {
-    fn reset(&self, view: Option<Arc<dyn TerminalView>>) {
+    fn reset(&mut self, view: Option<Arc<dyn TerminalView>>) {
         self.writer.reset();
 
         let (w, h) = termion::terminal_size().unwrap();

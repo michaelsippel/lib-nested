@@ -15,19 +15,17 @@ use {
 
 struct CompositeLayer {
     comp: Weak<RwLock<TerminalCompositeView>>,
-    idx: usize,
-    view: RwLock<Option<Arc<dyn TerminalView>>>
+    idx: usize
 }
 
 impl Observer<dyn TerminalView> for CompositeLayer {
-    fn reset(&self, view: Option<Arc<dyn TerminalView>>) {
+    fn reset(&mut self, view: Option<Arc<dyn TerminalView>>) {
         let comp = self.comp.upgrade().unwrap();
         let mut c = comp.write().unwrap();
 
         {
-            let mut v = self.view.write().unwrap();
-            let old_view = v.clone();
-            *v = view.clone();
+            let old_view = c.layers[&self.idx].1.clone();
+            c.layers.get_mut(&self.idx).unwrap().1 = view.clone();
 
             if let Some(old_view) = old_view {
                 if let Some(range) = old_view.range() {
@@ -35,7 +33,7 @@ impl Observer<dyn TerminalView> for CompositeLayer {
                 }
             }
 
-            if let Some(view) = v.as_ref() {
+            if let Some(view) = view.as_ref() {
                 if let Some(range) = view.range() {
                     c.cast.notify_each(GridWindowIterator::from(range));
                 }
@@ -55,7 +53,7 @@ impl Observer<dyn TerminalView> for CompositeLayer {
 
 pub struct TerminalCompositeView {
     idx_count: usize,
-    layers: HashMap<usize, Arc<CompositeLayer>>,
+    layers: HashMap<usize, (Arc<RwLock<CompositeLayer>>, Option<Arc<dyn TerminalView>>)>,
     range: Option<Range<Point2<i16>>>,
     cast: Arc<RwLock<ObserverBroadcast<dyn TerminalView>>>
 }
@@ -73,7 +71,7 @@ impl TerminalCompositeView {
                         Some(new_range),
                         Some(old_range)
                     ) = (
-                        if let Some(view) = layer.view.read().unwrap().clone() {
+                        if let Some(view) = layer.1.as_ref() {
                             view.range().clone()
                         } else {
                             None
@@ -106,7 +104,7 @@ impl ImplIndexView for TerminalCompositeView {
 
         for idx in 0 .. self.idx_count {
             if let Some(l) = self.layers.get(&idx) {
-                if let Some(view) = l.view.read().unwrap().as_ref() {
+                if let Some(view) = l.1.as_ref() {
                     if let Some(range) = view.range() {
                         if pos.x < range.start.x ||
                             pos.x >= range.end.x ||
@@ -160,13 +158,12 @@ impl TerminalCompositor {
         let idx = comp.idx_count;
         comp.idx_count += 1;
 
-        let layer = Arc::new(CompositeLayer {
+        let layer = Arc::new(RwLock::new(CompositeLayer {
             comp: Arc::downgrade(&self.view),
-            idx: idx,
-            view: RwLock::new(None)
-        });
+            idx: idx
+        }));
 
-        comp.layers.insert(idx, layer.clone());
+        comp.layers.insert(idx, (layer.clone(), None));
         drop(comp);
 
         v.add_observer(layer);

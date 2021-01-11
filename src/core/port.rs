@@ -41,12 +41,12 @@ impl<V: View + ?Sized> ViewPort<V> {
 
     pub fn set_view(&self, view: Option<Arc<V>>) {
         *self.view.write().unwrap() = view.clone();
-        self.observers.read().unwrap().reset(view);
+        self.observers.write().unwrap().reset(view);
     }
 
-    pub fn add_observer(&self, observer: Arc<dyn Observer<V>>) {
+    pub fn add_observer(&self, observer: Arc<RwLock<dyn Observer<V>>>) {
         self.observers.write().unwrap().add_observer(Arc::downgrade(&observer));
-        observer.reset(self.view.read().unwrap().clone());
+        observer.write().unwrap().reset(self.view.read().unwrap().clone());
     }
 
     pub fn inner(&self) -> InnerViewPort<V> {
@@ -106,7 +106,7 @@ impl<V: View + ?Sized + 'static> OuterViewPort<V> {
         self.0.view.clone()
     }
 
-    pub fn add_observer(&self, observer: Arc<dyn Observer<V>>) -> Arc<RwLock<Option<Arc<V>>>> {
+    pub fn add_observer(&self, observer: Arc<RwLock<dyn Observer<V>>>) -> Arc<RwLock<Option<Arc<V>>>> {
         self.0.add_observer(observer);
         self.get_view_arc()
     }

@@ -1,7 +1,7 @@
 use {
     crate::core::View,
     std::{
-        ops::Deref,
+        ops::{Deref, DerefMut},
         sync::{Arc, Weak, RwLock}
     }
 };
@@ -12,21 +12,19 @@ use {
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                     \*/
 pub trait Observer<V: View + ?Sized> : Send + Sync {
-    fn reset(&self, view: Option<Arc<V>>) {}
+    fn reset(&mut self, view: Option<Arc<V>>) {}
     fn notify(&self, msg: &V::Msg);
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-impl<V: View + ?Sized, O: Observer<V>> Observer<V> for RwLock<O> {
+impl<V: View + ?Sized, O: Observer<V>> Observer<V> for Arc<RwLock<O>> {
+    fn reset(&mut self, view: Option<Arc<V>>) {
+        self.write().unwrap().reset(view);
+    }
+
     fn notify(&self, msg: &V::Msg) {
         self.read().unwrap().notify(&msg);
-    }
-}
-
-impl<V: View + ?Sized, O: Observer<V>> Observer<V> for Arc<O> {
-    fn notify(&self, msg: &V::Msg) {
-        self.deref().notify(&msg);
     }
 }
 
@@ -51,7 +49,7 @@ impl<V: View + ?Sized, T: Observer<V>> ObserverExt<V> for T {
                     \*/
 
 pub struct ObserverBroadcast<V: View + ?Sized> {
-    observers: Vec<Weak<dyn Observer<V>>>
+    observers: Vec<Weak<RwLock<dyn Observer<V>>>>
 }
 
 impl<V: View + ?Sized> ObserverBroadcast<V> {
@@ -61,7 +59,7 @@ impl<V: View + ?Sized> ObserverBroadcast<V> {
         }
     }
 
-    pub fn add_observer(&mut self, obs: Weak<dyn Observer<V>>) {
+    pub fn add_observer(&mut self, obs: Weak<RwLock<dyn Observer<V>>>) {
         self.cleanup();
         self.observers.push(obs);
     }
@@ -70,21 +68,21 @@ impl<V: View + ?Sized> ObserverBroadcast<V> {
         self.observers.retain(|o| o.strong_count() > 0);
     }
 
-    fn iter(&self) -> impl Iterator<Item = Arc<dyn Observer<V>>> + '_ {
+    fn iter(&self) -> impl Iterator<Item = Arc<RwLock<dyn Observer<V>>>> + '_ {
         self.observers.iter().filter_map(|o| o.upgrade())
     }
 }
 
 impl<V: View + ?Sized> Observer<V> for ObserverBroadcast<V> {
-    fn reset(&self, view: Option<Arc<V>>) {
+    fn reset(&mut self, view: Option<Arc<V>>) {
         for o in self.iter() {
-            o.reset(view.clone());
+            o.write().unwrap().reset(view.clone());
         }
     }
 
     fn notify(&self, msg: &V::Msg) {
         for o in self.iter() {
-            o.notify(&msg);
+            o.read().unwrap().notify(&msg);
         }
     }
 }
@@ -141,7 +139,7 @@ impl<V, F> Observer<V> for ResetFnObserver<V, F>
 where V: View + ?Sized,
       F: Fn(Option<Arc<V>>) + Send + Sync {
     fn notify(&self, msg: &V::Msg) {}
-    fn reset(&self, view: Option<Arc<V>>) {
+    fn reset(&mut self, view: Option<Arc<V>>) {
         (self.f)(view);
     }
 }
