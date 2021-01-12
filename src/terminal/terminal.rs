@@ -27,9 +27,9 @@ use {
             }
         },
         view::{
-            IndexView,
-            grid::GridWindowIterator
-        }
+            IndexView
+        },
+        grid::{GridView, GridWindowIterator}
     },
     super::{
         TerminalStyle,

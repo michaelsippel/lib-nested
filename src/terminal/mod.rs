@@ -12,11 +12,7 @@ pub use {
 
 use {
     crate::{
-        core::View,
-        view::{
-            IndexView,
-            GridView
-        }
+        grid::GridView
     },
     cgmath::Point2,
     std::ops::Range

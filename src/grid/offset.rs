@@ -13,9 +13,9 @@ use {
             InnerViewPort
         },
         view::{
-            index::{IndexView, ImplIndexView},
-            grid::{GridView, GridWindowIterator}
-        }
+            index::IndexView
+        },
+        grid::{GridView, GridWindowIterator}
     }
 };
 

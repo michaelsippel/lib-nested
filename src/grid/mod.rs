@@ -10,35 +10,13 @@ use {
     }
 };
 
+pub mod offset;
+pub use offset::GridOffset;
+
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub trait GridView = IndexView<Point2<i16>>;
 
-//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
-/*
-pub trait ImplGridView : Send + Sync {
-    type Item;
-
-    fn get(&self, pos: &Point2<i16>) -> Self::Item;
-
-    fn range(&self) -> Option<Range<Point2<i16>>> {
-        None
-    }
-}
-
-impl<V: ImplGridView> ImplIndexView for V {
-    type Key = Point2<i16>;
-    type Value = V::Item;
-
-    fn get(&self, pos: &Point2<i16>) -> V::Item {
-        (self as &V).get(pos)
-    }
-
-    fn range(&self) -> Option<Range<Point2<i16>>> {
-        (self as &V).range()
-    }
-}
-*/
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub struct GridWindowIterator {
