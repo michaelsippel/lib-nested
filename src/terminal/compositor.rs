@@ -8,7 +8,7 @@ use {
     cgmath::Point2,
     crate::{
         core::{View, ViewPort, InnerViewPort, OuterViewPort, Observer, ObserverExt, ObserverBroadcast},
-        view::{ImplIndexView},
+        index::{ImplIndexView},
         grid::{GridWindowIterator},
         terminal::{TerminalAtom, TerminalView}
     }

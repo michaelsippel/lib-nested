@@ -6,7 +6,7 @@ use {
     cgmath::{Point2, Vector2},
     crate::{
         core::View,
-        view::{IndexView, ImplIndexView}
+        index::{IndexView, ImplIndexView}
     }
 };
 

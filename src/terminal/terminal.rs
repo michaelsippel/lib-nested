@@ -26,9 +26,7 @@ use {
                 set_channel
             }
         },
-        view::{
-            IndexView
-        },
+        index::IndexView,
         grid::{GridView, GridWindowIterator}
     },
     super::{

@@ -12,9 +12,7 @@ use {
             ObserverBroadcast,
             InnerViewPort
         },
-        view::{
-            index::IndexView
-        },
+        index::{IndexView},
         grid::{GridView, GridWindowIterator}
     }
 };
