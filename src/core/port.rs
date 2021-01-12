@@ -111,15 +111,17 @@ impl<V: View + ?Sized + 'static> OuterViewPort<V> {
         self.get_view_arc()
     }
 
-/*
-    pub fn add_reset_fn(&self, reset: impl Fn(Option<Arc<V>>) + Send + Sync + 'static) -> Arc<RwLock<Option<Arc<V>>>> {
-        self.add_observer(Arc::new(ResetFnObserver::new(reset)))
+    pub fn add_reset_fn<F: Fn(Option<Arc<V>>) + Send + Sync + 'static>(&self, reset: F) -> Arc<RwLock<ResetFnObserver<V, F>>> {
+        let obs = Arc::new(RwLock::new(ResetFnObserver::new(reset)));
+        self.add_observer(obs.clone());
+        obs
     }
 
-    pub fn add_notify_fn(&self, notify: impl Fn(&V::Msg) + Send + Sync + 'static) -> Arc<RwLock<Option<Arc<V>>>> {
-        self.add_observer(Arc::new(NotifyFnObserver::new(notify)))
+    pub fn add_notify_fn<F: Fn(&V::Msg) + Send + Sync + 'static>(&self, notify: F) -> Arc<RwLock<NotifyFnObserver<V, F>>> {
+        let obs = Arc::new(RwLock::new(NotifyFnObserver::new(notify)));
+        self.add_observer(obs.clone());
+        obs
     }
-*/
 }
 
 /*
