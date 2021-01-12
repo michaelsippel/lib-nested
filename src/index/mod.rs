@@ -1,4 +1,6 @@
 
+pub mod map_item;
+
 use {
     std::{
         sync::{Arc, RwLock},
