@@ -1,7 +1,6 @@
 use {
     crate::core::View,
     std::{
-        ops::{Deref, DerefMut},
         sync::{Arc, Weak, RwLock}
     }
 };
@@ -12,7 +11,7 @@ use {
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                     \*/
 pub trait Observer<V: View + ?Sized> : Send + Sync {
-    fn reset(&mut self, view: Option<Arc<V>>) {}
+    fn reset(&mut self, _view: Option<Arc<V>>) {}
     fn notify(&self, msg: &V::Msg);
 }
 
@@ -138,7 +137,7 @@ where V: View + ?Sized,
 impl<V, F> Observer<V> for ResetFnObserver<V, F>
 where V: View + ?Sized,
       F: Fn(Option<Arc<V>>) + Send + Sync {
-    fn notify(&self, msg: &V::Msg) {}
+    fn notify(&self, _msg: &V::Msg) {}
     fn reset(&mut self, view: Option<Arc<V>>) {
         (self.f)(view);
     }

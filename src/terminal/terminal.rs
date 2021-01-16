@@ -26,8 +26,7 @@ use {
                 set_channel
             }
         },
-        index::IndexView,
-        grid::{GridView, GridWindowIterator}
+        grid::{GridWindowIterator}
     },
     super::{
         TerminalStyle,

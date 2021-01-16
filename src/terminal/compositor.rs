@@ -1,15 +1,12 @@
 use {
     std::{
         sync::{Arc, Weak, RwLock},
-        collections::HashMap,
-        boxed::Box,
-        cmp::{min, max}
+        collections::HashMap
     },
     cgmath::Point2,
     crate::{
-        core::{View, ViewPort, InnerViewPort, OuterViewPort, Observer, ObserverExt, ObserverBroadcast},
+        core::{InnerViewPort, OuterViewPort, Observer, ObserverExt, ObserverBroadcast},
         index::{ImplIndexView},
-        grid::{GridWindowIterator},
         terminal::{TerminalAtom, TerminalView}
     }
 };
@@ -24,7 +21,7 @@ impl Observer<dyn TerminalView> for CompositeLayer {
         let comp = self.comp.upgrade().unwrap();
         let mut c = comp.write().unwrap();
 
-        let mut v = &mut c.layers.get_mut(&self.idx).unwrap().1;
+        let v = &mut c.layers.get_mut(&self.idx).unwrap().1;
         let old_view = v.clone();
         *v = view.clone();
         drop(v);
@@ -64,11 +61,11 @@ impl TerminalCompositeView {
     fn update_range(&mut self) {
         self.area = Some(Vec::new());
 
-        for (idx, layer) in self.layers.iter() {
+        for (_, layer) in self.layers.iter() {
             if let Some(view) = layer.1.as_ref() {
                 if let (
                     Some(mut new_area),
-                    Some(mut area)
+                    Some(area)
                 ) = (
                     view.area(),
                     self.area.as_mut()
@@ -120,8 +117,7 @@ impl ImplIndexView for TerminalCompositeView {
 }
 
 pub struct TerminalCompositor {
-    view: Arc<RwLock<TerminalCompositeView>>,
-    port: InnerViewPort<dyn TerminalView>
+    view: Arc<RwLock<TerminalCompositeView>>
 }
 
 impl TerminalCompositor {
@@ -138,7 +134,7 @@ impl TerminalCompositor {
         ));
 
         port.set_view(Some(view.clone()));
-        TerminalCompositor{ view, port }
+        TerminalCompositor{ view }
     }
 
     pub fn push(&mut self, v: OuterViewPort<dyn TerminalView>) {        

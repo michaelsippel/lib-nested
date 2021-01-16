@@ -5,12 +5,7 @@ use {
         Observer,
         ObserverBroadcast,
         NotifyFnObserver,
-        ResetFnObserver,
-        channel::{
-            ChannelData,
-            ChannelSender,
-            ChannelReceiver
-        }
+        ResetFnObserver
     }
 };
 

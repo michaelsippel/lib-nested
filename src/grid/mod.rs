@@ -1,12 +1,10 @@
 use {
     std::{
-        sync::{Arc, RwLock},
-        ops::{Deref, Range}
+        ops::{Range}
     },
-    cgmath::{Point2, Vector2},
+    cgmath::{Point2},
     crate::{
-        core::View,
-        index::{IndexView, ImplIndexView}
+        index::{IndexView}
     }
 };
 

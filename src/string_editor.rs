@@ -1,23 +1,17 @@
 
 use {
     std::{
-        boxed::Box,
         sync::{Arc, RwLock},
     },
     cgmath::Point2,
     crate::{
         core::{
-            View,
-            Observer,
             ObserverExt,
             ObserverBroadcast,
-            ViewPort,
-            InnerViewPort,
-            OuterViewPort
+            InnerViewPort
         },
-        sequence::SequenceView,
         index::{ImplIndexView},
-        grid::{GridView, GridWindowIterator},
+        grid::{GridWindowIterator},
         terminal::{TerminalAtom, TerminalStyle, TerminalView},
         //vec_buffer::VecBuffer
     }
@@ -124,11 +118,12 @@ impl StringEditor {
 
     pub fn insert(&mut self, c: char) {
         self.cast.notify_each({
-            let mut state = self.state.write().unwrap();
+            let state = self.state.write().unwrap();
             let mut data = state.data.write().unwrap();
 
             data.insert(state.cursor, c);
-            (state.cursor .. data.len()+2)
+
+            state.cursor .. data.len()+2
         }.map(|idx| Point2::new(1+idx as i16, 0)));
 
         self.next();
@@ -136,13 +131,14 @@ impl StringEditor {
 
     pub fn delete(&mut self) {
         self.cast.notify_each({
-            let mut state = self.state.write().unwrap();
+            let state = self.state.write().unwrap();
             let mut data = state.data.write().unwrap();
 
             if state.cursor < data.len() {
                 data.remove(state.cursor);
             }
-            (state.cursor .. data.len()+3)
+
+            state.cursor .. data.len()+3
         }.map(|idx| Point2::new(1+idx as i16, 0)));
     }
 }

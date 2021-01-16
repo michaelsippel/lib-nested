@@ -68,12 +68,12 @@ where T: Clone + Send + Sync + 'static {
                 self.cast.notify(&idx);
                 *self.cur_len.write().unwrap() -= 1;
             },
-            VecDiff::Insert{ idx, val } => {
+            VecDiff::Insert{ idx, val: _ } => {
                 let mut l = self.cur_len.write().unwrap();
                 *l += 1;
-                //self.cast.notify_each(idx .. &*l);
+                self.cast.notify_each(*idx .. *l);
             },
-            VecDiff::Update{ idx, val } => {
+            VecDiff::Update{ idx, val: _ } => {
                 self.cast.notify(&idx);
             }
         }

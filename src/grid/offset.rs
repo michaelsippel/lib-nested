@@ -1,7 +1,6 @@
 use {
     std::{
-        sync::{Arc, RwLock},
-        boxed::Box
+        sync::{Arc, RwLock}
     },
     cgmath::{Point2, Vector2},
     crate::{
@@ -13,7 +12,7 @@ use {
             InnerViewPort
         },
         index::{IndexView},
-        grid::{GridView, GridWindowIterator}
+        grid::{GridView}
     }
 };
 

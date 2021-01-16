@@ -12,8 +12,7 @@ pub mod string_editor;
 use {
     async_std::{task},
     std::{
-        sync::{Arc, RwLock},
-        ops::Range
+        sync::{Arc, RwLock}
     },
     cgmath::{Vector2, Point2},
     termion::event::{Event, Key},

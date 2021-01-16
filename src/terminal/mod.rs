@@ -13,9 +13,7 @@ pub use {
 use {
     crate::{
         grid::GridView
-    },
-    cgmath::Point2,
-    std::ops::Range
+    }
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>

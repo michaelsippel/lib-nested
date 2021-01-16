@@ -1,7 +1,6 @@
 use {
     std::{
-        sync::{Arc, RwLock},
-        boxed::Box
+        sync::{Arc, RwLock}
     },
     crate::{
         core::{
