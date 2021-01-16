@@ -17,6 +17,7 @@ pub trait IndexView<Key> : View<Msg = Key> {
 
     fn get(&self, key: &Key) -> Self::Item;
 
+    // todo: AreaIterator enum to switch between Allocated and Procedural area
     fn area(&self) -> Option<Vec<Key>> {
         None
     }

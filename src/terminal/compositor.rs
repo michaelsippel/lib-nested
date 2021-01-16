@@ -24,24 +24,25 @@ impl Observer<dyn TerminalView> for CompositeLayer {
         let comp = self.comp.upgrade().unwrap();
         let mut c = comp.write().unwrap();
 
-        {
-            let old_view = c.layers[&self.idx].1.clone();
-            c.layers.get_mut(&self.idx).unwrap().1 = view.clone();
+        let mut v = &mut c.layers.get_mut(&self.idx).unwrap().1;
+        let old_view = v.clone();
+        *v = view.clone();
+        drop(v);
 
-            if let Some(old_view) = old_view {
-                if let Some(area) = old_view.area() {
-                    c.cast.notify_each(area);
-                }
-            }
+        //todo: fixme: why does this cause a deadlock?
+        //c.update_range();
 
-            if let Some(view) = view.as_ref() {
-                if let Some(area) = view.area() {
-                    c.cast.notify_each(area);
-                }
+        if let Some(old_view) = old_view {
+            if let Some(area) = old_view.area() {
+                c.cast.notify_each(area);
             }
         }
 
-        c.update_range();
+        if let Some(view) = view.as_ref() {
+            if let Some(area) = view.area() {
+                c.cast.notify_each(area);
+            }
+        }
     }
 
     fn notify(&self, pos: &Point2<i16>) {
@@ -131,7 +132,7 @@ impl TerminalCompositor {
             TerminalCompositeView {
                 idx_count: 0,
                 layers: HashMap::new(),
-                area: Some(Vec::new()),
+                area: None,//Some(Vec::new()),
                 cast: port.get_broadcast()
             }
         ));

@@ -33,28 +33,6 @@ use {
     }
 };
 
-struct TermLabel(String);
-impl ImplIndexView for TermLabel {
-    type Key = Point2<i16>;
-    type Value = Option<TerminalAtom>;
-
-    fn get(&self, pos: &Point2<i16>) -> Option<TerminalAtom> {
-        if pos.y == 5 {
-            Some(TerminalAtom::from(self.0.chars().nth(pos.x as usize)?))
-        } else {
-            None
-        }
-    }
-
-    fn area(&self) -> Option<Vec<Point2<i16>>> {
-        Some(
-            GridWindowIterator::from(
-                Point2::new(0, 5) .. Point2::new(self.0.chars().count() as i16, 6)
-            ).collect()
-        )
-    }
-}
-
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 #[async_std::main]
@@ -76,7 +54,6 @@ async fn main() {
 
         let window_size_port = ViewPort::new();
         let window_size = SingletonBuffer::new(Vector2::new(0, 0), window_size_port.inner());
-
 
         //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
         // string editor
@@ -102,7 +79,6 @@ async fn main() {
         );
 
         edit_o.write().unwrap().set_offset(Vector2::new(40, 4));
-
 
         //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
         // stupid label animation
@@ -133,7 +109,6 @@ async fn main() {
         let vec_seq_port = ViewPort::new();
         let vec_seq = sequence::VecSequence::new(vec_seq_port.inner());
         vec_port.add_observer(vec_seq.clone());
-
         let vec_term_view = vec_seq_port.outer()
             .to_index()
             .map_key(
@@ -163,12 +138,10 @@ async fn main() {
                 TerminalEvent::Input(Event::Key(Key::Home)) => editor.goto(0),
                 TerminalEvent::Input(Event::Key(Key::End)) => editor.goto_end(),
                 TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {},
-                TerminalEvent::Input(Event::Key(Key::Char(c))) => {editor.insert(c); vec_buf.push(c); },
+                TerminalEvent::Input(Event::Key(Key::Char(c))) => editor.insert(c),
                 TerminalEvent::Input(Event::Key(Key::Delete)) => editor.delete(),
                 TerminalEvent::Input(Event::Key(Key::Backspace)) => { editor.prev(); editor.delete(); },
-                TerminalEvent::Input(Event::Key(Key::Ctrl('c'))) => {
-                    break
-                }
+                TerminalEvent::Input(Event::Key(Key::Ctrl('c'))) => break,
                 _ => {}
             }
         }
@@ -183,7 +156,6 @@ async fn main() {
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
-
 struct Checkerboard;
 impl ImplIndexView for Checkerboard {
     type Key = Point2<i16>;
@@ -209,7 +181,29 @@ impl ImplIndexView for Checkerboard {
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+struct TermLabel(String);
+impl ImplIndexView for TermLabel {
+    type Key = Point2<i16>;
+    type Value = Option<TerminalAtom>;
 
+    fn get(&self, pos: &Point2<i16>) -> Option<TerminalAtom> {
+        if pos.y == 5 {
+            Some(TerminalAtom::from(self.0.chars().nth(pos.x as usize)?))
+        } else {
+            None
+        }
+    }
+
+    fn area(&self) -> Option<Vec<Point2<i16>>> {
+        Some(
+            GridWindowIterator::from(
+                Point2::new(0, 5) .. Point2::new(self.0.chars().count() as i16, 6)
+            ).collect()
+        )
+    }
+}
+
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 struct ScrambleBackground;
 impl ImplIndexView for ScrambleBackground {
     type Key = Point2<i16>;
@@ -225,7 +219,6 @@ impl ImplIndexView for ScrambleBackground {
 
     fn area(&self) -> Option<Vec<Point2<i16>>> {
         None
-        //Some(Point2::new(0,0) .. Point2::new(50,30))
     }
 }
 
