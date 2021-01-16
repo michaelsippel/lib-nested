@@ -26,9 +26,6 @@ impl Observer<dyn TerminalView> for CompositeLayer {
         *v = view.clone();
         drop(v);
 
-        //todo: fixme: why does this cause a deadlock?
-        //c.update_range();
-
         if let Some(old_view) = old_view {
             if let Some(area) = old_view.area() {
                 c.cast.notify_each(area);
@@ -53,30 +50,7 @@ impl Observer<dyn TerminalView> for CompositeLayer {
 pub struct TerminalCompositeView {
     idx_count: usize,
     layers: HashMap<usize, (Arc<RwLock<CompositeLayer>>, Option<Arc<dyn TerminalView>>)>,
-    area: Option<Vec<Point2<i16>>>,
     cast: Arc<RwLock<ObserverBroadcast<dyn TerminalView>>>
-}
-
-impl TerminalCompositeView {
-    fn update_range(&mut self) {
-        self.area = Some(Vec::new());
-
-        for (_, layer) in self.layers.iter() {
-            if let Some(view) = layer.1.as_ref() {
-                if let (
-                    Some(mut new_area),
-                    Some(area)
-                ) = (
-                    view.area(),
-                    self.area.as_mut()
-                ) {
-                    area.append(&mut new_area);
-                } else {
-                    self.area = None;
-                }
-            }
-        }
-    }
 }
 
 impl ImplIndexView for TerminalCompositeView {
@@ -89,16 +63,6 @@ impl ImplIndexView for TerminalCompositeView {
         for idx in 0 .. self.idx_count {
             if let Some(l) = self.layers.get(&idx) {
                 if let Some(view) = l.1.as_ref() {
-                    /*
-                    if let Some(range) = view.range() {
-                        if pos.x < range.start.x ||
-                            pos.x >= range.end.x ||
-                            pos.y < range.start.y ||
-                            pos.y >= range.end.y {
-                                continue;
-                            }
-                    }
-                    */
                     match (atom, view.get(pos)) {
                         (None, next) => atom = next,
                         (Some(last), Some(next)) => atom = Some(next.add_style_back(last.style)),
@@ -112,7 +76,25 @@ impl ImplIndexView for TerminalCompositeView {
     }
 
     fn area(&self) -> Option<Vec<Point2<i16>>> {
-        self.area.clone()
+        let mut area = Some(Vec::new());
+
+        for (_, layer) in self.layers.iter() {
+            if let Some(view) = layer.1.as_ref() {
+                if let (
+                    Some(mut new_area),
+                    Some(area)
+                ) = (
+                    view.area(),
+                    area.as_mut()
+                ) {
+                    area.append(&mut new_area);
+                } else {
+                    area = None;
+                }
+            }
+        }
+
+        area
     }
 }
 
@@ -128,7 +110,6 @@ impl TerminalCompositor {
             TerminalCompositeView {
                 idx_count: 0,
                 layers: HashMap::new(),
-                area: None,//Some(Vec::new()),
                 cast: port.get_broadcast()
             }
         ));

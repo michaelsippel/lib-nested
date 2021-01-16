@@ -41,7 +41,7 @@ pub enum TerminalEvent {
 
 pub struct Terminal {
     writer: Arc<TermOutWriter>,
-    observer: Arc<RwLock<TermOutObserver>>,
+    _observer: Arc<RwLock<TermOutObserver>>,
 
     events: ChannelReceiver<Vec<TerminalEvent>>,
     _signal_handle: signal_hook_async_std::Handle
@@ -98,7 +98,7 @@ impl Terminal {
 
         Terminal {
             writer,
-            observer,
+            _observer: observer,
             events: event_rx,
             _signal_handle: handle
         }
