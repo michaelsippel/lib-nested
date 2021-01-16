@@ -1,10 +1,11 @@
 
 pub mod map_item;
+pub mod map_key;
 
 use {
     std::{
         sync::{Arc, RwLock},
-        ops::{Deref, Range}
+        ops::Deref,
     },
     crate::core::View
 };
@@ -16,7 +17,7 @@ pub trait IndexView<Key> : View<Msg = Key> {
 
     fn get(&self, key: &Key) -> Self::Item;
 
-    fn range(&self) -> Option<Range<Key>> {
+    fn area(&self) -> Option<Vec<Key>> {
         None
     }
 }
@@ -30,8 +31,8 @@ impl<Key, V: IndexView<Key>> IndexView<Key> for RwLock<V> {
         self.read().unwrap().get(key)
     }
 
-    fn range(&self) -> Option<Range<Key>> {
-        self.read().unwrap().range()
+    fn area(&self) -> Option<Vec<Key>> {
+        self.read().unwrap().area()
     }
 }
 
@@ -41,9 +42,9 @@ impl<Key, V: IndexView<Key>> IndexView<Key> for Arc<V> {
     fn get(&self, key: &Key) -> Self::Item {
         self.deref().get(key)
     }
-    
-    fn range(&self) -> Option<Range<Key>> {
-        self.deref().range()
+
+    fn area(&self) -> Option<Vec<Key>> {
+        self.deref().area()
     }
 }
 
@@ -54,7 +55,7 @@ pub trait ImplIndexView : Send + Sync {
     type Value;
 
     fn get(&self, key: &Self::Key) -> Self::Value;
-    fn range(&self) -> Option<Range<Self::Key>> {
+    fn area(&self) -> Option<Vec<Self::Key>> {
         None
     }    
 }
@@ -70,7 +71,8 @@ impl<V: ImplIndexView> IndexView<V::Key> for V {
         (self as &V).get(key)
     }
 
-    fn range(&self) -> Option<Range<V::Key>> {
-        (self as &V).range()
+    fn area(&self) -> Option<Vec<V::Key>> {
+        (self as &V).area()
     }
 }
+

@@ -1,7 +1,7 @@
 use {
     std::{
         sync::{Arc, RwLock},
-        ops::Range
+        boxed::Box
     },
     cgmath::{Point2, Vector2},
     crate::{
@@ -40,16 +40,12 @@ where V::Item: Default {
     }
 
     pub fn set_offset(&mut self, new_offset: Vector2<i16>) {
-        let old_range = self.range();
+        let old_area = self.area();
         self.offset = new_offset;
-        let new_range = self.range();
+        let new_area = self.area();
 
-        if let Some(old_range) = old_range {
-            self.cast.notify_each(GridWindowIterator::from(old_range));
-        }
-        if let Some(new_range) = new_range {
-            self.cast.notify_each(GridWindowIterator::from(new_range));
-        }
+        if let Some(area) = old_area { self.cast.notify_each(area); }
+        if let Some(area) = new_area { self.cast.notify_each(area); }
     }
 }
 
@@ -69,25 +65,25 @@ where V::Item: Default {
         }
     }
 
-    fn range(&self) -> Option<Range<Point2<i16>>> {
-        let src_range = self.src.as_ref()?.range()?;
-        Some((src_range.start + self.offset) .. (src_range.end + self.offset))
+    fn area(&self) -> Option<Vec<Point2<i16>>> {
+        Some(
+            self.src.as_ref()?
+                .area()?.into_iter()
+                .map(|pos| pos + self.offset)
+                .collect()
+        )
     }
 }
 
 impl<V: GridView + ?Sized> Observer<V> for GridOffset<V>
 where V::Item: Default {
     fn reset(&mut self, view: Option<Arc<V>>) {
-        let old_range = self.range();
+        let old_area = self.area();
         self.src = view;
-        let new_range = self.range();
+        let new_area = self.area();
 
-        if let Some(old_range) = old_range {
-            self.cast.notify_each(GridWindowIterator::from(old_range));
-        }
-        if let Some(new_range) = new_range {
-            self.cast.notify_each(GridWindowIterator::from(new_range));
-        }
+        if let Some(area) = old_area { self.cast.notify_each(area); }
+        if let Some(area) = new_area { self.cast.notify_each(area); }
     }
 
     fn notify(&self, msg: &Point2<i16>) {

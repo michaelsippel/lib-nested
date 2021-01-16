@@ -125,10 +125,9 @@ impl Observer<dyn TerminalView> for TermOutObserver {
 
         let (w, h) = termion::terminal_size().unwrap();
         if let Some(view) = view {
-            for pos in GridWindowIterator::from(
-                view.range().unwrap_or(
-                    Point2::new(0, 0) .. Point2::new(w as i16, h as i16)
-                )
+            for pos in view.area().unwrap_or(
+                GridWindowIterator::from(
+                    Point2::new(0, 0) .. Point2::new(w as i16, h as i16)).collect()
             ) {
                 self.dirty_pos_tx.send(pos);
             }

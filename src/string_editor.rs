@@ -1,6 +1,7 @@
+
 use {
     std::{
-        ops::Range,
+        boxed::Box,
         sync::{Arc, RwLock},
     },
     cgmath::Point2,
@@ -16,7 +17,7 @@ use {
         },
         sequence::SequenceView,
         index::{ImplIndexView},
-        grid::{GridView},
+        grid::{GridView, GridWindowIterator},
         terminal::{TerminalAtom, TerminalStyle, TerminalView},
         //vec_buffer::VecBuffer
     }
@@ -37,19 +38,19 @@ impl ImplIndexView for StringEditorState {
         let data = self.data.read().unwrap();
 
         if pos.y == 0 {
-            if pos.x < data.len() as i16 + 3 {
-                let i = pos.x as usize;
+            let i = pos.x as usize;
+            if i < data.len() + 3 {
                 return Some(
                     if i == 0 {
                         TerminalAtom::new('"', TerminalStyle::fg_color((180,200,130)))
                     } else if i-1 == self.cursor {
-                        TerminalAtom::new('|', TerminalStyle::fg_color((180,200,130)).add(TerminalStyle::bold(true)))
+                        TerminalAtom::new('|', TerminalStyle::fg_color((180,200,130)).add(TerminalStyle::bold(false)))
                     } else if i-1 == data.len()+1 {
                         TerminalAtom::new('"', TerminalStyle::fg_color((180,200,130)))
                     } else {
                         TerminalAtom::new(
                             data.get(i as usize - if i <= self.cursor { 1 } else { 2 }).unwrap().clone(),
-                            TerminalStyle::fg_color((80,150,80))
+                            TerminalStyle::fg_color((80,150,80)).add(TerminalStyle::bold(true))
                         )
                     }
                 )
@@ -59,11 +60,10 @@ impl ImplIndexView for StringEditorState {
         None
     }        
 
-    fn range(&self) -> Option<Range<Point2<i16>>> {
-        Some(
+    fn area(&self) -> Option<Vec<Point2<i16>>> {
+        Some(GridWindowIterator::from(
             Point2::new(0, 0)
-                .. Point2::new(self.data.read().unwrap().len() as i16 + 3, 1)
-        )
+                .. Point2::new(self.data.read().unwrap().len() as i16 + 3, 1)).collect())
     }
 }
 

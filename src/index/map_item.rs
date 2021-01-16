@@ -1,12 +1,13 @@
 pub use {
     std::{
         sync::{Arc, RwLock},
-        ops::Range
+        boxed::Box
     },
     crate::{
         core::{
             View,
             Observer,
+            ObserverExt,
             ObserverBroadcast,
             ViewPort,
             InnerViewPort,
@@ -85,21 +86,27 @@ where DstItem: Default,
         }
     }
 
-    fn range(&self) -> Option<Range<Key>> {
-        self.src_view.as_ref()?.range()
+    fn area(&self) -> Option<Vec<Key>> {
+        self.src_view.as_ref()?.area()
     }
 }
 
 impl<Key, DstItem, SrcView, F> Observer<SrcView> for MapIndexItem<Key, DstItem, SrcView, F>
-where SrcView: IndexView<Key> + ?Sized,
+where DstItem: Default,
+      SrcView: IndexView<Key> + ?Sized,
       F: Fn(&SrcView::Item) -> DstItem + Send + Sync
 {
     fn reset(&mut self, view: Option<Arc<SrcView>>) {
-        // todo: notify on reset ??
+        let old_area = self.area();
         self.src_view = view;
+        let new_area = self.area();
+
+        if let Some(area) = old_area { self.cast.notify_each(area); }
+        if let Some(area) = new_area { self.cast.notify_each(area); }
     }
 
     fn notify(&self, msg: &Key) {
         self.cast.notify(msg);
     }
 }
+

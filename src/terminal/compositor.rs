@@ -2,7 +2,7 @@ use {
     std::{
         sync::{Arc, Weak, RwLock},
         collections::HashMap,
-        ops::Range,
+        boxed::Box,
         cmp::{min, max}
     },
     cgmath::Point2,
@@ -29,14 +29,14 @@ impl Observer<dyn TerminalView> for CompositeLayer {
             c.layers.get_mut(&self.idx).unwrap().1 = view.clone();
 
             if let Some(old_view) = old_view {
-                if let Some(range) = old_view.range() {
-                    c.cast.notify_each(GridWindowIterator::from(range));
+                if let Some(area) = old_view.area() {
+                    c.cast.notify_each(area);
                 }
             }
 
             if let Some(view) = view.as_ref() {
-                if let Some(range) = view.range() {
-                    c.cast.notify_each(GridWindowIterator::from(range));
+                if let Some(area) = view.area() {
+                    c.cast.notify_each(area);
                 }
             }
         }
@@ -55,42 +55,27 @@ impl Observer<dyn TerminalView> for CompositeLayer {
 pub struct TerminalCompositeView {
     idx_count: usize,
     layers: HashMap<usize, (Arc<RwLock<CompositeLayer>>, Option<Arc<dyn TerminalView>>)>,
-    range: Option<Range<Point2<i16>>>,
+    area: Option<Vec<Point2<i16>>>,
     cast: Arc<RwLock<ObserverBroadcast<dyn TerminalView>>>
 }
 
 impl TerminalCompositeView {
     fn update_range(&mut self) {
-        if self.layers.len() == 0 {
-            self.range = Some(Point2::new(0, 0) .. Point2::new(0, 0))
-        } else {
-            self.range = None;
+        self.area = Some(Vec::new());
 
-            for (idx, layer) in self.layers.iter() {
-                self.range =
-                    if let (
-                        Some(new_range),
-                        Some(old_range)
-                    ) = (
-                        if let Some(view) = layer.1.as_ref() {
-                            view.range().clone()
-                        } else {
-                            None
-                        },
-                        self.range.as_ref()
-                    ) {
-                        Some(
-                            Point2::new(
-                                min(old_range.start.x, new_range.start.x),
-                                min(old_range.start.y, new_range.start.y)
-                            ) .. Point2::new(
-                                max(old_range.end.x, new_range.end.x),
-                                max(old_range.end.y, new_range.end.y)
-                            )
-                        )
-                    } else {
-                        None
-                    };
+        for (idx, layer) in self.layers.iter() {
+            if let Some(view) = layer.1.as_ref() {
+                if let (
+                    Some(mut new_area),
+                    Some(mut area)
+                ) = (
+                    view.area(),
+                    self.area.as_mut()
+                ) {
+                    area.append(&mut new_area);
+                } else {
+                    self.area = None;
+                }
             }
         }
     }
@@ -106,6 +91,7 @@ impl ImplIndexView for TerminalCompositeView {
         for idx in 0 .. self.idx_count {
             if let Some(l) = self.layers.get(&idx) {
                 if let Some(view) = l.1.as_ref() {
+                    /*
                     if let Some(range) = view.range() {
                         if pos.x < range.start.x ||
                             pos.x >= range.end.x ||
@@ -114,7 +100,7 @@ impl ImplIndexView for TerminalCompositeView {
                                 continue;
                             }
                     }
-
+                    */
                     match (atom, view.get(pos)) {
                         (None, next) => atom = next,
                         (Some(last), Some(next)) => atom = Some(next.add_style_back(last.style)),
@@ -127,8 +113,8 @@ impl ImplIndexView for TerminalCompositeView {
         atom
     }
 
-    fn range(&self) -> Option<Range<Point2<i16>>> {
-        self.range.clone()
+    fn area(&self) -> Option<Vec<Point2<i16>>> {
+        self.area.clone()
     }
 }
 
@@ -145,7 +131,7 @@ impl TerminalCompositor {
             TerminalCompositeView {
                 idx_count: 0,
                 layers: HashMap::new(),
-                range: Some(Point2::new(0, 0) .. Point2::new(0, 0)),
+                area: Some(Vec::new()),
                 cast: port.get_broadcast()
             }
         ));
