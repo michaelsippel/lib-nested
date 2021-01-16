@@ -65,8 +65,9 @@ where T: Clone + Send + Sync + 'static {
                 *l += 1;
             },
             VecDiff::Remove(idx) => {
-                self.cast.notify(&idx);
-                *self.cur_len.write().unwrap() -= 1;
+                let mut l = self.cur_len.write().unwrap();
+                *l -= 1;
+                self.cast.notify_each(*idx .. *l+1);
             },
             VecDiff::Insert{ idx, val: _ } => {
                 let mut l = self.cur_len.write().unwrap();
@@ -89,9 +90,10 @@ impl<T> SequenceView for VecSequence<T>
 where T: Clone + Send + Sync + 'static {
     type Item = T;
 
-    fn get(&self, idx: usize) -> T {
-        self.data.as_ref().unwrap()
-            .read().unwrap()[idx].clone()
+    fn get(&self, idx: &usize) -> Option<T> {
+        self.data.as_ref()?
+            .read().unwrap()
+            .get(*idx).cloned()
     }
 
     fn len(&self) -> Option<usize> {

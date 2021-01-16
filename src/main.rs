@@ -59,11 +59,6 @@ async fn main() {
         let edit_port = ViewPort::<dyn TerminalView>::new();        
         let mut editor = string_editor::StringEditor::new(edit_port.inner());
 
-        compositor.push(edit_port.outer().map_key(
-            |pt| pt + Vector2::new(4, 2),
-            |pt| Some(pt - Vector2::new(4, 2))
-        ));
-
         let edit_offset_port = ViewPort::<dyn TerminalView>::new();
         let edit_o = GridOffset::new(edit_offset_port.inner());
 
@@ -73,31 +68,10 @@ async fn main() {
             edit_offset_port
                 .into_outer()
                 // add a nice black background
-                .map_item(|atom| atom.map(
-                    |a| a.add_style_back(TerminalStyle::bg_color((0,0,0)))))
+                .map_item(|a| a.add_style_back(TerminalStyle::bg_color((0,0,0))))
         );
 
         edit_o.write().unwrap().set_offset(Vector2::new(40, 4));
-
-        //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
-        // stupid label animation
-        let label_port = ViewPort::<dyn TerminalView>::new();
-        compositor.push(
-            label_port.outer()
-                .map_item(
-                    |atom| atom.map(|atom|
-                                    atom.add_style_back(TerminalStyle::fg_color((255, 255, 255)))
-                                    .add_style_back(TerminalStyle::bg_color((0, 0, 0))))
-                )
-        );
-        task::spawn(async move {
-            loop {
-                label_port.set_view(Some(Arc::new(TermLabel(String::from("Hello")))));
-                task::sleep(std::time::Duration::from_secs(1)).await;
-                label_port.set_view(Some(Arc::new(TermLabel(String::from("I'm a dynamic label")))));
-                task::sleep(std::time::Duration::from_secs(1)).await;
-            }
-        });
 
         //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
         // Vec-Buffer
@@ -115,7 +89,7 @@ async fn main() {
                 |pt: &Point2<i16>| if pt.y == 0 { Some(pt.x as usize) } else { None }
             )
             .map_item(
-                |c| Some(TerminalAtom::new(c.clone()?, TerminalStyle::fg_color((200, 10, 10))))
+                |c| TerminalAtom::new(*c, TerminalStyle::fg_color((200, 10, 10)))
             );
 
         compositor.push(vec_term_view);
@@ -123,6 +97,8 @@ async fn main() {
         vec_buf.push('a');
         vec_buf.push('b');
         vec_buf.push('c');
+        vec_buf.insert(1, 'x');
+        vec_buf.remove(2);
 
                             /*\
         <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
@@ -151,6 +127,7 @@ async fn main() {
                  Terminal Rendering
     <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                         \*/
+
     term_writer.show().await.ok();
 }
 
@@ -158,7 +135,7 @@ async fn main() {
 struct Checkerboard;
 impl ImplIndexView for Checkerboard {
     type Key = Point2<i16>;
-    type Value = Option<TerminalAtom>;
+    type Value = TerminalAtom;
 
     fn get(&self, pos: &Point2<i16>) -> Option<TerminalAtom> {
         if pos.x == 0 || pos.x == 1 || pos.x > 17 || pos.y == 0 || pos.y > 8 {
@@ -183,7 +160,7 @@ impl ImplIndexView for Checkerboard {
 struct TermLabel(String);
 impl ImplIndexView for TermLabel {
     type Key = Point2<i16>;
-    type Value = Option<TerminalAtom>;
+    type Value = TerminalAtom;
 
     fn get(&self, pos: &Point2<i16>) -> Option<TerminalAtom> {
         if pos.y == 5 {
@@ -206,7 +183,7 @@ impl ImplIndexView for TermLabel {
 struct ScrambleBackground;
 impl ImplIndexView for ScrambleBackground {
     type Key = Point2<i16>;
-    type Value = Option<TerminalAtom>;
+    type Value = TerminalAtom;
 
     fn get(&self, pos: &Point2<i16>) -> Option<TerminalAtom> {
         if ((pos.x/2) % 2 == 0) ^ (pos.y % 2 == 0) {

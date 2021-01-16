@@ -19,7 +19,7 @@ pub use {
 
 impl<Key: 'static, Item: 'static> OuterViewPort<dyn IndexView<Key, Item = Item>> {
     pub fn map_item<
-        DstItem: Default + 'static,
+        DstItem: 'static,
         F: Fn(&Item) -> DstItem + Send + Sync + 'static
     >(
         &self,
@@ -43,7 +43,7 @@ where SrcView: IndexView<Key> + ?Sized,
 
 impl<Key, DstItem, SrcView, F> MapIndexItem<Key, DstItem, SrcView, F>
 where Key: 'static,
-      DstItem: Default + 'static,
+      DstItem: 'static,
       SrcView: IndexView<Key> + ?Sized + 'static,
       F: Fn(&SrcView::Item) -> DstItem + Send + Sync + 'static
 {
@@ -72,18 +72,13 @@ where SrcView: IndexView<Key> + ?Sized,
 }
 
 impl<Key, DstItem, SrcView, F> IndexView<Key> for MapIndexItem<Key, DstItem, SrcView, F>
-where DstItem: Default,
-      SrcView: IndexView<Key> + ?Sized,
+where SrcView: IndexView<Key> + ?Sized,
       F: Fn(&SrcView::Item) -> DstItem + Send + Sync
 {
     type Item = DstItem;
 
-    fn get(&self, key: &Key) -> Self::Item {
-        if let Some(v) = self.src_view.as_ref() {
-            (self.f)(&v.get(key))
-        } else {
-            DstItem::default()
-        }
+    fn get(&self, key: &Key) -> Option<Self::Item> {
+        self.src_view.as_ref()?.get(key).as_ref().map(&self.f)
     }
 
     fn area(&self) -> Option<Vec<Key>> {
@@ -92,8 +87,7 @@ where DstItem: Default,
 }
 
 impl<Key, DstItem, SrcView, F> Observer<SrcView> for MapIndexItem<Key, DstItem, SrcView, F>
-where DstItem: Default,
-      SrcView: IndexView<Key> + ?Sized,
+where SrcView: IndexView<Key> + ?Sized,
       F: Fn(&SrcView::Item) -> DstItem + Send + Sync
 {
     fn reset(&mut self, view: Option<Arc<SrcView>>) {

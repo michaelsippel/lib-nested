@@ -14,7 +14,7 @@ use crate::core::View;
 pub trait SequenceView : View<Msg = usize> {
     type Item;
 
-    fn get(&self, idx: usize) -> Self::Item;
+    fn get(&self, idx: &usize) -> Option<Self::Item>;
     fn len(&self) -> Option<usize>;
 }
 
@@ -28,7 +28,7 @@ use std::{
 impl<V: SequenceView> SequenceView for RwLock<V> {
     type Item = V::Item;
 
-    fn get(&self, idx: usize) -> Self::Item {
+    fn get(&self, idx: &usize) -> Option<Self::Item> {
         self.read().unwrap().get(idx)
     }
 
@@ -40,7 +40,7 @@ impl<V: SequenceView> SequenceView for RwLock<V> {
 impl<V: SequenceView> SequenceView for Arc<V> {
     type Item = V::Item;
 
-    fn get(&self, idx: usize) -> Self::Item {
+    fn get(&self, idx: &usize) -> Option<Self::Item> {
         self.deref().get(idx)
     }
 

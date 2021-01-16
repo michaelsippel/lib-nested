@@ -16,13 +16,13 @@ use {
 pub struct Sequence2Index<SrcView>
 where SrcView: SequenceView + ?Sized + 'static {
     src_view: Option<Arc<SrcView>>,
-    cast: Arc<RwLock<ObserverBroadcast<dyn IndexView<usize, Item = Option<SrcView::Item>>>>>
+    cast: Arc<RwLock<ObserverBroadcast<dyn IndexView<usize, Item = SrcView::Item>>>>
 }
 
 impl<SrcView> Sequence2Index<SrcView>
 where SrcView: SequenceView + ?Sized + 'static {
     pub fn new(
-        port: InnerViewPort<dyn IndexView<usize, Item = Option<SrcView::Item>>>
+        port: InnerViewPort<dyn IndexView<usize, Item = SrcView::Item>>
     ) -> Arc<RwLock<Self>> {
         let s2i = Arc::new(RwLock::new(
             Sequence2Index {
@@ -36,7 +36,7 @@ where SrcView: SequenceView + ?Sized + 'static {
 }
 
 impl<Item: 'static> OuterViewPort<dyn SequenceView<Item = Item>> {
-    pub fn to_index(&self) -> OuterViewPort<dyn IndexView<usize, Item = Option<Item>>> {
+    pub fn to_index(&self) -> OuterViewPort<dyn IndexView<usize, Item = Item>> {
         let port = ViewPort::new();
         self.add_observer(Sequence2Index::new(port.inner()));
         port.into_outer()
@@ -50,24 +50,15 @@ where SrcView: SequenceView + ?Sized + 'static {
 
 impl<SrcView> IndexView<usize> for Sequence2Index<SrcView>
 where SrcView: SequenceView + ?Sized + 'static {
-    type Item = Option<SrcView::Item>;
+    type Item = SrcView::Item;
 
-    fn get(&self, key: &usize) -> Self::Item {
-        if let Some(v) = self.src_view.as_ref() {
-            if *key < v.len().unwrap_or(usize::MAX) {
-                return Some(v.get(*key));
-            }
-        }
-        None
+    fn get(&self, key: &usize) -> Option<Self::Item> {
+        self.src_view.as_ref()?.get(key)
     }
 
     fn area(&self) -> Option<Vec<usize>> {
-        if let Some(v) = self.src_view.as_ref() {
-            if let Some(len) = v.len() {
-                return Some((0 .. len).collect());
-            }
-        }
-        None
+        let len = self.src_view.as_ref()?.len()?;
+        Some((0 .. len).collect())
     }
 }
 

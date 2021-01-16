@@ -15,7 +15,7 @@ use {
 pub trait IndexView<Key> : View<Msg = Key> {
     type Item;
 
-    fn get(&self, key: &Key) -> Self::Item;
+    fn get(&self, key: &Key) -> Option<Self::Item>;
 
     // todo: AreaIterator enum to switch between Allocated and Procedural area
     fn area(&self) -> Option<Vec<Key>> {
@@ -28,7 +28,7 @@ pub trait IndexView<Key> : View<Msg = Key> {
 impl<Key, V: IndexView<Key>> IndexView<Key> for RwLock<V> {
     type Item = V::Item;
 
-    fn get(&self, key: &Key) -> Self::Item {
+    fn get(&self, key: &Key) -> Option<Self::Item> {
         self.read().unwrap().get(key)
     }
 
@@ -40,7 +40,7 @@ impl<Key, V: IndexView<Key>> IndexView<Key> for RwLock<V> {
 impl<Key, V: IndexView<Key>> IndexView<Key> for Arc<V> {
     type Item = V::Item;
 
-    fn get(&self, key: &Key) -> Self::Item {
+    fn get(&self, key: &Key) -> Option<Self::Item> {
         self.deref().get(key)
     }
 
@@ -55,7 +55,7 @@ pub trait ImplIndexView : Send + Sync {
     type Key;
     type Value;
 
-    fn get(&self, key: &Self::Key) -> Self::Value;
+    fn get(&self, key: &Self::Key) -> Option<Self::Value>;
     fn area(&self) -> Option<Vec<Self::Key>> {
         None
     }    
@@ -68,7 +68,7 @@ impl<V: ImplIndexView> View for V {
 impl<V: ImplIndexView> IndexView<V::Key> for V {
     type Item = V::Value;
 
-    fn get(&self, key: &V::Key) -> Self::Item {
+    fn get(&self, key: &V::Key) -> Option<Self::Item> {
         (self as &V).get(key)
     }
 

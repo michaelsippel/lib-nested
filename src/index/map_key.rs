@@ -17,7 +17,7 @@ pub use {
     }
 };
 
-impl<SrcKey: 'static, Item: 'static + Default> OuterViewPort<dyn IndexView<SrcKey, Item = Item>> {
+impl<SrcKey: 'static, Item: 'static> OuterViewPort<dyn IndexView<SrcKey, Item = Item>> {
     pub fn map_key<
         DstKey: 'static,
         F1: Fn(&SrcKey) -> DstKey + Send + Sync + 'static,
@@ -49,7 +49,7 @@ impl<DstKey, SrcKey, SrcView, F1, F2> MapIndexKey<DstKey, SrcKey, SrcView, F1, F
 where DstKey: 'static,
       SrcKey: 'static,
       SrcView: IndexView<SrcKey> + ?Sized + 'static,
-      SrcView::Item: Default + 'static,
+      SrcView::Item: 'static,
       F1: Fn(&SrcKey) -> DstKey + Send + Sync + 'static,
       F2: Fn(&DstKey) -> Option<SrcKey> + Send + Sync + 'static,
 {
@@ -82,18 +82,13 @@ where SrcView: IndexView<SrcKey> + ?Sized,
 
 impl<DstKey, SrcKey, SrcView, F1, F2> IndexView<DstKey> for MapIndexKey<DstKey, SrcKey, SrcView, F1, F2>
 where SrcView: IndexView<SrcKey> + ?Sized,
-      SrcView::Item: Default,
       F1: Fn(&SrcKey) -> DstKey + Send + Sync,
       F2: Fn(&DstKey) -> Option<SrcKey> + Send + Sync,
 {
     type Item = SrcView::Item;
 
-    fn get(&self, key: &DstKey) -> Self::Item {
-        if let (Some(v), Some(k)) = (self.src_view.as_ref(), (self.f2)(key)) {
-            v.get(&k)
-        } else {
-            Self::Item::default()
-        }
+    fn get(&self, key: &DstKey) -> Option<Self::Item> {
+        self.src_view.as_ref()?.get(&(self.f2)(key)?)
     }
 
     fn area(&self) -> Option<Vec<DstKey>> {
@@ -103,7 +98,6 @@ where SrcView: IndexView<SrcKey> + ?Sized,
 
 impl<DstKey, SrcKey, SrcView, F1, F2> Observer<SrcView> for MapIndexKey<DstKey, SrcKey, SrcView, F1, F2>
 where SrcView: IndexView<SrcKey> + ?Sized,
-      SrcView::Item: Default,
       F1: Fn(&SrcKey) -> DstKey + Send + Sync,
       F2: Fn(&DstKey) -> Option<SrcKey> + Send + Sync,
 {

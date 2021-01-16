@@ -26,7 +26,7 @@ pub struct StringEditorState {
 
 impl ImplIndexView for StringEditorState {
     type Key = Point2<i16>;
-    type Value = Option<TerminalAtom>;
+    type Value = TerminalAtom;
 
     fn get(&self, pos: &Point2<i16>) -> Option<TerminalAtom> {
         let data = self.data.read().unwrap();

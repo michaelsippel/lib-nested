@@ -22,8 +22,7 @@ pub struct GridOffset<V: GridView + ?Sized> {
     cast: Arc<RwLock<ObserverBroadcast<dyn GridView<Item = V::Item>>>>
 }
 
-impl<V: 'static + GridView + ?Sized> GridOffset<V>
-where V::Item: Default {
+impl<V: 'static + GridView + ?Sized> GridOffset<V> {
     pub fn new(port: InnerViewPort<dyn GridView<Item = V::Item>>) -> Arc<RwLock<Self>> {
         let offset_view =
             Arc::new(RwLock::new(
@@ -52,16 +51,11 @@ impl<V: GridView + ?Sized> View for GridOffset<V> {
     type Msg = Point2<i16>;
 }
 
-impl<V: GridView + ?Sized> IndexView<Point2<i16>> for GridOffset<V>
-where V::Item: Default {
+impl<V: GridView + ?Sized> IndexView<Point2<i16>> for GridOffset<V> {
     type Item = V::Item;
 
-    fn get(&self, pos: &Point2<i16>) -> Self::Item {
-        if let Some(src) = self.src.as_ref() {
-            src.get(&(pos - self.offset))
-        } else {
-            Self::Item::default()
-        }
+    fn get(&self, pos: &Point2<i16>) -> Option<Self::Item> {
+        self.src.as_ref()?.get(&(pos - self.offset))
     }
 
     fn area(&self) -> Option<Vec<Point2<i16>>> {
@@ -74,8 +68,7 @@ where V::Item: Default {
     }
 }
 
-impl<V: GridView + ?Sized> Observer<V> for GridOffset<V>
-where V::Item: Default {
+impl<V: GridView + ?Sized> Observer<V> for GridOffset<V> {
     fn reset(&mut self, view: Option<Arc<V>>) {
         let old_area = self.area();
         self.src = view;

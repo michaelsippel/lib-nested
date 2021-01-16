@@ -18,7 +18,7 @@ use {
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-pub trait TerminalView = GridView<Item = Option<TerminalAtom>>;
+pub trait TerminalView = GridView<Item = TerminalAtom>;
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
