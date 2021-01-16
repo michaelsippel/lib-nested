@@ -9,6 +9,8 @@ use {
     crate::core::{View}
 };
 
+pub use buffer::SingletonBuffer;
+
 // TODO: #[ImplForArc, ImplForRwLock]
 pub trait SingletonView : View<Msg = ()> {
     type Item;

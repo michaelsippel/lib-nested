@@ -7,7 +7,6 @@ pub mod grid;
 pub mod sequence;
 pub mod singleton;
 pub mod terminal;
-
 pub mod string_editor;
 
 use {
@@ -29,23 +28,161 @@ use {
             Terminal,
             TerminalCompositor
         },
-        grid::GridOffset
+        grid::{GridOffset, GridWindowIterator},
+        singleton::{SingletonView, SingletonBuffer}
     }
 };
 
-struct VecSequenceView<T: Send + Sync + Clone>(Arc<RwLock<Vec<T>>>);
-impl<T: Send + Sync + Clone> ImplIndexView for VecSequenceView<T> {
-    type Key = usize;
-    type Value = T;
+struct TermLabel(String);
+impl ImplIndexView for TermLabel {
+    type Key = Point2<i16>;
+    type Value = Option<TerminalAtom>;
 
-    fn get(&self, idx: &usize) -> T {
-        self.0.read().unwrap()[*idx].clone()
+    fn get(&self, pos: &Point2<i16>) -> Option<TerminalAtom> {
+        if pos.y == 5 {
+            Some(TerminalAtom::from(self.0.chars().nth(pos.x as usize)?))
+        } else {
+            None
+        }
     }
 
-    fn range(&self) -> Option<Range<usize>> {
-        Some(0 .. self.0.read().unwrap().len())
+    fn area(&self) -> Option<Vec<Point2<i16>>> {
+        Some(
+            GridWindowIterator::from(
+                Point2::new(0, 5) .. Point2::new(self.0.chars().count() as i16, 6)
+            ).collect()
+        )
     }
 }
+
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+
+#[async_std::main]
+async fn main() {
+    let term_port = ViewPort::<dyn TerminalView>::new();
+
+    let mut compositor = TerminalCompositor::new(term_port.inner());
+    compositor.push(ViewPort::<dyn TerminalView>::with_view(Arc::new(ScrambleBackground)).into_outer());
+
+    let mut term = Terminal::new(term_port.outer());
+    let term_writer = term.get_writer();
+
+    task::spawn(async move {
+                            /*\
+        <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+                        Setup Views
+        <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+                            \*/
+
+        let window_size_port = ViewPort::new();
+        let window_size = SingletonBuffer::new(Vector2::new(0, 0), window_size_port.inner());
+
+
+        //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+        // string editor
+        let edit_port = ViewPort::<dyn TerminalView>::new();        
+        let mut editor = string_editor::StringEditor::new(edit_port.inner());
+
+        compositor.push(edit_port.outer().map_key(
+            |pt| pt + Vector2::new(4, 2),
+            |pt| Some(pt - Vector2::new(4, 2))
+        ));
+
+        let edit_offset_port = ViewPort::<dyn TerminalView>::new();
+        let edit_o = GridOffset::new(edit_offset_port.inner());
+
+        edit_port.add_observer(edit_o.clone());
+
+        compositor.push(
+            edit_offset_port
+                .into_outer()
+                // add a nice black background
+                .map_item(|atom| atom.map(
+                    |a| a.add_style_back(TerminalStyle::bg_color((0,0,0)))))
+        );
+
+        edit_o.write().unwrap().set_offset(Vector2::new(40, 4));
+
+
+        //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+        // stupid label animation
+        let label_port = ViewPort::<dyn TerminalView>::new();
+        compositor.push(
+            label_port.outer()
+                .map_item(
+                    |atom| atom.map(|atom|
+                                    atom.add_style_back(TerminalStyle::fg_color((255, 255, 255)))
+                                    .add_style_back(TerminalStyle::bg_color((0, 0, 0))))
+                )
+        );
+        task::spawn(async move {
+            loop {
+                label_port.set_view(Some(Arc::new(TermLabel(String::from("Hello")))));
+                task::sleep(std::time::Duration::from_secs(1)).await;
+                label_port.set_view(Some(Arc::new(TermLabel(String::from("I'm a dynamic label")))));
+                task::sleep(std::time::Duration::from_secs(1)).await;
+            }
+        });
+
+        //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+        // Vec-Buffer
+        let vec_port = ViewPort::new();
+        let mut vec_buf = sequence::VecBuffer::<char>::new(vec_port.inner());
+
+        // project Vec-Buffer to SequenceView
+        let vec_seq_port = ViewPort::new();
+        let vec_seq = sequence::VecSequence::new(vec_seq_port.inner());
+        vec_port.add_observer(vec_seq.clone());
+
+        let vec_term_view = vec_seq_port.outer()
+            .to_index()
+            .map_key(
+                |idx: &usize| Point2::<i16>::new(*idx as i16, 0),
+                |pt: &Point2<i16>| if pt.y == 0 { Some(pt.x as usize) } else { None }
+            )
+            .map_item(
+                |c| Some(TerminalAtom::new(c.clone()?, TerminalStyle::fg_color((200, 10, 10))))
+            );
+
+        compositor.push(vec_term_view);
+
+        vec_buf.push('a');
+        vec_buf.push('b');
+        vec_buf.push('c');
+
+                            /*\
+        <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+                        Event Loop
+        <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+                            \*/
+        loop {
+            match term.next_event().await {
+                TerminalEvent::Resize(size) => window_size.write().unwrap().set(size),
+                TerminalEvent::Input(Event::Key(Key::Left)) => editor.prev(),
+                TerminalEvent::Input(Event::Key(Key::Right)) => editor.next(),
+                TerminalEvent::Input(Event::Key(Key::Home)) => editor.goto(0),
+                TerminalEvent::Input(Event::Key(Key::End)) => editor.goto_end(),
+                TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {},
+                TerminalEvent::Input(Event::Key(Key::Char(c))) => {editor.insert(c); vec_buf.push(c); },
+                TerminalEvent::Input(Event::Key(Key::Delete)) => editor.delete(),
+                TerminalEvent::Input(Event::Key(Key::Backspace)) => { editor.prev(); editor.delete(); },
+                TerminalEvent::Input(Event::Key(Key::Ctrl('c'))) => {
+                    break
+                }
+                _ => {}
+            }
+        }
+    });
+
+                        /*\
+    <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+                 Terminal Rendering
+    <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+                        \*/
+    term_writer.show().await.ok();
+}
+
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 struct Checkerboard;
 impl ImplIndexView for Checkerboard {
@@ -66,10 +203,12 @@ impl ImplIndexView for Checkerboard {
         }
     }
 
-    fn range(&self) -> Option<Range<Point2<i16>>> {
-        Some(Point2::new(0,0) .. Point2::new(20,10))
+    fn area(&self) -> Option<Vec<Point2<i16>>> {
+        Some(GridWindowIterator::from(Point2::new(0,0) .. Point2::new(20,10)).collect())
     }
 }
+
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 struct ScrambleBackground;
 impl ImplIndexView for ScrambleBackground {
@@ -84,88 +223,10 @@ impl ImplIndexView for ScrambleBackground {
         }
     }
 
-    fn range(&self) -> Option<Range<Point2<i16>>> {
+    fn area(&self) -> Option<Vec<Point2<i16>>> {
         None
         //Some(Point2::new(0,0) .. Point2::new(50,30))
     }
 }
 
-#[async_std::main]
-async fn main() {
-    let term_port = ViewPort::<dyn TerminalView>::new();
-
-    let mut compositor = TerminalCompositor::new(term_port.inner());
-    compositor.push(ViewPort::<dyn TerminalView>::with_view(Arc::new(ScrambleBackground)).into_outer());
-
-    let mut term = Terminal::new(term_port.outer());
-    let term_writer = term.get_writer();
-
-    task::spawn(async move {
-                            /*\
-        <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
-                        Setup Views
-        <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
-                            \*/
-
-        let offset_port = ViewPort::<dyn TerminalView>::new();
-        let o = GridOffset::new(offset_port.inner());
-
-        let checkerboard_port = ViewPort::<dyn TerminalView>::with_view(Arc::new(Checkerboard));
-        checkerboard_port.add_observer(o.clone());
-
-        compositor.push(offset_port.into_outer());
-
-        let edit_port = ViewPort::<dyn TerminalView>::new();        
-        let mut editor = string_editor::StringEditor::new(edit_port.inner());
-
-        let edit_offset_port = ViewPort::<dyn TerminalView>::new();
-        let edit_o = GridOffset::new(edit_offset_port.inner());
-        edit_port.add_observer(edit_o.clone());
-
-        compositor.push(
-            edit_offset_port
-                .into_outer()
-                // add a nice black background
-                .map_item(|atom| atom.map(
-                         |a| a.add_style_back(TerminalStyle::bg_color((0,0,0))))));
-
-        edit_o.write().unwrap().set_offset(Vector2::new(40, 4));
-
-        task::spawn(async move {
-            for x in 0 .. 20 {
-                async_std::task::sleep(std::time::Duration::from_millis(15)).await;
-                o.write().unwrap().set_offset(Vector2::new(x as i16, x as i16));
-            }
-        });
-        
-                            /*\
-        <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
-                        Event Loop
-        <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
-                            \*/
-        loop {
-            match term.next_event().await {
-                TerminalEvent::Input(Event::Key(Key::Left)) => editor.prev(),
-                TerminalEvent::Input(Event::Key(Key::Right)) => editor.next(),
-                TerminalEvent::Input(Event::Key(Key::Home)) => editor.goto(0),
-                TerminalEvent::Input(Event::Key(Key::End)) => editor.goto_end(),
-                TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {},
-                TerminalEvent::Input(Event::Key(Key::Char(c))) => editor.insert(c),
-                TerminalEvent::Input(Event::Key(Key::Delete)) => editor.delete(),
-                TerminalEvent::Input(Event::Key(Key::Backspace)) => { editor.prev(); editor.delete(); },
-                TerminalEvent::Input(Event::Key(Key::Ctrl('c'))) => {
-                    break
-                }
-                _ => {}
-            }
-        }
-    });
-
-                        /*\
-    <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
-                 Terminal Rendering
-    <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
-                        \*/
-    term_writer.show().await.ok();
-}
 
