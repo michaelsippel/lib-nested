@@ -3,7 +3,7 @@ use {
         sync::{Arc, RwLock}
     },
     crate::{
-        core::{View, Observer, ObserverExt, ObserverBroadcast, InnerViewPort},
+        core::{View, Observer, ObserverExt, ObserverBroadcast, ViewPort, InnerViewPort, OuterViewPort},
         sequence::SequenceView,
     }
 };
@@ -29,6 +29,16 @@ where T: Clone + Send + Sync + 'static {
     cur_len: RwLock<usize>,
     data: Option<Arc<RwLock<Vec<T>>>>,
     cast: Arc<RwLock<ObserverBroadcast<dyn SequenceView<Item = T>>>>
+}
+
+impl<T> OuterViewPort<RwLock<Vec<T>>>
+where T: Clone + Send + Sync + 'static {
+    pub fn to_sequence(&self) -> OuterViewPort<dyn SequenceView<Item = T>> {
+        let port = ViewPort::new();
+        let vec_seq = VecSequence::new(port.inner());
+        self.add_observer(vec_seq.clone());
+        port.into_outer()
+    }
 }
 
 impl<T> VecSequence<T>

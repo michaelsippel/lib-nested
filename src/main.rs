@@ -78,11 +78,9 @@ async fn main() {
         let vec_port = ViewPort::new();
         let mut vec_buf = sequence::VecBuffer::<char>::new(vec_port.inner());
 
-        // project Vec-Buffer to SequenceView
-        let vec_seq_port = ViewPort::new();
-        let vec_seq = sequence::VecSequence::new(vec_seq_port.inner());
-        vec_port.add_observer(vec_seq.clone());
-        let vec_term_view = vec_seq_port.outer()
+        // project Vec-Buffer
+        let vec_term_view = vec_port.outer()
+            .to_sequence()
             .to_index()
             .map_key(
                 |idx: &usize| Point2::<i16>::new(*idx as i16, 0),
