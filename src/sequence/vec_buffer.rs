@@ -70,19 +70,28 @@ where T: Clone + Send + Sync + 'static {
     fn notify(&self, diff: &VecDiff<T>) {
         match diff {
             VecDiff::Push(_) => {
-                let mut l = self.cur_len.write().unwrap();
-                self.cast.notify(&l);
-                *l += 1;
+                let l = {
+                    let mut l = self.cur_len.write().unwrap();
+                    *l += 1;
+                    *l
+                };
+                self.cast.notify(&(l - 1));
             },
             VecDiff::Remove(idx) => {
-                let mut l = self.cur_len.write().unwrap();
-                *l -= 1;
-                self.cast.notify_each(*idx .. *l+1);
+                let l = {
+                    let mut l = self.cur_len.write().unwrap();
+                    *l -= 1;
+                    *l + 1
+                };
+                self.cast.notify_each(*idx .. l);
             },
             VecDiff::Insert{ idx, val: _ } => {
-                let mut l = self.cur_len.write().unwrap();
-                *l += 1;
-                self.cast.notify_each(*idx .. *l);
+                let l = {
+                    let mut l = self.cur_len.write().unwrap();
+                    *l += 1;
+                    *l
+                };
+                self.cast.notify_each(*idx .. l);
             },
             VecDiff::Update{ idx, val: _ } => {
                 self.cast.notify(&idx);

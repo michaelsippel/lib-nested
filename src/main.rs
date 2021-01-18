@@ -28,7 +28,8 @@ use {
             TerminalCompositor
         },
         grid::{GridOffset, GridWindowIterator},
-        singleton::{SingletonView, SingletonBuffer}
+        singleton::{SingletonView, SingletonBuffer},
+        string_editor::{StringEditor}
     }
 };
 
@@ -52,51 +53,43 @@ async fn main() {
                             \*/
 
         let window_size_port = ViewPort::new();
-        let window_size = SingletonBuffer::new(Vector2::new(0, 0), window_size_port.inner());
+        let mut window_size = SingletonBuffer::new(Vector2::new(0, 0), window_size_port.inner());
 
         //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
         // string editor
-        let edit_port = ViewPort::<dyn TerminalView>::new();        
-        let mut editor = string_editor::StringEditor::new(edit_port.inner());
+        let mut editor = StringEditor::new();
 
-        let edit_offset_port = ViewPort::<dyn TerminalView>::new();
-        let edit_o = GridOffset::new(edit_offset_port.inner());
-
-        edit_port.add_observer(edit_o.clone());
-
-        compositor.push(
-            edit_offset_port
-                .into_outer()
-                // add a nice black background
-                .map_item(|a| a.add_style_back(TerminalStyle::bg_color((0,0,0))))
-        );
-
-        edit_o.write().unwrap().set_offset(Vector2::new(40, 4));
-
-        //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
-        // Vec-Buffer
-        let vec_port = ViewPort::new();
-        let mut vec_buf = sequence::VecBuffer::<char>::new(vec_port.inner());
-
-        // project Vec-Buffer
-        let vec_term_view = vec_port.outer()
-            .to_sequence()
-            .to_index()
-            .map_key(
-                |idx: &usize| Point2::<i16>::new(*idx as i16, 0),
-                |pt: &Point2<i16>| if pt.y == 0 { Some(pt.x as usize) } else { None }
-            )
-            .map_item(
-                |c| TerminalAtom::new(*c, TerminalStyle::fg_color((200, 10, 10)))
+        let edit_view_port = ViewPort::new();
+        let edit_view =
+            string_editor::insert_view::StringEditView::new(
+                editor.get_cursor_port(),
+                editor.get_data_port().to_sequence(),
+                edit_view_port.inner()
             );
 
-        compositor.push(vec_term_view);
+        compositor.push(
+            edit_view_port.outer()
+                .map_item(
+                    |_pos, atom| atom.add_style_back(
+                        TerminalStyle::fg_color((200,200,200))
+                            .add(TerminalStyle::bg_color((0,0,0)))
+                            .add(TerminalStyle::bold(true)))
+                )
+        );
 
-        vec_buf.push('a');
-        vec_buf.push('b');
-        vec_buf.push('c');
-        vec_buf.insert(1, 'x');
-        vec_buf.remove(2);
+        //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+        // another view of the string, without editor
+        compositor.push(
+            editor.get_data_port()
+                .to_sequence()
+                .to_index()
+                .map_key(
+                    |idx| Point2::new(*idx as i16, 2),
+                    |pt| if pt.y == 2 { Some(pt.x as usize) } else { None }
+                ).map_item(
+                    |_key, c| TerminalAtom::new(*c, TerminalStyle::fg_color((0, 200, 0)))
+                )
+        );
 
                             /*\
         <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
@@ -105,7 +98,7 @@ async fn main() {
                             \*/
         loop {
             match term.next_event().await {
-                TerminalEvent::Resize(size) => window_size.write().unwrap().set(size),
+                TerminalEvent::Resize(size) => window_size.set(size),
                 TerminalEvent::Input(Event::Key(Key::Left)) => editor.prev(),
                 TerminalEvent::Input(Event::Key(Key::Right)) => editor.next(),
                 TerminalEvent::Input(Event::Key(Key::Home)) => editor.goto(0),
