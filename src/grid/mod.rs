@@ -1,6 +1,6 @@
 use {
     std::{
-        ops::{Range}
+        ops::{Range, RangeInclusive}
     },
     cgmath::{Point2},
     crate::{
@@ -17,6 +17,24 @@ pub trait GridView = IndexView<Point2<i16>>;
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
+impl<Item> GridView<Item = Item> {
+    pub fn range(&self) -> RangeInclusive<Point2<i16>> {
+        let area = self.area().unwrap_or(Vec::new());
+
+        Point2::new(
+            area.iter().map(|p| p.x).min().unwrap_or(i16::MIN),
+            area.iter().map(|p| p.y).min().unwrap_or(i16::MIN)
+        ) ..=
+        Point2::new(
+            area.iter().map(|p| p.x).max().unwrap_or(i16::MAX),
+            area.iter().map(|p| p.y).max().unwrap_or(i16::MAX)
+        )            
+    }
+}
+
+
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+
 pub struct GridWindowIterator {
     next: Point2<i16>,
     range: Range<Point2<i16>>
@@ -27,6 +45,15 @@ impl From<Range<Point2<i16>>> for GridWindowIterator {
         GridWindowIterator {
             next: range.start,
             range
+        }
+    }
+}
+
+impl From<RangeInclusive<Point2<i16>>> for GridWindowIterator {
+    fn from(range: RangeInclusive<Point2<i16>>) -> Self {
+        GridWindowIterator {
+            next: *range.start(),
+            range: *range.start() .. Point2::new(range.end().x+1, range.end().y+1)
         }
     }
 }
