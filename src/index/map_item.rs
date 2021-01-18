@@ -20,7 +20,7 @@ pub use {
 impl<Key: 'static, Item: 'static> OuterViewPort<dyn IndexView<Key, Item = Item>> {
     pub fn map_item<
         DstItem: 'static,
-        F: Fn(&Item) -> DstItem + Send + Sync + 'static
+        F: Fn(&Key, &Item) -> DstItem + Send + Sync + 'static
     >(
         &self,
         f: F
@@ -34,7 +34,7 @@ impl<Key: 'static, Item: 'static> OuterViewPort<dyn IndexView<Key, Item = Item>>
 
 pub struct MapIndexItem<Key, DstItem, SrcView, F>
 where SrcView: IndexView<Key> + ?Sized,
-      F: Fn(&SrcView::Item) -> DstItem + Send + Sync
+      F: Fn(&Key, &SrcView::Item) -> DstItem + Send + Sync
 {
     src_view: Option<Arc<SrcView>>,
     f: F,
@@ -45,7 +45,7 @@ impl<Key, DstItem, SrcView, F> MapIndexItem<Key, DstItem, SrcView, F>
 where Key: 'static,
       DstItem: 'static,
       SrcView: IndexView<Key> + ?Sized + 'static,
-      F: Fn(&SrcView::Item) -> DstItem + Send + Sync + 'static
+      F: Fn(&Key, &SrcView::Item) -> DstItem + Send + Sync + 'static
 {
     fn new(
         port: InnerViewPort<dyn IndexView<Key, Item = DstItem>>,
@@ -66,19 +66,19 @@ where Key: 'static,
 
 impl<Key, DstItem, SrcView, F> View for MapIndexItem<Key, DstItem, SrcView, F>
 where SrcView: IndexView<Key> + ?Sized,
-      F: Fn(&SrcView::Item) -> DstItem + Send + Sync
+      F: Fn(&Key, &SrcView::Item) -> DstItem + Send + Sync
 {
     type Msg = Key;
 }
 
 impl<Key, DstItem, SrcView, F> IndexView<Key> for MapIndexItem<Key, DstItem, SrcView, F>
 where SrcView: IndexView<Key> + ?Sized,
-      F: Fn(&SrcView::Item) -> DstItem + Send + Sync
+      F: Fn(&Key, &SrcView::Item) -> DstItem + Send + Sync
 {
     type Item = DstItem;
 
     fn get(&self, key: &Key) -> Option<Self::Item> {
-        self.src_view.as_ref()?.get(key).as_ref().map(&self.f)
+        self.src_view.as_ref()?.get(key).as_ref().map(|item| (self.f)(key, item))
     }
 
     fn area(&self) -> Option<Vec<Key>> {
@@ -88,7 +88,7 @@ where SrcView: IndexView<Key> + ?Sized,
 
 impl<Key, DstItem, SrcView, F> Observer<SrcView> for MapIndexItem<Key, DstItem, SrcView, F>
 where SrcView: IndexView<Key> + ?Sized,
-      F: Fn(&SrcView::Item) -> DstItem + Send + Sync
+      F: Fn(&Key, &SrcView::Item) -> DstItem + Send + Sync
 {
     fn reset(&mut self, view: Option<Arc<SrcView>>) {
         let old_area = self.area();
