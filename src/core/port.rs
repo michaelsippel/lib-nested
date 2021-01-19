@@ -14,7 +14,6 @@ use {
                  View Port
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                     \*/
-#[derive(Clone)]
 pub struct ViewPort<V: View + ?Sized> {
     view: Arc<RwLock<Option<Arc<V>>>>,
     observers: Arc<RwLock<ObserverBroadcast<V>>>
@@ -58,6 +57,15 @@ impl<V: View + ?Sized> ViewPort<V> {
 
     pub fn into_outer(self) -> OuterViewPort<V> {
         OuterViewPort(ViewPort{ view: self.view, observers: self.observers })
+    }
+}
+
+impl<V: View + ?Sized> Clone for ViewPort<V> {
+    fn clone(&self) -> Self {
+        ViewPort {
+            view: self.view.clone(),
+            observers: self.observers.clone()
+        }
     }
 }
 

@@ -29,6 +29,7 @@ where T: Clone + Eq + Send + Sync + 'static {
     }
 }
 
+#[derive(Clone)]
 pub struct SingletonBuffer<T>
 where T: Clone + Eq + Send + Sync + 'static {
     value: Arc<RwLock<T>>,
