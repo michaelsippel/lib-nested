@@ -25,7 +25,7 @@ use std::{
     ops::{Deref}
 };
 
-impl<V: SequenceView> SequenceView for RwLock<V> {
+impl<V: SequenceView + ?Sized> SequenceView for RwLock<V> {
     type Item = V::Item;
 
     fn get(&self, idx: &usize) -> Option<Self::Item> {
@@ -37,7 +37,7 @@ impl<V: SequenceView> SequenceView for RwLock<V> {
     }
 }
 
-impl<V: SequenceView> SequenceView for Arc<V> {
+impl<V: SequenceView + ?Sized> SequenceView for Arc<V> {
     type Item = V::Item;
 
     fn get(&self, idx: &usize) -> Option<Self::Item> {
@@ -49,4 +49,19 @@ impl<V: SequenceView> SequenceView for Arc<V> {
     }
 }
 
+impl<V: SequenceView> SequenceView for Option<V> {
+    type Item = V::Item;
+
+    fn get(&self, idx: &usize) -> Option<Self::Item> {
+        (self.as_ref()? as &V).get(idx)
+    }
+
+    fn len(&self) -> Option<usize> {
+        if let Some(v) = self.as_ref() {
+            v.len()
+        } else {
+            Some(0)
+        }
+    }
+}
 

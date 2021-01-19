@@ -88,11 +88,11 @@ where SrcView: IndexView<SrcKey> + ?Sized,
     type Item = SrcView::Item;
 
     fn get(&self, key: &DstKey) -> Option<Self::Item> {
-        self.src_view.as_ref()?.get(&(self.f2)(key)?)
+        self.src_view.get(&(self.f2)(key)?)
     }
 
     fn area(&self) -> Option<Vec<DstKey>> {
-        Some(self.src_view.as_ref()?.area()?.iter().map(&self.f1).collect())
+        Some(self.src_view.area()?.iter().map(&self.f1).collect())
     }
 }
 

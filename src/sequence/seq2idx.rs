@@ -53,12 +53,11 @@ where SrcView: SequenceView + ?Sized + 'static {
     type Item = SrcView::Item;
 
     fn get(&self, key: &usize) -> Option<Self::Item> {
-        self.src_view.as_ref()?.get(key)
+        self.src_view.get(key)
     }
 
     fn area(&self) -> Option<Vec<usize>> {
-        let len = self.src_view.as_ref()?.len()?;
-        Some((0 .. len).collect())
+        Some((0 .. self.src_view.len()?).collect())
     }
 }
 

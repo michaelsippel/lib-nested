@@ -9,6 +9,7 @@ use {
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
+#[derive(Clone)]
 pub struct StringEditor {
     data: VecBuffer<char>,
     cursor: SingletonBuffer<usize>,
@@ -34,11 +35,11 @@ impl StringEditor {
     pub fn get_data_port(&self) -> OuterViewPort<RwLock<Vec<char>>> {
         self.data_port.outer()
     }
-    
+
     pub fn get_cursor_port(&self) -> OuterViewPort<dyn SingletonView<Item = usize>> {
         self.cursor_port.outer()
     }
-    
+
     pub fn goto(&mut self, new_pos: usize) {
         if new_pos <= self.data.len() {
             self.cursor.set(new_pos);
@@ -123,21 +124,9 @@ pub mod insert_view {
 
     impl Observer<dyn SequenceView<Item = char>> for DataObserver {
         fn reset(&mut self, new_data: Option<Arc<dyn SequenceView<Item = char>>>) {
-            let old_len =
-                if let Some(data) = self.data.as_ref() {
-                    data.len().unwrap_or(0)
-                } else {
-                    0
-                };
-
+            let old_len = self.data.len().unwrap_or(0);
             self.data = new_data;
-
-            let new_len =
-                if let Some(data) = self.data.as_ref() {
-                    data.len().unwrap_or(0)
-                } else {
-                    0
-                };
+            let new_len = self.data.len().unwrap_or(0);
 
             self.edit
                 .upgrade().unwrap()

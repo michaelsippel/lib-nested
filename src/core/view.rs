@@ -13,12 +13,15 @@ pub trait View : Send + Sync {
 
 use std::sync::{Arc, RwLock};
 
-impl<V: View> View for RwLock<V> {
+impl<V: View + ?Sized> View for RwLock<V> {
     type Msg = V::Msg;
 }
 
-impl<V: View> View for Arc<V> {
+impl<V: View + ?Sized> View for Arc<V> {
     type Msg = V::Msg;
 }
 
+impl<V: View> View for Option<V> {
+    type Msg = V::Msg;
+}
 

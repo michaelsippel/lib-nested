@@ -25,7 +25,7 @@ pub trait IndexView<Key> : View<Msg = Key> {
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-impl<Key, V: IndexView<Key>> IndexView<Key> for RwLock<V> {
+impl<Key, V: IndexView<Key> + ?Sized> IndexView<Key> for RwLock<V> {
     type Item = V::Item;
 
     fn get(&self, key: &Key) -> Option<Self::Item> {
@@ -37,7 +37,7 @@ impl<Key, V: IndexView<Key>> IndexView<Key> for RwLock<V> {
     }
 }
 
-impl<Key, V: IndexView<Key>> IndexView<Key> for Arc<V> {
+impl<Key, V: IndexView<Key> + ?Sized> IndexView<Key> for Arc<V> {
     type Item = V::Item;
 
     fn get(&self, key: &Key) -> Option<Self::Item> {
@@ -46,6 +46,22 @@ impl<Key, V: IndexView<Key>> IndexView<Key> for Arc<V> {
 
     fn area(&self) -> Option<Vec<Key>> {
         self.deref().area()
+    }
+}
+
+impl<Key, V: IndexView<Key>> IndexView<Key> for Option<V> {
+    type Item = V::Item;
+
+    fn get(&self, key: &Key) -> Option<Self::Item> {
+        (self.as_ref()? as &V).get(key)
+    }
+
+    fn area(&self) -> Option<Vec<Key>> {
+        if let Some(v) = self.as_ref() {
+            v.area()
+        } else {
+            Some(Vec::new())
+        }
     }
 }
 
