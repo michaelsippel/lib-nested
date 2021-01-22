@@ -115,7 +115,7 @@ pub mod insert_view {
         _data_obs: Arc<RwLock<ProjectionArg<dyn SequenceView<Item = char>, Self>>>,
 
         cursor: Arc<dyn SingletonView<Item = usize>>,
-        data: Arc<dyn SequenceView<Item = char>>,
+        data: Arc<RwLock<dyn SequenceView<Item = char>>>,
         cur_pos: usize,
         cast: Arc<RwLock<ObserverBroadcast<dyn TerminalView>>>
     }
@@ -130,16 +130,17 @@ pub mod insert_view {
         fn get(&self, pos: &Point2<i16>) -> Option<TerminalAtom> {
             if pos.y == 0 && pos.x >= 0 {
                 let i = pos.x as usize;
-                let len = self.data.len().unwrap_or(0);
+                let data = self.data.read().unwrap();
+                let len = data.len().unwrap_or(0);
 
                 if i < len+1 {
                     return Some(
-                        if i < self.cur_pos && i < len {
-                            TerminalAtom::from(self.data.get(&i).unwrap())
+                        if i < self.cur_pos {
+                            TerminalAtom::from(data.get(&i)?)
                         } else if i == self.cur_pos {
                             TerminalAtom::new('|', TerminalStyle::fg_color((200, 0, 0)))
                         } else {
-                            TerminalAtom::from(self.data.get(&(i-1)).unwrap())
+                            TerminalAtom::from(data.get(&(i - 1))?)
                         }
                     );
                 }
