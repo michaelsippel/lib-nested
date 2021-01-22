@@ -17,7 +17,7 @@ pub trait GridView = IndexView<Point2<i16>>;
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-impl<Item> GridView<Item = Item> {
+impl<Item> dyn GridView<Item = Item> {
     pub fn range(&self) -> RangeInclusive<Point2<i16>> {
         let area = self.area().unwrap_or(Vec::new());
 

@@ -1,9 +1,10 @@
 use {
-    std::sync::{Arc, RwLock},
+    std::sync::{RwLock},
     crate::{
-        core::{ViewPort, OuterViewPort, InnerViewPort},
+        core::{ViewPort, OuterViewPort},
         singleton::{SingletonView, SingletonBuffer},
-        sequence::VecBuffer
+        sequence::VecBuffer,
+        terminal::{TerminalView}
     }
 };
 
@@ -30,6 +31,17 @@ impl StringEditor {
             data_port,
             cursor_port
         }
+    }
+
+    pub fn insert_view(&self) -> OuterViewPort<dyn TerminalView> {
+        let port = ViewPort::new();
+        insert_view::StringInsertView::new(
+            self.get_cursor_port(),
+            self.get_data_port().to_sequence(),
+            port.inner()
+        );
+
+        port.into_outer()
     }
 
     pub fn get_data_port(&self) -> OuterViewPort<RwLock<Vec<char>>> {
@@ -66,6 +78,14 @@ impl StringEditor {
         self.next();
     }
 
+    pub fn delete_prev(&mut self) {
+        let cur = self.cursor.get();
+        if cur <= self.data.len() && cur > 0 {
+            self.data.remove(cur-1);
+        }
+        self.prev();
+    }
+
     pub fn delete(&mut self) {
         let cur = self.cursor.get();
         if cur < self.data.len() {
@@ -77,166 +97,49 @@ impl StringEditor {
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub mod insert_view {
-    use {
-        std::sync::{Arc, RwLock, Weak},
-        cgmath::Point2,
-        crate::{
-            core::{Observer, ObserverExt, ObserverBroadcast, OuterViewPort, InnerViewPort},
-            singleton::SingletonView,
-            sequence::SequenceView,
-            index::ImplIndexView,
-            grid::GridWindowIterator,
-            terminal::{TerminalAtom, TerminalStyle, TerminalView}
-        }
+    use cgmath::Point2;
+    use std::sync::{Arc, RwLock};
+    use std::cmp::{min, max};
+    use crate::{
+        core::{View, Observer, ObserverExt, ObserverBroadcast, OuterViewPort, InnerViewPort},
+        terminal::{TerminalAtom, TerminalStyle, TerminalView},
+        grid::{GridWindowIterator},
+        singleton::{SingletonView},
+        sequence::{SequenceView},
+        index::{IndexView},
+        projection::ProjectionArg,
     };
 
-    struct CursorObserver {
-        cursor: Option<Arc<dyn SingletonView<Item = usize>>>,
-        edit: Weak<RwLock<StringEditView>>
-    }
+    pub struct StringInsertView {
+        _cursor_obs: Arc<RwLock<ProjectionArg<dyn SingletonView<Item = usize>, Self>>>,
+        _data_obs: Arc<RwLock<ProjectionArg<dyn SequenceView<Item = char>, Self>>>,
 
-    impl Observer<dyn SingletonView<Item = usize>> for CursorObserver {
-        fn reset(&mut self, new_cursor: Option<Arc<dyn SingletonView<Item = usize>>>) {
-            self.cursor = new_cursor;
-
-            if let Some(cursor) = self.cursor.as_ref() {
-                self.edit
-                    .upgrade().unwrap()
-                    .write().unwrap()
-                    .update_cursor( cursor.get() );
-            }
-        }
-
-        fn notify(&self, _msg: &()) {
-            if let Some(cursor) = self.cursor.as_ref() {
-                self.edit
-                    .upgrade().unwrap()
-                    .write().unwrap()
-                    .update_cursor( cursor.get() );
-            }            
-        }
-    }
-
-    struct DataObserver {
-        data: Option<Arc<dyn SequenceView<Item = char>>>,
-        edit: Weak<RwLock<StringEditView>>
-    }
-
-    impl Observer<dyn SequenceView<Item = char>> for DataObserver {
-        fn reset(&mut self, new_data: Option<Arc<dyn SequenceView<Item = char>>>) {
-            let old_len = self.data.len().unwrap_or(0);
-            self.data = new_data;
-            let new_len = self.data.len().unwrap_or(0);
-
-            self.edit
-                .upgrade().unwrap()
-                .write().unwrap()
-                .reset_data( std::cmp::max(old_len, new_len) );
-        }
-
-        fn notify(&self, pos: &usize) {
-            self.edit
-                .upgrade().unwrap()
-                .write().unwrap()
-                .update_data( *pos );
-        }
-    }
-    
-    pub struct StringEditView {
-        data_obs: Option<Arc<RwLock<DataObserver>>>,
-        cursor_obs: Option<Arc<RwLock<CursorObserver>>>,
+        cursor: Arc<dyn SingletonView<Item = usize>>,
+        data: Arc<dyn SequenceView<Item = char>>,
         cur_pos: usize,
         cast: Arc<RwLock<ObserverBroadcast<dyn TerminalView>>>
     }
-    
-    impl StringEditView {
-        pub fn new(
-            cursor_port: OuterViewPort<dyn SingletonView<Item = usize>>,
-            data_port: OuterViewPort<dyn SequenceView<Item = char>>,
-            out_port: InnerViewPort<dyn TerminalView>
-        ) -> Arc<RwLock<Self>> {
-            let edit_view = Arc::new(RwLock::new(
-                StringEditView {
-                    data_obs: None,
-                    cursor_obs: None,
-                    cur_pos: 0,
-                    cast: out_port.get_broadcast()
-                }
-            ));
 
-            let data_obs = Arc::new(RwLock::new(
-                DataObserver {
-                    data: None,
-                    edit: Arc::downgrade(&edit_view)
-                }
-            ));
-            edit_view.write().unwrap().data_obs = Some(data_obs.clone());
-            data_port.add_observer(data_obs);
-
-            let cursor_obs = Arc::new(RwLock::new(
-                CursorObserver {
-                    cursor: None,
-                    edit: Arc::downgrade(&edit_view)
-                }
-            ));
-            edit_view.write().unwrap().cursor_obs = Some(cursor_obs.clone());
-            cursor_port.add_observer(cursor_obs);
-
-            out_port.set_view(Some(edit_view.clone()));
-            edit_view
-        }
-
-        fn reset_data(&mut self, max_len: usize) {
-            self.cast.notify_each(GridWindowIterator::from(
-                Point2::new(0, 0) .. Point2::new(max_len as i16 +  1, 1)
-            ));
-        }
-
-        fn update_data(&mut self, pos: usize) {
-            self.cast.notify(
-                &Point2::new(
-                    if pos < self.cur_pos {
-                        pos
-                    } else {
-                        pos + 1
-                    } as i16,
-                    0
-                )
-            );
-        }
-
-        fn update_cursor(&mut self, new_pos: usize) {
-            let old_pos = self.cur_pos;
-            self.cur_pos = new_pos;
-
-            self.cast.notify_each(GridWindowIterator::from(
-                Point2::new(std::cmp::min(old_pos,new_pos) as i16, 0) .. Point2::new(std::cmp::max(old_pos,new_pos) as i16 + 1, 1)
-            ));
-        }
+    impl View for StringInsertView {
+        type Msg = Point2<i16>;
     }
-    
-    impl ImplIndexView for StringEditView {
-        type Key = Point2<i16>;
-        type Value = TerminalAtom;
+
+    impl IndexView<Point2<i16>> for StringInsertView {
+        type Item = TerminalAtom;
 
         fn get(&self, pos: &Point2<i16>) -> Option<TerminalAtom> {
             if pos.y == 0 && pos.x >= 0 {
                 let i = pos.x as usize;
-                let data =
-                    self.data_obs.as_ref().unwrap()
-                    .read().unwrap()
-                    .data.clone()
-                    .unwrap();
-                let len = data.len().unwrap();
+                let len = self.data.len().unwrap_or(0);
 
                 if i < len+1 {
                     return Some(
                         if i < self.cur_pos && i < len {
-                            TerminalAtom::from(data.get(&i).unwrap())
+                            TerminalAtom::from(self.data.get(&i).unwrap())
                         } else if i == self.cur_pos {
                             TerminalAtom::new('|', TerminalStyle::fg_color((200, 0, 0)))
                         } else {
-                            TerminalAtom::from(data.get(&(i-1)).unwrap())
+                            TerminalAtom::from(self.data.get(&(i-1)).unwrap())
                         }
                     );
                 }
@@ -246,18 +149,59 @@ pub mod insert_view {
         }
 
         fn area(&self) -> Option<Vec<Point2<i16>>> {
-            let data =
-                self.data_obs.as_ref().unwrap()
-                .read().unwrap()
-                .data.clone()
-                .unwrap();
-            let len = data.len()?;
+            Some(GridWindowIterator::from(
+                Point2::new(0, 0) .. Point2::new(self.data.len()? as i16 + 1, 1)
+            ).collect())
+        }
+    }
 
-            Some(
-                GridWindowIterator::from(
-                    Point2::new(0, 0) .. Point2::new(len as i16 + 1, 1)
-                ).collect()
-            )
+    impl StringInsertView {
+        pub fn new(
+            cursor_port: OuterViewPort<dyn SingletonView<Item = usize>>,
+            data_port: OuterViewPort<dyn SequenceView<Item = char>>,
+            out_port: InnerViewPort<dyn TerminalView>
+        ) -> Arc<RwLock<Self>> {
+            let cursor_obs = ProjectionArg::new(
+                |s: Arc<RwLock<Self>>, _msg| {
+                    let old_pos = s.read().unwrap().cur_pos;
+                    let new_pos = s.read().unwrap().cursor.get();
+                    s.write().unwrap().cur_pos = new_pos;
+                    s.read().unwrap().cast.notify_each(GridWindowIterator::from(Point2::new(min(old_pos, new_pos) as i16,0) ..= Point2::new(max(old_pos, new_pos) as i16, 0)))
+                });
+
+            let data_obs = ProjectionArg::new(
+                |s: Arc<RwLock<Self>>, idx| {
+                    s.read().unwrap().cast.notify(&Point2::new(
+                        if *idx < s.read().unwrap().cur_pos {
+                            *idx as i16
+                        } else {
+                            *idx as i16 + 1
+                        },
+                        0
+                    ));
+                });
+
+            let proj = Arc::new(RwLock::new(
+                StringInsertView {
+                    _cursor_obs: cursor_obs.clone(),
+                    _data_obs: data_obs.clone(),
+
+                    cursor: cursor_obs.read().unwrap().src.clone(),
+                    data: data_obs.read().unwrap().src.clone(),
+                    cur_pos: 0,
+                    cast: out_port.get_broadcast()
+                }
+            ));
+
+            cursor_obs.write().unwrap().proj = Arc::downgrade(&proj);
+            data_obs.write().unwrap().proj = Arc::downgrade(&proj);
+
+            cursor_port.add_observer(cursor_obs);
+            data_port.add_observer(data_obs);
+
+            out_port.set_view(Some(proj.clone()));
+
+            proj
         }
     }
 }

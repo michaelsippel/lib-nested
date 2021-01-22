@@ -53,7 +53,7 @@ impl<Key, V: IndexView<Key>> IndexView<Key> for Option<V> {
     type Item = V::Item;
 
     fn get(&self, key: &Key) -> Option<Self::Item> {
-        (self.as_ref()? as &V).get(key)
+        self.as_ref()?.get(key)
     }
 
     fn area(&self) -> Option<Vec<Key>> {

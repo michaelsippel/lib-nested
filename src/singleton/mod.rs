@@ -20,7 +20,7 @@ pub trait SingletonView : View<Msg = ()> {
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-impl<V: SingletonView> SingletonView for RwLock<V> {
+impl<V: SingletonView + ?Sized> SingletonView for RwLock<V> {
     type Item = V::Item;
 
     fn get(&self) -> Self::Item {
@@ -28,11 +28,24 @@ impl<V: SingletonView> SingletonView for RwLock<V> {
     }
 }
 
-impl<V: SingletonView> SingletonView for Arc<V> {
+impl<V: SingletonView + ?Sized> SingletonView for Arc<V> {
     type Item = V::Item;
 
     fn get(&self) -> Self::Item {
         self.deref().get()
+    }
+}
+
+impl<V: SingletonView> SingletonView for Option<V>
+where V::Item: Default{
+    type Item = V::Item;
+
+    fn get(&self) -> Self::Item {
+        if let Some(s) = self.as_ref() {
+            s.get()
+        } else {
+            V::Item::default()
+        }
     }
 }
 
