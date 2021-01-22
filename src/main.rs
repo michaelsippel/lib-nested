@@ -10,6 +10,7 @@ pub mod terminal;
 pub mod projection;
 pub mod string_editor;
 pub mod leveled_term_view;
+pub mod cell_layout;
 
 use {
     async_std::{task},
@@ -59,34 +60,44 @@ async fn main() {
         let mut window_size = SingletonBuffer::new(Vector2::new(0, 0), window_size_port.inner());
 
         //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+        // cells
+
+        let cells_port = ViewPort::new();
+        let cells = cell_layout::CellLayout::with_port(cells_port.inner());
+
+        compositor.push(cells_port.outer());
+
+        //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
         // string editor 1
         let mut editor = StringEditor::new();
         let (leveled_edit_view, leveled_edit_view_port) = LeveledTermView::new(editor.insert_view());
-        compositor.push(
+
+        cell_layout::CellLayout::set_cell(
+            &cells,
+            Point2::new(0, 0),
             leveled_edit_view_port
                 .map_item(
                     move |_pos, atom| atom.add_style_back(
-                        TerminalStyle::fg_color((200,200,200))))
-        );
+                        TerminalStyle::fg_color((200,200,200)))));
 
         //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
         // string editor 2
         let mut editor2 = StringEditor::new();
         let (leveled_edit2_view, leveled_edit2_view_port) = LeveledTermView::new(editor2.insert_view());
-        compositor.push(
+
+        cell_layout::CellLayout::set_cell(
+            &cells,
+            Point2::new(1, 1),
             leveled_edit2_view_port
                 .map_item(
                     move |_pos, atom| atom.add_style_back(
-                        TerminalStyle::fg_color((200,200,200))))
-                .map_key(
-                    |p| p + Vector2::new(0, 1),
-                    |p| Some(p - Vector2::new(0, 1))
-                )
-        );
+                        TerminalStyle::fg_color((200,200,200)))));
 
         //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
         // another view of the string, without editor
-        compositor.push(
+        cell_layout::CellLayout::set_cell(
+            &cells,
+            Point2::new(1, 0),
             editor.get_data_port()
                 .to_sequence()
                 .to_index()
@@ -100,6 +111,7 @@ async fn main() {
 
         //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
         // welcome message
+
         for c in "Welcome!".chars() {
             editor.insert(c);
             task::sleep(std::time::Duration::from_millis(80)).await;
