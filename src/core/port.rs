@@ -71,10 +71,7 @@ impl<V: View + ?Sized> Clone for ViewPort<V> {
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-#[derive(Clone)]
 pub struct InnerViewPort<V: View + ?Sized>(ViewPort<V>);
-
-#[derive(Clone)]
 pub struct OuterViewPort<V: View + ?Sized>(ViewPort<V>);
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
@@ -95,6 +92,12 @@ impl<V: View + ?Sized> InnerViewPort<V> {
 
     pub fn notify(&self, msg: &V::Msg) {
         self.0.observers.read().unwrap().notify(msg);
+    }
+}
+
+impl<V: View + ?Sized> Clone for InnerViewPort<V> {
+    fn clone(&self) -> Self {
+        InnerViewPort(self.0.clone())
     }
 }
 
@@ -124,6 +127,12 @@ impl<V: View + ?Sized + 'static> OuterViewPort<V> {
         let obs = Arc::new(RwLock::new(NotifyFnObserver::new(notify)));
         self.add_observer(obs.clone());
         obs
+    }
+}
+
+impl<V: View + ?Sized> Clone for OuterViewPort<V> {
+    fn clone(&self) -> Self {
+        OuterViewPort(self.0.clone())
     }
 }
 

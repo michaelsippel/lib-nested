@@ -20,7 +20,7 @@ use {
     cgmath::{Vector2, Point2},
     termion::event::{Event, Key},
     crate::{
-        core::{View, Observer, ObserverExt, ObserverBroadcast, ViewPort},
+        core::{View, Observer, ObserverExt, ObserverBroadcast, ViewPort, OuterViewPort},
         index::{ImplIndexView},
         terminal::{
             TerminalView,
@@ -30,6 +30,7 @@ use {
             Terminal,
             TerminalCompositor
         },
+        sequence::{VecBuffer, SequenceView},
         grid::{GridOffset, GridWindowIterator},
         singleton::{SingletonView, SingletonBuffer},
         string_editor::{StringEditor, insert_view::StringInsertView},
@@ -59,70 +60,103 @@ async fn main() {
         let window_size_port = ViewPort::new();
         let mut window_size = SingletonBuffer::new(Vector2::new(0, 0), window_size_port.inner());
 
+        let opening_port = ViewPort::new();
+        let mut opening = VecBuffer::new(opening_port.inner());
+
+        let delim_port = ViewPort::new();
+        let mut delim = VecBuffer::new(delim_port.inner());
+
+        let closing_port = ViewPort::new();
+        let mut closing = VecBuffer::new(closing_port.inner());
+
+        let e1_port = ViewPort::new();
+        let mut e1 = VecBuffer::new(e1_port.inner());
+
+        let e2_port = ViewPort::new();
+        let mut e2 = VecBuffer::new(e2_port.inner());
+
+        opening.push(TerminalAtom::new('[', TerminalStyle::fg_color((180, 120, 80))));
+        delim.push(TerminalAtom::new(',', TerminalStyle::fg_color((180, 120, 80))));
+        delim.push(TerminalAtom::new(' ', TerminalStyle::fg_color((180, 120, 80))));
+        closing.push(TerminalAtom::new(']', TerminalStyle::fg_color((180, 120, 80))));
+
+        let str_list_port = ViewPort::new();
+        let mut str_list = VecBuffer::<OuterViewPort<dyn SequenceView<Item = TerminalAtom>>>::new(str_list_port.inner());
+
+        str_list.push(opening_port.outer().to_sequence());
+        str_list.push(closing_port.outer().to_sequence());
+
+        compositor.push(
+            str_list_port.outer()
+                .to_sequence()
+                .flatten()
+                .to_index()
+                .map_key(
+                    |idx| Point2::new(*idx as i16, 0 as i16),
+                    |pt| if pt.y == 0 { Some(pt.x as usize) } else { None }
+                )
+        );
+
         //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
-        // cells
+        // welcome message
+        task::sleep(std::time::Duration::from_millis(500)).await;
+        str_list.insert(1, e1_port.outer().to_sequence());
+        for c in "Welcome!".chars() {
+            e1.push(TerminalAtom::new(c, TerminalStyle::fg_color((180, 180, 255))));
+            task::sleep(std::time::Duration::from_millis(80)).await;
+        }
+        task::sleep(std::time::Duration::from_millis(500)).await;
+        str_list.insert(2, delim_port.outer().to_sequence());
+        str_list.insert(3, e2_port.outer().to_sequence());
+        task::sleep(std::time::Duration::from_millis(80)).await;
+        for c in "This is a flattened SequenceView.".chars() {
+            e2.push(TerminalAtom::new(c, TerminalStyle::fg_color((180, 180, 255))));
+            task::sleep(std::time::Duration::from_millis(80)).await;
+        }
 
-        let cells_port = ViewPort::new();
-        let cells = cell_layout::CellLayout::with_port(cells_port.inner());
+        task::sleep(std::time::Duration::from_millis(500)).await;
 
-        compositor.push(cells_port.outer());
+        let l2_port = ViewPort::new();
+        let mut l2 = VecBuffer::new(l2_port.inner());
+
+        *str_list.get_mut(1) = l2_port.outer().to_sequence().flatten();
+
+        l2.push(opening_port.outer().to_sequence());
+
+        e1.clear();
+        l2.push(e1_port.outer().to_sequence());
+        l2.push(closing_port.outer().to_sequence());
+
+        for c in "they can even be NeStEd!".chars() {
+            e1.push(TerminalAtom::new(c, TerminalStyle::fg_color((180, 180, 255))));
+            task::sleep(std::time::Duration::from_millis(80)).await;
+        }
+
+        for i in 0 .. 10 {
+            task::sleep(std::time::Duration::from_millis(100)).await;
+
+            let col = (100+10*i, 55+20*i, 20+ 20*i);
+            *opening.get_mut(0) = TerminalAtom::new('{', TerminalStyle::fg_color(col));
+            *closing.get_mut(0) = TerminalAtom::new('}', TerminalStyle::fg_color(col));
+        }
+
+        for i in 0 .. 10 {
+            task::sleep(std::time::Duration::from_millis(100)).await;
+
+            let col = (100+10*i, 55+20*i, 20+ 20*i);
+            *opening.get_mut(0) = TerminalAtom::new('<', TerminalStyle::fg_color(col));
+            *closing.get_mut(0) = TerminalAtom::new('>', TerminalStyle::fg_color(col));
+        }
 
         //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
         // string editor 1
         let mut editor = StringEditor::new();
         let (leveled_edit_view, leveled_edit_view_port) = LeveledTermView::new(editor.insert_view());
 
-        cell_layout::CellLayout::set_cell(
-            &cells,
-            Point2::new(0, 0),
-            leveled_edit_view_port
-                .map_item(
-                    move |_pos, atom| atom.add_style_back(
-                        TerminalStyle::fg_color((200,200,200)))));
-
         //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
         // string editor 2
         let mut editor2 = StringEditor::new();
         let (leveled_edit2_view, leveled_edit2_view_port) = LeveledTermView::new(editor2.insert_view());
-
-        cell_layout::CellLayout::set_cell(
-            &cells,
-            Point2::new(1, 1),
-            leveled_edit2_view_port
-                .map_item(
-                    move |_pos, atom| atom.add_style_back(
-                        TerminalStyle::fg_color((200,200,200)))));
-
-        //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
-        // another view of the string, without editor
-        cell_layout::CellLayout::set_cell(
-            &cells,
-            Point2::new(1, 0),
-            editor.get_data_port()
-                .to_sequence()
-                .to_index()
-                .map_key(
-                    |idx| Point2::new(*idx as i16, 2 + *idx as i16),
-                    |pt| if pt.x == pt.y-2 { Some(pt.x as usize) } else { None }
-                ).map_item(
-                    |_key, c| TerminalAtom::new(*c, TerminalStyle::fg_color((80, 20, 180)).add(TerminalStyle::bg_color((40,10,90))))
-                )
-        );
-
-        //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
-        // welcome message
-
-        for c in "Welcome!".chars() {
-            editor.insert(c);
-            task::sleep(std::time::Duration::from_millis(80)).await;
-        }
-
-        task::sleep(std::time::Duration::from_millis(500)).await;
-
-        for c in "Use arrow keys to navigate.".chars() {
-            editor2.insert(c);
-            task::sleep(std::time::Duration::from_millis(80)).await;
-        }
 
         
                             /*\
@@ -131,7 +165,7 @@ async fn main() {
         <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                             \*/
 
-        let mut sel = 0;
+        let mut sel = 0 as usize;
 
         leveled_edit_view.write().unwrap().set_level(if sel == 0 {1} else {0});
         leveled_edit2_view.write().unwrap().set_level(if sel == 1 {1} else {0});

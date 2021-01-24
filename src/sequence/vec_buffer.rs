@@ -166,6 +166,12 @@ where T: Clone + Send + Sync + 'static {
         self.cast.notify(&diff);
     }
 
+    pub fn clear(&mut self) {
+        for _ in 0 .. self.len() {
+            self.remove(0);
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.data.read().unwrap().len()
     }
