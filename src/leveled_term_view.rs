@@ -1,20 +1,25 @@
 use {
-    std::sync::{Arc, RwLock},
+    std::{
+        sync::{Arc, RwLock},
+        collections::HashSet
+    },
     cgmath::Point2,
     crate::{
         core::{ViewPort, Observer, ObserverExt, ObserverBroadcast, InnerViewPort, OuterViewPort},
         index::{ImplIndexView},
         terminal::{TerminalAtom, TerminalView, TerminalStyle},
-        projection::ProjectionArg
+        projection::{ProjectionHelper, ProjectionArg}
     }
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub struct LeveledTermView {
-    src: Arc<RwLock<Option<Arc<dyn TerminalView>>>>,
-    _src_obs: Arc<RwLock<ProjectionArg<dyn TerminalView, Self>>>,
+    proj_helper: Option<ProjectionHelper<Self>>,
+
+    src: Arc<RwLock<dyn TerminalView>>,
     level: usize,
+
     cast: Arc<RwLock<ObserverBroadcast<dyn TerminalView>>>
 }
 
@@ -31,24 +36,24 @@ impl LeveledTermView {
         src_port: OuterViewPort<dyn TerminalView>,
         dst_port: InnerViewPort<dyn TerminalView>
     ) -> Arc<RwLock<Self>> {
-        let src_obs = ProjectionArg::new(
-            // we simply forward all messages
-            |s: Arc<RwLock<Self>>, msg: &Point2<i16>| {
-                s.read().unwrap().cast.notify(msg);
-            }
-        );
-
         let v = Arc::new(RwLock::new(
             LeveledTermView {
-                src: src_obs.read().unwrap().src.clone(),
-                _src_obs: src_obs.clone(),
+                proj_helper: None,
+                src: Arc::new(RwLock::new(Option::<Arc<dyn TerminalView>>::None)),
                 level: 0,
                 cast: dst_port.get_broadcast()
             }
         ));
 
-        src_obs.write().unwrap().proj = Arc::downgrade(&v);
+        let mut projection_helper = ProjectionHelper::new(Arc::downgrade(&v));
 
+        let (src, src_obs) = projection_helper.new_arg(
+            |p: Arc<RwLock<Self>>, pos: &Point2<i16>| {
+                p.read().unwrap().cast.notify(pos);
+            });
+
+        v.write().unwrap().proj_helper = Some(projection_helper);
+        v.write().unwrap().src = src;
         src_port.add_observer(src_obs);
         dst_port.set_view(Some(v.clone()));
 

@@ -1,5 +1,7 @@
 use {
-    std::sync::{RwLock},
+    std::{
+        sync::{RwLock}
+    },
     crate::{
         core::{ViewPort, OuterViewPort},
         singleton::{SingletonView, SingletonBuffer},
@@ -97,22 +99,27 @@ impl StringEditor {
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub mod insert_view {
-    use cgmath::Point2;
-    use std::sync::{Arc, RwLock};
-    use std::cmp::{min, max};
-    use crate::{
-        core::{View, Observer, ObserverExt, ObserverBroadcast, OuterViewPort, InnerViewPort},
-        terminal::{TerminalAtom, TerminalStyle, TerminalView},
-        grid::{GridWindowIterator},
-        singleton::{SingletonView},
-        sequence::{SequenceView},
-        index::{IndexView},
-        projection::ProjectionArg,
+    use {
+        std::{
+            sync::{Arc, RwLock},
+            cmp::{min, max},
+            any::Any,
+            collections::HashSet
+        },
+        cgmath::Point2,
+        crate::{
+            core::{View, Observer, ObserverExt, ObserverBroadcast, OuterViewPort, InnerViewPort},
+            terminal::{TerminalAtom, TerminalStyle, TerminalView},
+            grid::{GridWindowIterator},
+            singleton::{SingletonView},
+            sequence::{SequenceView},
+            index::{IndexView},
+            projection::{ProjectionHelper, ProjectionArg},
+        }
     };
 
     pub struct StringInsertView {
-        _cursor_obs: Arc<RwLock<ProjectionArg<dyn SingletonView<Item = usize>, Self>>>,
-        _data_obs: Arc<RwLock<ProjectionArg<dyn SequenceView<Item = char>, Self>>>,
+        proj_helper: Option<ProjectionHelper<Self>>,
 
         cursor: Arc<dyn SingletonView<Item = usize>>,
         data: Arc<RwLock<dyn SequenceView<Item = char>>>,
@@ -162,7 +169,19 @@ pub mod insert_view {
             data_port: OuterViewPort<dyn SequenceView<Item = char>>,
             out_port: InnerViewPort<dyn TerminalView>
         ) -> Arc<RwLock<Self>> {
-            let cursor_obs = ProjectionArg::new(
+            let proj = Arc::new(RwLock::new(
+                StringInsertView {
+                    proj_helper: None,
+                    cursor: Arc::new(Option::<Arc<dyn SingletonView<Item = usize>>>::None),
+                    data: Arc::new(RwLock::new(Option::<Arc<dyn SequenceView<Item = char>>>::None)),
+                    cur_pos: 0,
+                    cast: out_port.get_broadcast()
+                }
+            ));
+
+            let mut projection_helper = ProjectionHelper::new(Arc::downgrade(&proj));
+
+            let (cursor, cursor_obs) = projection_helper.new_arg(
                 |s: Arc<RwLock<Self>>, _msg| {
                     let old_pos = s.read().unwrap().cur_pos;
                     let new_pos = s.read().unwrap().cursor.get();
@@ -170,7 +189,7 @@ pub mod insert_view {
                     s.read().unwrap().cast.notify_each(GridWindowIterator::from(Point2::new(min(old_pos, new_pos) as i16,0) ..= Point2::new(max(old_pos, new_pos) as i16, 0)))
                 });
 
-            let data_obs = ProjectionArg::new(
+            let (data, data_obs) = projection_helper.new_arg(
                 |s: Arc<RwLock<Self>>, idx| {
                     s.read().unwrap().cast.notify(&Point2::new(
                         if *idx < s.read().unwrap().cur_pos {
@@ -182,20 +201,9 @@ pub mod insert_view {
                     ));
                 });
 
-            let proj = Arc::new(RwLock::new(
-                StringInsertView {
-                    _cursor_obs: cursor_obs.clone(),
-                    _data_obs: data_obs.clone(),
-
-                    cursor: cursor_obs.read().unwrap().src.clone(),
-                    data: data_obs.read().unwrap().src.clone(),
-                    cur_pos: 0,
-                    cast: out_port.get_broadcast()
-                }
-            ));
-
-            cursor_obs.write().unwrap().proj = Arc::downgrade(&proj);
-            data_obs.write().unwrap().proj = Arc::downgrade(&proj);
+            proj.write().unwrap().proj_helper = Some(projection_helper);
+            proj.write().unwrap().cursor = cursor;
+            proj.write().unwrap().data = data;
 
             cursor_port.add_observer(cursor_obs);
             data_port.add_observer(data_obs);
