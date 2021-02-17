@@ -10,7 +10,7 @@ pub mod terminal;
 pub mod projection;
 pub mod string_editor;
 pub mod leveled_term_view;
-pub mod cell_layout;
+//pub mod cell_layout;
 
 use {
     async_std::{task},
@@ -39,13 +39,69 @@ use {
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+/*
+struct ListView {
+    opening: OuterViewPort<dyn SequenceView<Item = TerminalAtom>>,
+    closing: OuterViewPort<dyn SequenceView<Item = TerminalAtom>>,
+    delim: OuterViewPort<dyn SequenceView<Item = TerminalAtom>>,
+
+    data: Option<Arc<dyn SequenceView<Item = OuterViewPort<dyn SequenceView<Item = TerminalAtom>>>>>,
+    cast: Arc<RwLock<ObserverBroadcast<>>
+}
+
+impl View for ListView {
+    type Msg = usize;
+}
+
+impl SequenceView for ListView {
+    type Item = OuterViewPort<dyn SequenceView<Item = TerminalAtom>>;
+
+    fn get(&self, idx: usize) -> Option<Self::Item> {
+        let len = self.data.len();
+
+        if idx == 0 {
+            Some(self.opening.clone())
+        } else if idx < len*2 {
+            if idx % 2 == 1 {
+                self.data.get(idx / 2)
+            } else {
+                Some(self.delim.clone())
+            }
+        } else if idx == len*2 {
+            Some(self.closing.clone())
+        } else {
+            None
+        }
+    }
+}
+
+impl Observer<dyn SequenceView<Item = OuterViewPort<dyn SequenceView<Item = TerminalAtom>>>> for ListView {
+    fn reset(&mut self, v: Option<Arc<dyn SequenceView<Item = OuterViewPort<dyn SequenceView<Item = TerminalAtom>>>>>) {
+        self.data = v;
+    }
+
+    fn notify(&self, idx: usize) {
+        
+    }
+}
+
+impl ListView {
+    fn new(
+        data: OuterViewPort<dyn SequenceView<Item = OuterViewPort<dyn SequenceView<Item = TerminalAtom>>>>,
+        port: InnerViewPort<dyn SequenceView<Item = OuterViewPort<dyn SequenceView<Item = TerminalAtom>>>>
+    ) -> Self {
+        let
+    }
+}
+ */
+
 
 #[async_std::main]
 async fn main() {
     let term_port = ViewPort::<dyn TerminalView>::new();
 
     let mut compositor = TerminalCompositor::new(term_port.inner());
-    compositor.push(ViewPort::<dyn TerminalView>::with_view(Arc::new(ScrambleBackground)).into_outer());
+    //compositor.push(ViewPort::<dyn TerminalView>::with_view(Arc::new(ScrambleBackground)).into_outer());
 
     let mut term = Terminal::new(term_port.outer());
     let term_writer = term.get_writer();
@@ -60,33 +116,10 @@ async fn main() {
         let window_size_port = ViewPort::new();
         let mut window_size = SingletonBuffer::new(Vector2::new(0, 0), window_size_port.inner());
 
-        let opening_port = ViewPort::new();
-        let mut opening = VecBuffer::new(opening_port.inner());
-
-        let delim_port = ViewPort::new();
-        let mut delim = VecBuffer::new(delim_port.inner());
-
-        let closing_port = ViewPort::new();
-        let mut closing = VecBuffer::new(closing_port.inner());
-
-        let e1_port = ViewPort::new();
-        let mut e1 = VecBuffer::new(e1_port.inner());
-
-        let e2_port = ViewPort::new();
-        let mut e2 = VecBuffer::new(e2_port.inner());
-
-        opening.push(TerminalAtom::new('[', TerminalStyle::fg_color((180, 120, 80))));
-        delim.push(TerminalAtom::new(',', TerminalStyle::fg_color((180, 120, 80))));
-        delim.push(TerminalAtom::new(' ', TerminalStyle::fg_color((180, 120, 80))));
-        closing.push(TerminalAtom::new(']', TerminalStyle::fg_color((180, 120, 80))));
-
         let str_list_port = ViewPort::new();
         let mut str_list = VecBuffer::<OuterViewPort<dyn SequenceView<Item = TerminalAtom>>>::new(str_list_port.inner());
 
-        str_list.push(opening_port.outer().to_sequence());
-        str_list.push(closing_port.outer().to_sequence());
-
-        compositor.push(
+        compositor.write().unwrap().push(
             str_list_port.outer()
                 .to_sequence()
                 .flatten()
@@ -99,54 +132,83 @@ async fn main() {
 
         //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
         // welcome message
-        task::sleep(std::time::Duration::from_millis(500)).await;
-        str_list.insert(1, e1_port.outer().to_sequence());
-        for c in "Welcome!".chars() {
-            e1.push(TerminalAtom::new(c, TerminalStyle::fg_color((180, 180, 255))));
+        task::spawn(async move {
+            let opening_port = ViewPort::new();
+            let mut opening = VecBuffer::new(opening_port.inner());
+
+            let delim_port = ViewPort::new();
+            let mut delim = VecBuffer::new(delim_port.inner());
+
+            let closing_port = ViewPort::new();
+            let mut closing = VecBuffer::new(closing_port.inner());
+
+            let e1_port = ViewPort::new();
+            let mut e1 = VecBuffer::new(e1_port.inner());
+
+            let e2_port = ViewPort::new();
+            let mut e2 = VecBuffer::new(e2_port.inner());
+
+            opening.push(TerminalAtom::new('[', TerminalStyle::fg_color((180, 120, 80))));
+            delim.push(TerminalAtom::new(',', TerminalStyle::fg_color((180, 120, 80))));
+            delim.push(TerminalAtom::new(' ', TerminalStyle::fg_color((180, 120, 80))));
+            closing.push(TerminalAtom::new(']', TerminalStyle::fg_color((180, 120, 80))));
+
+            str_list.push(opening_port.outer().to_sequence());
+            str_list.push(closing_port.outer().to_sequence());
+
+            task::sleep(std::time::Duration::from_millis(500)).await;
+            str_list.insert(1, e1_port.outer().to_sequence());
+
+            for c in "Welcome!".chars() {
+                e1.push(TerminalAtom::new(c, TerminalStyle::fg_color((180, 180, 255))));
+                task::sleep(std::time::Duration::from_millis(80)).await;
+            }
+
+            task::sleep(std::time::Duration::from_millis(500)).await;
+            str_list.insert(2, delim_port.outer().to_sequence());
+            str_list.insert(3, e2_port.outer().to_sequence());
             task::sleep(std::time::Duration::from_millis(80)).await;
-        }
-        task::sleep(std::time::Duration::from_millis(500)).await;
-        str_list.insert(2, delim_port.outer().to_sequence());
-        str_list.insert(3, e2_port.outer().to_sequence());
-        task::sleep(std::time::Duration::from_millis(80)).await;
-        for c in "This is a flattened SequenceView.".chars() {
-            e2.push(TerminalAtom::new(c, TerminalStyle::fg_color((180, 180, 255))));
-            task::sleep(std::time::Duration::from_millis(80)).await;
-        }
+            for c in "This is a flattened SequenceView.".chars() {
+                e2.push(TerminalAtom::new(c, TerminalStyle::fg_color((180, 180, 255))));
+                task::sleep(std::time::Duration::from_millis(80)).await;
+            }
 
-        task::sleep(std::time::Duration::from_millis(500)).await;
+            task::sleep(std::time::Duration::from_millis(500)).await;
 
-        let l2_port = ViewPort::new();
-        let mut l2 = VecBuffer::new(l2_port.inner());
+            let l2_port = ViewPort::new();
+            let mut l2 = VecBuffer::new(l2_port.inner());
 
-        *str_list.get_mut(1) = l2_port.outer().to_sequence().flatten();
+            *str_list.get_mut(1) = l2_port.outer().to_sequence().flatten();
 
-        l2.push(opening_port.outer().to_sequence());
+            l2.push(opening_port.outer().to_sequence());
 
-        e1.clear();
-        l2.push(e1_port.outer().to_sequence());
-        l2.push(closing_port.outer().to_sequence());
+            e1.clear();
+            l2.push(e1_port.outer().to_sequence());
+            l2.push(closing_port.outer().to_sequence());
 
-        for c in "they can even be NeStEd!".chars() {
-            e1.push(TerminalAtom::new(c, TerminalStyle::fg_color((180, 180, 255))));
-            task::sleep(std::time::Duration::from_millis(80)).await;
-        }
+            for c in "they can even be NeStEd!".chars() {
+                e1.push(TerminalAtom::new(c, TerminalStyle::fg_color((180, 180, 255))));
+                task::sleep(std::time::Duration::from_millis(80)).await;
+            }
 
-        for i in 0 .. 10 {
-            task::sleep(std::time::Duration::from_millis(100)).await;
+            loop {
+                for i in 0 .. 10 {
+                    task::sleep(std::time::Duration::from_millis(60)).await;
 
-            let col = (100+10*i, 55+20*i, 20+ 20*i);
-            *opening.get_mut(0) = TerminalAtom::new('{', TerminalStyle::fg_color(col));
-            *closing.get_mut(0) = TerminalAtom::new('}', TerminalStyle::fg_color(col));
-        }
+                    let col = (100+10*i, 55+20*i, 20+ 20*i);
+                    *opening.get_mut(0) = TerminalAtom::new('{', TerminalStyle::fg_color(col));
+                    *closing.get_mut(0) = TerminalAtom::new('}', TerminalStyle::fg_color(col));
+                }
 
-        for i in 0 .. 10 {
-            task::sleep(std::time::Duration::from_millis(100)).await;
+                for i in 0 .. 10 {
+                    task::sleep(std::time::Duration::from_millis(60)).await;
 
-            let col = (100+10*i, 55+20*i, 20+ 20*i);
-            *opening.get_mut(0) = TerminalAtom::new('<', TerminalStyle::fg_color(col));
-            *closing.get_mut(0) = TerminalAtom::new('>', TerminalStyle::fg_color(col));
-        }
+                    let col = (100+10*i, 55+20*i, 20+ 20*i);
+                    *opening.get_mut(0) = TerminalAtom::new('<', TerminalStyle::fg_color(col));
+                    *closing.get_mut(0) = TerminalAtom::new('>', TerminalStyle::fg_color(col));
+                }
+            }
+        });
 
         //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
         // string editor 1
@@ -158,6 +220,22 @@ async fn main() {
         let mut editor2 = StringEditor::new();
         let (leveled_edit2_view, leveled_edit2_view_port) = LeveledTermView::new(editor2.insert_view());
 
+        compositor.write().unwrap().push(
+            leveled_edit_view_port
+                .map_key(
+                    |p| p + Vector2::new(1, 1),
+                    |p| Some(p - Vector2::new(1, 1))
+                )
+        );
+
+        compositor.write().unwrap().push(
+            leveled_edit2_view_port
+                .map_key(
+                    |p| p + Vector2::new(1, 2),
+                    |p| Some(p - Vector2::new(1, 2))
+                )
+        );
+        
         
                             /*\
         <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
