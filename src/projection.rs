@@ -1,12 +1,14 @@
 use {
     std::{
-        sync::{Arc, RwLock, Weak},
         cmp::{max},
-        any::Any
+        any::Any,
+        sync::{Arc, RwLock, Weak}
     },
-    async_std::stream::StreamExt,
+    async_std::{
+        stream::StreamExt
+    },
     crate::{
-        core::{View, Observer, ObserverExt, channel::{channel, ChannelData, ChannelSender, ChannelReceiver}},
+        core::{View, Observer, ObserverExt, OuterViewPort, channel::{channel, ChannelData, ChannelSender, ChannelReceiver}},
         singleton::{SingletonView},
         sequence::{SequenceView},
         index::{IndexView}
@@ -17,22 +19,59 @@ use {
 
 pub struct ProjectionHelper<P: Send + Sync + 'static> {
     keepalive: Vec<Arc<dyn Any + Send + Sync>>,
-    proj: Weak<RwLock<P>>
+    proj: Arc<RwLock<Weak<RwLock<P>>>>
 }
 
 impl<P: Send + Sync + 'static> ProjectionHelper<P> {
-    pub fn new(proj: Weak<RwLock<P>>) -> Self {
+    pub fn new() -> Self {
         ProjectionHelper {
             keepalive: Vec::new(),
-            proj
+            proj: Arc::new(RwLock::new(Weak::new()))
         }
+    }
+
+    pub fn set_proj(&mut self, proj: &Arc<RwLock<P>>) {
+        *self.proj.write().unwrap() = Arc::downgrade(proj);
+    }
+
+    // todo: make this functions generic over the View
+    // this does currently not work because Observer<V> is not implemented for ProjectionArg for *all* V.
+
+    pub fn new_singleton_arg<Item: 'static>(
+        &mut self,
+        port: OuterViewPort<dyn SingletonView<Item = Item>>,
+        notify: impl Fn(&mut P, &()) + Send + Sync + 'static
+    ) -> Arc<RwLock<Option<Arc<dyn SingletonView<Item = Item>>>>> {
+        let (view, obs) = self.new_arg(notify);
+        port.add_observer(obs);
+        view
+    }
+
+    pub fn new_sequence_arg<Item: 'static>(
+        &mut self,
+        port: OuterViewPort<dyn SequenceView<Item = Item>>,
+        notify: impl Fn(&mut P, &usize) + Send + Sync + 'static
+    ) -> Arc<RwLock<Option<Arc<dyn SequenceView<Item = Item>>>>> {
+        let (view, obs) = self.new_arg(notify);
+        port.add_observer(obs);
+        view
+    }
+
+    pub fn new_index_arg<Key: Clone + Send + Sync + 'static, Item: 'static>(
+        &mut self,
+        port: OuterViewPort<dyn IndexView<Key, Item = Item>>,
+        notify: impl Fn(&mut P, &Key) + Send + Sync + 'static
+    ) -> Arc<RwLock<Option<Arc<dyn IndexView<Key, Item = Item>>>>> {
+        let (view, obs) = self.new_arg(notify);
+        port.add_observer(obs);
+        view
     }
 
     pub fn new_arg<
         V: View + ?Sized + 'static
     >(
         &mut self,
-        notify: impl Fn(Arc<RwLock<P>>, &V::Msg) + Send + Sync + 'static
+        notify: impl Fn(&mut P, &V::Msg) + Send + Sync + 'static
     ) -> (
         Arc<RwLock<Option<Arc<V>>>>,
         Arc<RwLock<ProjectionArg<V, Vec<V::Msg>>>>
@@ -49,8 +88,16 @@ impl<P: Send + Sync + 'static> ProjectionHelper<P> {
         let proj = self.proj.clone();
         async_std::task::spawn(async move {
             while let Some(msg) = rx.next().await {
-                let proj = proj.upgrade().unwrap();
-                notify(proj, &msg);
+                if let Some(proj) = proj.read().unwrap().upgrade() {
+                    loop {
+                        if let Ok(p) = proj.try_write().as_mut() {
+                            notify(&mut *p, &msg);
+                            break;
+                        }
+
+                        async_std::task::yield_now();
+                    }
+                }
             }
         });
 

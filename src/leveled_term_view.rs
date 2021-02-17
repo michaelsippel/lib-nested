@@ -15,12 +15,11 @@ use {
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub struct LeveledTermView {
-    proj_helper: Option<ProjectionHelper<Self>>,
-
     src: Arc<RwLock<dyn TerminalView>>,
     level: usize,
 
-    cast: Arc<RwLock<ObserverBroadcast<dyn TerminalView>>>
+    cast: Arc<RwLock<ObserverBroadcast<dyn TerminalView>>>,
+    proj_helper: ProjectionHelper<Self>
 }
 
 impl LeveledTermView {
@@ -36,25 +35,22 @@ impl LeveledTermView {
         src_port: OuterViewPort<dyn TerminalView>,
         dst_port: InnerViewPort<dyn TerminalView>
     ) -> Arc<RwLock<Self>> {
+        let mut proj_helper = ProjectionHelper::new();
+
         let v = Arc::new(RwLock::new(
             LeveledTermView {
-                proj_helper: None,
-                src: Arc::new(RwLock::new(Option::<Arc<dyn TerminalView>>::None)),
+                src: proj_helper.new_index_arg(
+                    src_port,
+                    |p: &mut Self, pos: &Point2<i16>| {
+                        p.cast.notify(pos);
+                    }),
                 level: 0,
-                cast: dst_port.get_broadcast()
+                cast: dst_port.get_broadcast(),
+                proj_helper
             }
         ));
 
-        let mut projection_helper = ProjectionHelper::new(Arc::downgrade(&v));
-
-        let (src, src_obs) = projection_helper.new_arg(
-            |p: Arc<RwLock<Self>>, pos: &Point2<i16>| {
-                p.read().unwrap().cast.notify(pos);
-            });
-
-        v.write().unwrap().proj_helper = Some(projection_helper);
-        v.write().unwrap().src = src;
-        src_port.add_observer(src_obs);
+        v.write().unwrap().proj_helper.set_proj(&v);
         dst_port.set_view(Some(v.clone()));
 
         v
