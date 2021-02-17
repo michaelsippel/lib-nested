@@ -208,7 +208,7 @@ where V1: SequenceView<Item = OuterViewPort<V2>> + ?Sized + 'static,
         let top_len = self.top.read().unwrap().view.len().unwrap_or(0);
 
         let first_chunk = self.chunks.get(&start_idx).unwrap().read().unwrap();
-        let mut start_offset = first_chunk.offset + first_chunk.view.len().unwrap_or(0);
+        let start_offset = first_chunk.offset + first_chunk.view.len().unwrap_or(0);
         let mut cur_offset = start_offset;
 
         let mut dirty_idx = Vec::new();
