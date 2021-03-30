@@ -1,9 +1,10 @@
 use {
     async_std::stream::StreamExt,
     std::{
-        sync::{Arc, Weak, RwLock},
+        sync::{Arc, Weak},
         collections::{HashMap, HashSet}
     },
+    std::sync::RwLock,
     crate::{
         core::{
             View, Observer, ObserverExt, ObserverBroadcast,

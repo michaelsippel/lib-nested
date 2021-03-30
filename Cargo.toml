@@ -6,6 +6,7 @@ name = "NeStEd"
 version = "0.1.0"
 
 [dependencies]
+no_deadlocks = "*"
 cgmath = "0.17.0"
 termion = "1.5.5"
 signal-hook = "0.3.1"

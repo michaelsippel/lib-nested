@@ -1,8 +1,9 @@
 use {
     std::{
-        sync::{Arc, RwLock},
+        sync::{Arc},
         collections::HashSet
     },
+    std::sync::RwLock,
     cgmath::Point2,
     crate::{
         core::{ViewPort, Observer, ObserverExt, ObserverBroadcast, InnerViewPort, OuterViewPort},

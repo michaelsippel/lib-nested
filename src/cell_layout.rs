@@ -1,11 +1,12 @@
 use {
     async_std::stream::StreamExt,
     std::{
-        sync::{Arc, RwLock},
+        sync::Arc,
         collections::HashMap,
         cmp::{min, max}
     },
     cgmath::{Point2, Vector2},
+    std::sync::RwLock,
     crate::{
         core::{InnerViewPort, OuterViewPort, Observer, ObserverExt, ObserverBroadcast, ChannelReceiver, ChannelSender},
         terminal::{TerminalView, TerminalAtom},

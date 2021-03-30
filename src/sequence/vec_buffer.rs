@@ -1,8 +1,9 @@
 use {
     std::{
-        sync::{Arc, RwLock},
+        sync::Arc,
         ops::{Deref, DerefMut}
     },
+    std::sync::RwLock,
     crate::{
         core::{View, Observer, ObserverExt, ObserverBroadcast, ViewPort, InnerViewPort, OuterViewPort},
         sequence::SequenceView,

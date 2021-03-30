@@ -1,8 +1,9 @@
 use {
     crate::core::View,
     std::{
-        sync::{Arc, Weak, RwLock}
-    }
+        sync::{Arc, Weak}
+    },
+    std::sync::RwLock
 };
 
                     /*\

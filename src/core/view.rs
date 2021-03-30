@@ -11,7 +11,8 @@ pub trait View : Send + Sync {
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use std::sync::RwLock;
 
 impl<V: View + ?Sized> View for RwLock<V> {
     type Msg = V::Msg;

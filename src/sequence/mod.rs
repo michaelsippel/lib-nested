@@ -22,9 +22,10 @@ pub trait SequenceView : View<Msg = usize> {
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 use std::{
-    sync::{Arc, RwLock},
+    sync::Arc,
     ops::{Deref}
 };
+use std::sync::RwLock;
 
 impl<V: SequenceView + ?Sized> SequenceView for RwLock<V> {
     type Item = V::Item;

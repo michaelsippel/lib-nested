@@ -4,9 +4,10 @@ pub mod map_key;
 
 use {
     std::{
-        sync::{Arc, RwLock},
+        sync::Arc,
         ops::Deref,
     },
+    std::sync::RwLock,
     crate::core::View
 };
 

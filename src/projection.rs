@@ -2,11 +2,12 @@ use {
     std::{
         cmp::{max},
         any::Any,
-        sync::{Arc, RwLock, Weak}
+        sync::{Arc, Weak},
     },
     async_std::{
         stream::StreamExt
     },
+    std::sync::RwLock,
     crate::{
         core::{View, Observer, ObserverExt, OuterViewPort, channel::{channel, ChannelData, ChannelSender, ChannelReceiver}},
         singleton::{SingletonView},

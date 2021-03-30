@@ -1,8 +1,9 @@
 pub use {
     std::{
-        sync::{Arc, RwLock},
+        sync::Arc,
         boxed::Box
     },
+    std::sync::RwLock,
     crate::{
         core::{
             View,

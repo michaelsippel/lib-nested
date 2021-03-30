@@ -1,8 +1,7 @@
 use {
-    std::{
-        sync::{Arc, RwLock}
-    },
+    std::sync::Arc,
     cgmath::{Point2, Vector2},
+    std::sync::RwLock,
     crate::{
         core::{
             View,

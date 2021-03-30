@@ -3,9 +3,10 @@ pub mod buffer;
 
 use {
     std::{
-        sync::{Arc, RwLock},
+        sync::Arc,
         ops::Deref
     },
+    std::sync::RwLock,
     crate::core::{View}
 };
 

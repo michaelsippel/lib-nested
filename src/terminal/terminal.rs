@@ -1,9 +1,10 @@
 use {
     std::{
-        sync::{Arc, RwLock},
+        sync::Arc,
         io::{Write, stdout, stdin},
         collections::HashSet
     },
+    std::sync::RwLock,
     async_std::{
         stream::StreamExt,
         task

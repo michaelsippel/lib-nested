@@ -1,7 +1,8 @@
 use {
     std::{
-        sync::{Arc, RwLock}
+        sync::{Arc}
     },
+    std::sync::RwLock,
     crate::{
         core::{
             Observer,

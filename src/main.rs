@@ -14,9 +14,8 @@ pub mod leveled_term_view;
 
 use {
     async_std::{task},
-    std::{
-        sync::{Arc, RwLock}
-    },
+    std::sync::{Arc},
+    std::sync::RwLock,
     cgmath::{Vector2, Point2},
     termion::event::{Event, Key},
     crate::{

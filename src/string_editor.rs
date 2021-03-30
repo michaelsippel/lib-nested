@@ -1,7 +1,5 @@
 use {
-    std::{
-        sync::{RwLock}
-    },
+    std::sync::RwLock,
     crate::{
         core::{ViewPort, OuterViewPort},
         singleton::{SingletonView, SingletonBuffer},
@@ -101,12 +99,13 @@ impl StringEditor {
 pub mod insert_view {
     use {
         std::{
-            sync::{Arc, RwLock},
+            sync::Arc,
             cmp::{min, max},
             any::Any,
             collections::HashSet
         },
         cgmath::Point2,
+        std::sync::RwLock,
         crate::{
             core::{View, Observer, ObserverExt, ObserverBroadcast, OuterViewPort, InnerViewPort},
             terminal::{TerminalAtom, TerminalStyle, TerminalView},
