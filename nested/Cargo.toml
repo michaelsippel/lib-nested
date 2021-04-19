@@ -1,0 +1,17 @@
+
+[package]
+authors = ["Michael Sippel <micha@fragmental.art>"]
+edition = "2018"
+name = "nested"
+version = "0.1.0"
+
+[dependencies]
+no_deadlocks = "*"
+cgmath = "0.17.0"
+termion = "1.5.5"
+signal-hook = "0.3.1"
+signal-hook-async-std = "0.2.0"
+
+[dependencies.async-std]
+version = "1.7.0"
+features = ["unstable", "attributes"]
