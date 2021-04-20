@@ -1,6 +1,8 @@
 [workspace]
 members = [
     "nested",
+    "terminal/display_server",
+    "terminal/ansi_parser",
     "math/str2int",
     "math/int2str",
     "math/fib"
