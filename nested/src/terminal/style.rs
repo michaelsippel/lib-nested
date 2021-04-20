@@ -1,5 +1,6 @@
+use serde::{Serialize, Deserialize};
 
-#[derive(Default, Copy, Clone, PartialEq)]
+#[derive(Default, Copy, Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct TerminalStyle {
     pub fg_color: Option<(u8, u8, u8)>,
     pub bg_color: Option<(u8, u8, u8)>,

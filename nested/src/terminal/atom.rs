@@ -1,7 +1,9 @@
+use {
+    super::TerminalStyle,
+    serde::{Serialize, Deserialize}
+};
 
-use super::TerminalStyle;
-
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub struct TerminalAtom {
     pub c: Option<char>,
     pub style: TerminalStyle
