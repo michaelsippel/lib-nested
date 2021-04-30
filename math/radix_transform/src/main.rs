@@ -8,7 +8,9 @@ use {
             Observer,
             ObserverBroadcast,
             InnerViewPort,
-            OuterViewPort
+            OuterViewPort,
+            TypeTerm,
+            TypeDict
         },
         sequence::{SequenceView, VecBuffer},
         integer::{RadixProjection}
@@ -17,6 +19,23 @@ use {
 
 #[async_std::main]
 async fn main() {
+    let mut td = TypeDict::new();
+    for tn in vec![
+        "MachineWord", "MachineInt", "MachineSlab",
+        "Vec", "NullTerminatedString",
+        "Sequence", "Ascii",
+        "PositionalInt", "Digit", "LittleEndian", "BigEndian",
+        "DiffStream", "ℕ"
+    ] { td.add_typename(tn.into()); }
+
+    let radix_types = vec![
+        td.type_term_from_str("( ℕ )").unwrap(),
+        td.type_term_from_str("( PositionalInt 10 LittleEndian )").unwrap(),
+        td.type_term_from_str("( Sequence ( Digit 10 ) )").unwrap(),
+        td.type_term_from_str("( Sequence Ascii )").unwrap(),
+        td.type_term_from_str("( Sequence MachineSlab )").unwrap()
+    ];
+
     nested::magic_header();
     eprintln!("    Convert Radix of Positional Integer");
     nested::magic_header();
@@ -24,49 +43,68 @@ async fn main() {
     let mut args = std::env::args();
     args.next().expect("Arg $0 missing!");
 
-    eprintln!("
-$1: src_radix
-  ( ℕ )
-  ( PositionalInt 10 LittleEndian )
-  ( Sequence (Digit 10) )
-  ( Sequence Ascii )
-  ( ArgString )
-");
+    eprintln!("\n$1: src_radix");
+    for t in radix_types.iter() {
+        eprintln!("  {}", td.type_term_to_str(t));
+    }
+
+    eprintln!("\n$2: dst_radix");
+    for t in radix_types.iter() {
+        eprintln!("  {}", td.type_term_to_str(t));
+    }
+
     let src_radix_str = args.next().expect("Arg $1 required!");
-
-    
-    eprintln!("
-$2: dst_radix
-  ( ℕ )
-  ( PositionalInt 10 LittleEndian )
-  ( Sequence (Digit 10) )
-  ( Sequence Ascii )
-  ( ArgString )
-");
     let dst_radix_str = args.next().expect("Arg $2 required!");
-    
-    eprintln!("
->0: n
-  ( ℕ ) ~~ <1
-  ( PositionalInt src_radix LittleEndian )
-  ( Sequence (Digit src_radix) )
-  ( Sequence MachineInt )
-  ( PipeStream bincode (SequenceDiff MachineInt) )
-");
-
-    eprintln!("
-<1: n
-  ( ℕ ) ~~ >0
-  ( PositionalInt dst_radix LittleEndian )
-  ( Sequence (Digit dst_radix) )
-  ( Sequence MachineInt )
-  ( PipeStream bincode (SequenceDiff MachineInt) )
-");
-
-    nested::magic_header();
 
     let src_radix = usize::from_str_radix(&src_radix_str, 10).expect("could not parse src_radix");
     let dst_radix = usize::from_str_radix(&dst_radix_str, 10).expect("could not parse dst_radix");
+
+    let in_types = vec![
+        td.type_term_from_str("( ℕ )").unwrap(),
+        td.type_term_from_str("( PositionalInt )").unwrap()
+            .num_arg(src_radix as i64)
+            .arg(td.type_term_from_str("( LittleEndian )").unwrap())
+            .clone(),
+
+        td.type_term_from_str("( Sequence )").unwrap()
+            .arg(
+                td.type_term_from_str("( Digit )").unwrap()
+                    .num_arg(src_radix as i64).clone()
+            )
+            .clone(),
+
+        td.type_term_from_str("( Sequence MachineInt )").unwrap(),
+        td.type_term_from_str("( DiffStream ( Vec MachineInt ) )").unwrap(),
+    ];
+
+    let out_types = vec![
+        td.type_term_from_str("( ℕ )").unwrap(),
+        td.type_term_from_str("( PositionalInt )").unwrap()
+            .num_arg(dst_radix as i64)
+            .arg(td.type_term_from_str("( LittleEndian )").unwrap()).clone(),
+
+        td.type_term_from_str("( Sequence )").unwrap()
+            .arg(
+                td.type_term_from_str("( Digit )").unwrap()
+                    .num_arg(dst_radix as i64).clone()
+            )
+            .clone(),
+
+        td.type_term_from_str("( Sequence MachineInt )").unwrap(),
+        td.type_term_from_str("( DiffStream ( Vec MachineInt ) )").unwrap(),
+    ];
+
+    eprintln!("\n>0: n");
+    for t in in_types.iter() {
+        eprintln!("  {}", td.type_term_to_str(t));
+    }
+
+    eprintln!("\n<1: n");
+    for t in out_types.iter() {
+        eprintln!("  {}", td.type_term_to_str(t));
+    }
+
+    nested::magic_header();
 
     let src_digits_port = ViewPort::new();
     let dst_digits_port = ViewPort::new();

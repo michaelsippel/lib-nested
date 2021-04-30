@@ -1,4 +1,5 @@
 #![feature(trait_alias)]
+#![feature(non_ascii_idents)]
 
 pub mod core;
 pub mod projection;
@@ -12,6 +13,8 @@ pub mod integer;
 
 pub mod string_editor;
 pub mod leveled_term_view;
+
+pub mod bimap;
 
 pub fn magic_header() {
     eprintln!("<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>");
