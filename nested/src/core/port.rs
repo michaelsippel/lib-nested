@@ -158,3 +158,72 @@ where V::Msg: Clone {
 }
 */
 
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+
+#[derive(Debug, Clone)]
+pub struct AnyViewPort {
+    view: Arc<dyn Any + Send + Sync + 'static>,
+    observers: Arc<dyn Any + Send + Sync + 'static>
+}
+
+impl AnyViewPort {
+    pub fn downcast<V: View + ?Sized + 'static>(self) -> Result<ViewPort<V>, AnyViewPort> {
+        match (
+            self.view.clone().downcast::<RwLock<Option<Arc<V>>>>(),
+            self.observers.clone().downcast::<RwLock<ObserverBroadcast<V>>>()
+        ) {
+            (Ok(view), Ok(observers)) => Ok(ViewPort{view, observers}),
+            _ => Err(self)
+        }
+    }
+}
+
+impl<V: View + ?Sized + 'static> From<ViewPort<V>> for AnyViewPort {
+    fn from(port: ViewPort<V>) -> Self {
+        AnyViewPort {
+            view: port.view as Arc<dyn Any + Send + Sync + 'static>,
+            observers: port.observers as Arc<dyn Any + Send + Sync + 'static>
+        }
+    }
+}
+
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+
+#[derive(Debug, Clone)]
+pub struct AnyOuterViewPort(AnyViewPort);
+
+#[derive(Debug, Clone)]
+pub struct AnyInnerViewPort(AnyViewPort);
+
+impl AnyOuterViewPort {
+    pub fn downcast<V: View + ?Sized + 'static>(self) -> Result<OuterViewPort<V>, AnyViewPort> {
+        Ok(OuterViewPort(self.0.downcast::<V>()?))
+    }
+}
+
+impl<V: View + ?Sized + 'static> From<OuterViewPort<V>> for AnyOuterViewPort {
+    fn from(port: OuterViewPort<V>) -> Self {
+        AnyOuterViewPort(AnyViewPort{
+            view: port.0.view as Arc<dyn Any + Send + Sync + 'static>,
+            observers: port.0.observers as Arc<dyn Any + Send + Sync + 'static>
+        })
+    }
+}
+
+impl AnyInnerViewPort {
+    pub fn downcast<V: View + ?Sized + 'static>(self) -> Result<InnerViewPort<V>, AnyViewPort> {
+        Ok(InnerViewPort(self.0.downcast::<V>()?))
+    }
+}
+
+impl<V: View + ?Sized + 'static> From<InnerViewPort<V>> for AnyInnerViewPort {
+    fn from(port: InnerViewPort<V>) -> Self {
+        AnyInnerViewPort(AnyViewPort{
+            view: port.0.view as Arc<dyn Any + Send + Sync + 'static>,
+            observers: port.0.observers as Arc<dyn Any + Send + Sync + 'static>
+        })
+    }
+}
+
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+
