@@ -12,21 +12,21 @@ fn main() {
 
     let mut f0 = unsafe { File::from_raw_fd(0) };
     eprintln!("
-> 0:
+>0:
   ( ℕ )
   ( MachineInt )
   ( MachineWord )
-  ( Array 8 MachineSlab )
-  ( Pipe Shot (Array 8 MachineSlab) )
+  ( Stream MachineSyllab )
 ");
 
     eprintln!("
-< 1:
+<1:
   ( ℕ )
-  ( Sequence (Digit 10) )
-  ( Sequence ASCII )
-  ( Sequence MachineSlab )
-  ( Pipe Shot (Sequence MachineSlab) )
+  ( PositionalInt 10 BigEndian )
+  ( Sequence ( Digit 10 ) )
+  ( Sequence UTF-8-Char )
+  ( Stream UTF-8-Char )
+  ( Stream MachineSyllab )
 ");
 
     nested::magic_header();

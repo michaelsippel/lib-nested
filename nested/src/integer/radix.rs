@@ -82,8 +82,6 @@ impl RadixProjection {
 
 impl Observer<dyn SequenceView<Item = usize>> for RadixProjection {
     fn reset(&mut self, view: Option<Arc<dyn SequenceView<Item = usize>>>) {
-        eprintln!("reset");
-
         self.src_digits = view;
     }
 
