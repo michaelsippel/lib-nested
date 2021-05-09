@@ -25,17 +25,22 @@ pub use {
     port::{
         ViewPort,
         InnerViewPort,
-        OuterViewPort
+        OuterViewPort,
+        AnyViewPort,
+        AnyOuterViewPort,
+        AnyInnerViewPort,
     },
     type_term::{
         TypeID,
-        TypeTerm
+        TypeTerm,
+        TypeDict,
     },
     context::{
         ReprTree,
-        TypeDict,
+        Object,
         Context,
-        Object
+        MorphismMode,
+        MorphismType
     }
 };
 

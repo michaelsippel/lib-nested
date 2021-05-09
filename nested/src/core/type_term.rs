@@ -1,9 +1,14 @@
-use std::{
-    sync::Arc,
-    any::Any,
-    ops::Deref,
-    collections::HashMap,
-    iter::Peekable
+use {
+    std::{
+        sync::Arc,
+        any::Any,
+        ops::Deref,
+        collections::HashMap,
+        iter::Peekable
+    },
+    crate::{
+        bimap::Bimap,
+    }
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
@@ -127,6 +132,35 @@ impl TypeTerm {
         }
     }
 
+}
+
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+
+pub struct TypeDict {
+    typenames: Bimap::<String, u64>,
+    type_id_counter: u64
+}
+
+impl TypeDict {
+    pub fn new() -> Self {
+        TypeDict {
+            typenames: Bimap::new(),
+            type_id_counter: 0
+        }
+    }
+
+    pub fn add_typename(&mut self, tn: String) {
+        self.typenames.insert(tn, self.type_id_counter);
+        self.type_id_counter += 1;
+    }
+
+    pub fn type_term_from_str(&self, typename: &str) -> Option<TypeTerm> {
+        TypeTerm::from_str(typename, &self.typenames.mλ)
+    }
+
+    pub fn type_term_to_str(&self, term: &TypeTerm) -> String {
+        term.to_str(&self.typenames.my)
+    }
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
