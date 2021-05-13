@@ -52,9 +52,8 @@ impl<P: Send + Sync + 'static> ProjectionHelper<P> {
         port: OuterViewPort<dyn SingletonView<Item = Item>>,
         notify: impl Fn(&mut P, &()) + Send + Sync + 'static
     ) -> Arc<RwLock<Option<Arc<dyn SingletonView<Item = Item>>>>> {
-        let (view, obs) = self.new_arg(notify);
-        port.add_observer(obs);
-        view
+        port.add_observer(self.new_arg(notify));
+        port.get_view_arc()
     }
 
     pub fn new_sequence_arg<Item: 'static>(
@@ -62,9 +61,8 @@ impl<P: Send + Sync + 'static> ProjectionHelper<P> {
         port: OuterViewPort<dyn SequenceView<Item = Item>>,
         notify: impl Fn(&mut P, &usize) + Send + Sync + 'static
     ) -> Arc<RwLock<Option<Arc<dyn SequenceView<Item = Item>>>>> {
-        let (view, obs) = self.new_arg(notify);
-        port.add_observer(obs);
-        view
+        port.add_observer(self.new_arg(notify));
+        port.get_view_arc()
     }
 
     pub fn new_index_arg<Key: Clone + Send + Sync + 'static, Item: 'static>(
@@ -72,9 +70,8 @@ impl<P: Send + Sync + 'static> ProjectionHelper<P> {
         port: OuterViewPort<dyn IndexView<Key, Item = Item>>,
         notify: impl Fn(&mut P, &Key) + Send + Sync + 'static
     ) -> Arc<RwLock<Option<Arc<dyn IndexView<Key, Item = Item>>>>> {
-        let (view, obs) = self.new_arg(notify);
-        port.add_observer(obs);
-        view
+        port.add_observer(self.new_arg(notify));
+        port.get_view_arc()
     }
 
     pub fn new_arg<
@@ -82,16 +79,13 @@ impl<P: Send + Sync + 'static> ProjectionHelper<P> {
     >(
         &mut self,
         notify: impl Fn(&mut P, &V::Msg) + Send + Sync + 'static
-    ) -> (
-        Arc<RwLock<Option<Arc<V>>>>,
-        Arc<RwLock<ProjectionArg<V, Vec<V::Msg>>>>
-    ) where V::Msg: Send + Sync {
+    ) -> Arc<RwLock<ProjectionArg<V, Vec<V::Msg>>>>
+    where V::Msg: Send + Sync {
         let (tx, mut rx) = channel::<Vec<V::Msg>>();
 
-        let view = Arc::new(RwLock::new(None));
         let arg = Arc::new(RwLock::new(
             ProjectionArg {
-                src: view.clone(),
+                src: None,
                 sender: tx
             }));
 
@@ -105,8 +99,8 @@ impl<P: Send + Sync + 'static> ProjectionHelper<P> {
         });
 
         self.keepalive.push(arg.clone());
-        
-        (view, arg)
+
+        arg
     }
 }
 
@@ -117,7 +111,7 @@ where V: View + ?Sized,
       D: ChannelData<Item = V::Msg>,
       D::IntoIter: Send + Sync
 {
-    src: Arc<RwLock<Option<Arc<V>>>>,
+    src: Option<Arc<V>>,
     sender: ChannelSender<D>
 }
 
@@ -128,7 +122,7 @@ where D: ChannelData<Item = ()>,
       D::IntoIter: Send + Sync
 {
     fn reset(&mut self, new_src: Option<Arc<dyn SingletonView<Item = Item>>>) {
-        *self.src.write().unwrap() = new_src;
+        self.src = new_src;
         self.notify(&());
     }
 
@@ -145,7 +139,7 @@ where D: ChannelData<Item = usize>,
 {
     fn reset(&mut self, new_src: Option<Arc<dyn SequenceView<Item = Item>>>) {
         let old_len = self.src.len().unwrap_or(0);
-        *self.src.write().unwrap() = new_src;
+        self.src = new_src;
         let new_len = self.src.len().unwrap_or(0);
 
         self.notify_each(0 .. max(old_len, new_len));
@@ -164,7 +158,7 @@ where D: ChannelData<Item = Key>,
 {
     fn reset(&mut self, new_src: Option<Arc<dyn IndexView<Key, Item = Item>>>) {
         let old_area = self.src.area();
-        *self.src.write().unwrap() = new_src;
+        self.src = new_src;
         let new_area = self.src.area();
 
         if let Some(area) = old_area { self.notify_each(area); }
