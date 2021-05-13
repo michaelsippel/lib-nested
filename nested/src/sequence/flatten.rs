@@ -1,13 +1,13 @@
 use {
     async_std::stream::StreamExt,
     std::{
-        sync::{Arc, Weak},
+        sync::{Arc},
         collections::{HashMap, HashSet}
     },
     std::sync::RwLock,
     crate::{
         core::{
-            View, Observer, ObserverExt, ObserverBroadcast,
+            View, Observer, ObserverBroadcast, ObserverExt,
             ViewPort, InnerViewPort, OuterViewPort,
             channel::{ChannelSender, ChannelReceiver}
         },
@@ -34,7 +34,7 @@ where V1: SequenceView<Item = OuterViewPort<V2>> + ?Sized + 'static,
     top: Arc<RwLock<TopObserver<V1, V2>>>,
     chunks: HashMap<usize, Arc<RwLock<BotObserver<V2>>>>,
 
-    cast: Arc<RwLock<ObserverBroadcast<dyn SequenceView<Item = V2::Item>>>>
+    _cast: Arc<RwLock<ObserverBroadcast<dyn SequenceView<Item = V2::Item>>>>
 }
 
 struct TopObserver<V1, V2>
@@ -130,7 +130,7 @@ where V1: SequenceView<Item = OuterViewPort<V2>> + ?Sized + 'static,
             length: 0,
             top: top_obs.clone(),
             chunks: HashMap::new(),
-            cast: out_port.get_broadcast()
+            _cast: out_port.get_broadcast()
         }));
 
         let f = flat.clone();

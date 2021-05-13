@@ -1,5 +1,4 @@
 #![feature(trait_alias)]
-#![feature(non_ascii_idents)]
 
 pub mod core;
 pub mod projection;

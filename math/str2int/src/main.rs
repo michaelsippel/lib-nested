@@ -46,15 +46,15 @@ $1: radix
     args.next().expect("Arg $0 missing!");
 
     let radix_str = args.next().expect("Arg $1 required!");
-    
+
     let radix = u32::from_str_radix(&radix_str, 10).expect("could not parse radix");
     if radix > 16 {
         panic!("invalid radix! (radix<=16 required)");
     }
-    
+
     let mut chars = Vec::new();
-    f0.read_to_end(&mut chars);
+    f0.read_to_end(&mut chars).expect("");
     chars.retain(|c| (*c as char).is_alphanumeric());
-    f1.write(&u64::from_str_radix(&String::from_utf8_lossy(&chars), radix).unwrap().to_le_bytes());
+    f1.write(&u64::from_str_radix(&String::from_utf8_lossy(&chars), radix).unwrap().to_le_bytes()).expect("");
 }
 

@@ -1,18 +1,11 @@
 
 use {
-    std::sync::{Arc, RwLock},
     nested::{
         core::{
-            View,
             ViewPort,
-            Observer,
-            ObserverBroadcast,
-            InnerViewPort,
-            OuterViewPort,
-            TypeTerm,
             TypeDict
         },
-        sequence::{SequenceView, VecBuffer},
+        sequence::{VecBuffer},
         integer::{RadixProjection}
     }
 };
@@ -102,7 +95,7 @@ async fn main() {
 
     let mut src_digits = VecBuffer::<usize>::new(src_digits_port.inner());
 
-    let proj = RadixProjection::new(
+    let _proj = RadixProjection::new(
         src_radix,
         dst_radix,
         src_digits_port.outer().to_sequence(),
@@ -110,10 +103,8 @@ async fn main() {
     );
 
     // output dst digits
-    let writer = {
+    let _writer = {
         use std::{
-            fs::File,
-            io::{Read, Write},
             os::unix::io::FromRawFd
         };
 
@@ -123,8 +114,6 @@ async fn main() {
     // start reading src digits
     {
         use async_std::{
-            fs::File,
-            io::{Read, Write},
             os::unix::io::FromRawFd
         };
 

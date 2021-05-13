@@ -52,21 +52,14 @@ where V::Item: Default{
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 /*
-pub trait ImplSingletonView : Send + Sync {
-    type Item;
+impl<T> OuterViewPort<dyn SingletonView<Item = T>> {
+    pub fn get(&self) -> T {
+        self.get_view().unrwap().read().unwrap().get();
+    }
 
-    fn get(&self) -> Self::Item;
-}
-
-impl<V: ImplSingletonView> View for V {
-    type Msg = ();
-}
-
-impl<V: ImplSingletonView> SingletonView for V {
-    type Item = V::Item;
-
-    fn get(&self) -> Self::Item {
-        (self as &V).get()
+    pub fn map<U: Send + Sync + 'static>(&self, f: impl Fn(T) -> U) -> OuterViewPort<dyn SingletonView<Item = U>> {
+        
     }
 }
-*/
+ */
+

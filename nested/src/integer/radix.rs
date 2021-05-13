@@ -2,10 +2,7 @@ use {
     std::sync::{Arc, RwLock},
     crate::{
         core::{
-            View,
-            ViewPort,
             Observer,
-            ObserverBroadcast,
             InnerViewPort,
             OuterViewPort
         },
@@ -63,7 +60,7 @@ impl RadixProjection {
         }        
     }
 
-    fn update_dst_digit(&mut self, idx: usize) {
+    fn _update_dst_digit(&mut self, _idx: usize) {
         /*
         let v = 0; // calculate new digit value
 
@@ -85,7 +82,7 @@ impl Observer<dyn SequenceView<Item = usize>> for RadixProjection {
         self.src_digits = view;
     }
 
-    fn notify(&self, idx: &usize) {
+    fn notify(&self, _idx: &usize) {
         // todo:
         // src digit i changed.
         // which dst-digits does it affect?

@@ -1,13 +1,11 @@
 use {
     std::{
         collections::HashMap,
-        sync::{Arc, RwLock},
-        any::Any
+        sync::{Arc, RwLock}
     },
     crate::{
         core::{
             type_term::{
-                TypeID,
                 TypeTerm,
                 TypeDict
             },
@@ -194,8 +192,8 @@ impl Object {
     // replace with higher-level type in which self is a repr branch
     pub fn epi_cast<'a>(
         &self,
-        type_ladder: impl Iterator<Item = TypeTerm>,
-        morphism_constructors: &HashMap<MorphismType, Box<dyn Fn(Object) -> Object>>
+        _type_ladder: impl Iterator<Item = TypeTerm>,
+        _morphism_constructors: &HashMap<MorphismType, Box<dyn Fn(Object) -> Object>>
     ) {
         // todo        
     }
@@ -288,7 +286,6 @@ impl Context {
                     type_tag,
                     repr: Arc::new(RwLock::new(ReprTree::new()))
                 }
-
             }
         );
     }
@@ -341,8 +338,8 @@ impl Context {
         typename: &str
     ) {
         let dst_type = self.type_dict.type_term_from_str(typename).unwrap();
-        let mut old_obj = self.objects.get(&name.to_string()).unwrap().clone();
-        let mut new_obj =
+        let old_obj = self.objects.get(&name.to_string()).unwrap().clone();
+        let new_obj =
             if let Some(ctor) = self.morphism_constructors.get(
                 &MorphismType {
                     mode: MorphismMode::Epi,
@@ -387,29 +384,6 @@ impl Context {
             None
         }
     }
-
-/*
-    pub fn _default_repr<'a>(
-        &mut self,
-        name: &String,
-        type_ladder: impl Iterator<Item = &'a str>
-    ) -> AnyOuterViewPort {
-        for (i, type_term) in type_ladder.rev().enumerate() {
-            match i {
-                0 => {
-                    if let Some(constructor) = self.default_constructors.get(&type_term) {
-                        self.add_repr()
-                    } else {
-                        panic!("cannot find matching default constructor!");
-                    }
-                }
-                _n => {
-                    
-                }
-            }
-        }
-    }
-     */
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>

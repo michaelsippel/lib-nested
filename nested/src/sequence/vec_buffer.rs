@@ -7,7 +7,7 @@ use {
     std::sync::RwLock,
     async_std::{
         io::{Read, ReadExt},
-        stream::{Stream, StreamExt}
+        stream::{StreamExt}
     },
     serde::{Serialize, Deserialize, de::DeserializeOwned},
     crate::{
@@ -101,24 +101,24 @@ where T: Clone + Serialize + Send + Sync + 'static,
         self.data = view;
         let mut out = self.out.write().unwrap();
 
-        out.write(&bincode::serialized_size(&VecDiff::<T>::Clear).unwrap().to_le_bytes());
-        out.write(&bincode::serialize(&VecDiff::<T>::Clear).unwrap());
+        out.write(&bincode::serialized_size(&VecDiff::<T>::Clear).unwrap().to_le_bytes()).expect("");
+        out.write(&bincode::serialize(&VecDiff::<T>::Clear).unwrap()).expect("");
 
         if let Some(data) = self.data.as_ref() {
             for x in data.read().unwrap().iter() {
-                out.write(&bincode::serialized_size(&VecDiff::Push(x)).unwrap().to_le_bytes());
-                out.write(&bincode::serialize(&VecDiff::Push(x)).unwrap());
+                out.write(&bincode::serialized_size(&VecDiff::Push(x)).unwrap().to_le_bytes()).expect("");
+                out.write(&bincode::serialize(&VecDiff::Push(x)).unwrap()).expect("");
             }
         }
 
-        out.flush();
+        out.flush().expect("");
     }
 
     fn notify(&self, diff: &VecDiff<T>) {
         let mut out = self.out.write().unwrap();
-        out.write(&bincode::serialized_size(diff).unwrap().to_le_bytes());
-        out.write(&bincode::serialize(diff).unwrap());
-        out.flush();
+        out.write(&bincode::serialized_size(diff).unwrap().to_le_bytes()).expect("");
+        out.write(&bincode::serialize(diff).unwrap()).expect("");
+        out.flush().expect("");
     }
 }
 
@@ -129,23 +129,23 @@ where T: Clone + Serialize + Send + Sync + 'static,
     fn reset(&mut self, view: Option<Arc<RwLock<Vec<T>>>>) {
         self.data = view;
 
-        self.out.write().unwrap().write(&serde_json::to_string(&VecDiff::<T>::Clear).unwrap().as_bytes());
-        self.out.write().unwrap().write(b"\n");
+        self.out.write().unwrap().write(&serde_json::to_string(&VecDiff::<T>::Clear).unwrap().as_bytes()).expect("");
+        self.out.write().unwrap().write(b"\n").expect("");
 
         if let Some(data) = self.data.as_ref() {
             for x in data.read().unwrap().iter() {
-                self.out.write().unwrap().write(&serde_json::to_string(&VecDiff::Push(x)).unwrap().as_bytes());
-                self.out.write().unwrap().write(b"\n");
+                self.out.write().unwrap().write(&serde_json::to_string(&VecDiff::Push(x)).unwrap().as_bytes()).expect("");
+                self.out.write().unwrap().write(b"\n").expect("");
             }
         }
 
-        self.out.write().unwrap().flush();
+        self.out.write().unwrap().flush().expect("");
     }
 
     fn notify(&self, diff: &VecDiff<T>) {
-        self.out.write().unwrap().write(serde_json::to_string(diff).unwrap().as_bytes());
-        self.out.write().unwrap().write(b"\n");
-        self.out.write().unwrap().flush();
+        self.out.write().unwrap().write(serde_json::to_string(diff).unwrap().as_bytes()).expect("");
+        self.out.write().unwrap().write(b"\n").expect("");
+        self.out.write().unwrap().flush().expect("");
     }
 }
 

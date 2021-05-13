@@ -1,12 +1,11 @@
 use {
     std::{
-        sync::{Arc, Weak},
-        collections::HashMap
+        sync::{Arc}
     },
     std::sync::RwLock,
     cgmath::Point2,
     crate::{
-        core::{InnerViewPort, OuterViewPort, Observer, ObserverExt, ObserverBroadcast},
+        core::{InnerViewPort, OuterViewPort, Observer, ObserverBroadcast},
         index::{ImplIndexView},
         terminal::{TerminalAtom, TerminalView},
         projection::ProjectionHelper

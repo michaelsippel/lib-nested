@@ -1,7 +1,7 @@
 
 use std::{
     fs::File,
-    io::{Read, Write},
+    io::{Read},
     os::unix::io::FromRawFd
 };
 
@@ -32,7 +32,7 @@ fn main() {
     nested::magic_header();
 
     let mut bytes = [0 as u8; 8];
-    f0.read_exact(&mut bytes);
+    f0.read_exact(&mut bytes).expect("");
     println!("{}", u64::from_le_bytes(bytes));
 }
 

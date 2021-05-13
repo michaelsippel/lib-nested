@@ -4,7 +4,7 @@ use {
     std::{
         fs::File,
         os::unix::io::FromRawFd,
-        io::{Read, Write, stdin, stdout}
+        io::{Read, Write, stdin}
     },
     nested::{
         terminal::{
@@ -39,7 +39,7 @@ struct PerfAtom {
 
 impl PerfAtom {
     fn write_atom(&mut self, pos: Point2<i16>, atom: Option<TerminalAtom>) {
-        self.out.write(&bincode::serialize(&(pos, atom)).unwrap());
+        self.out.write(&bincode::serialize(&(pos, atom)).unwrap()).expect("");
     }
 }
 

@@ -31,28 +31,28 @@ interface (Sequence ℕ) 0 1");
 
     let mut f0 = unsafe { File::from_raw_fd(0) };
     eprintln!("
-> 0: n
+>0: n
   ( ℕ )
   ( MachineInt )
   ( MachineWord )
-  ( Pipe Shot MachineWord )
+  ( Stream MachineSyllab )
 ");
 
     let mut f1 = unsafe { File::from_raw_fd(1) };
     eprintln!("
-< 1: n'th fibonacci number
+<1: n'th fibonacci number
   ( ℕ )
   ( MachineInt )
   ( MachineWord )
-  ( Pipe Shot MachineWord )
+  ( Stream MachineSyllab )
 ");
 
     nested::magic_header();
 
     let mut bytes = [0 as u8; 8];
-    f0.read_exact(&mut bytes);
+    f0.read_exact(&mut bytes).expect("");
     let n = u64::from_le_bytes(bytes);
     bytes = fib(n).to_le_bytes();
-    f1.write(&bytes);
+    f1.write(&bytes).expect("");
 }
 

@@ -1,7 +1,5 @@
 use {
     std::{
-        fs::File,
-        os::unix::io::FromRawFd,
         io::{Read, Write, stdout}
     },
     nested::terminal::{
@@ -22,12 +20,7 @@ fn main() {
     let mut cur_pos = Point2::<i16>::new(0, 0);
     let mut cur_style = TerminalStyle::default();
 
-    let mut f = unsafe { File::from_raw_fd(0) };
-    let mut bytes = [0 as u8; 0xe];
-
-    
     let mut input = std::io::stdin();
-    let mut buf = [0; 2048];
 
     loop {
         match bincode::deserialize_from::<_, (Point2<i16>, Option<TerminalAtom>)>(input.by_ref()) {
@@ -39,12 +32,12 @@ fn main() {
                 if let Some(atom) = atom {
                     if cur_style != atom.style {
                         cur_style = atom.style;
-                        write!(out, "{}", atom.style);
+                        write!(out, "{}", atom.style).expect("");
                     }
 
-                    write!(out, "{}", atom.c.unwrap_or(' '));
+                    write!(out, "{}", atom.c.unwrap_or(' ')).expect("");
                 } else {
-                    write!(out, "{} ", termion::style::Reset);
+                    write!(out, "{} ", termion::style::Reset).expect("");
                     cur_style = TerminalStyle::default();
                 }
 
@@ -54,11 +47,11 @@ fn main() {
             }
             Err(err) => {
                 match *err {
-                    bincode::ErrorKind::Io(io_error) => {
+                    bincode::ErrorKind::Io(_io_error) => {
                         break
                     }
                     err => {
-                        eprintln!("deserialization error: {:?}\n{:?}", bytes, err);
+                        eprintln!("deserialization error\n{:?}", err);
                     }
                 }
                 break;

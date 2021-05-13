@@ -9,7 +9,16 @@ use {
     },
     std::sync::RwLock,
     crate::{
-        core::{View, Observer, ObserverExt, OuterViewPort, channel::{channel, ChannelData, ChannelSender, ChannelReceiver}},
+        core::{
+            View,
+            Observer, ObserverExt,
+            OuterViewPort,
+            channel::{
+                channel,
+                ChannelData,
+                ChannelSender
+            }
+        },
         singleton::{SingletonView},
         sequence::{SequenceView},
         index::{IndexView}
@@ -90,14 +99,7 @@ impl<P: Send + Sync + 'static> ProjectionHelper<P> {
         async_std::task::spawn(async move {
             while let Some(msg) = rx.next().await {
                 if let Some(proj) = proj.read().unwrap().upgrade() {
-                    loop {
-                        if let Ok(p) = proj.try_write().as_mut() {
-                            notify(&mut *p, &msg);
-                            break;
-                        }
-
-                        async_std::task::yield_now();
-                    }
+                    notify(&mut *proj.write().unwrap(), &msg);
                 }
             }
         });

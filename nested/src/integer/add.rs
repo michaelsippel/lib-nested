@@ -1,7 +1,7 @@
 use {
     std::sync::{Arc, RwLock},
     crate::{
-        core::{InnerViewPort, OuterViewPort, ObserverBroadcast},
+        core::{InnerViewPort, OuterViewPort},
         sequence::{SequenceView, VecBuffer},
         projection::ProjectionHelper
     }
@@ -43,7 +43,7 @@ pub struct Add {
     a: Arc<dyn SequenceView<Item = usize>>, // PosInt, Little Endian
     b: Arc<dyn SequenceView<Item = usize>>, // PosInt, Little Endian
     c: VecBuffer<usize>,
-    proj_helper: ProjectionHelper<Self>
+    _proj_helper: ProjectionHelper<Self>
 }
 
 impl Add {
@@ -60,7 +60,7 @@ impl Add {
                 a: proj_helper.new_sequence_arg(a, |s: &mut Self, _digit_idx| s.update()),
                 b: proj_helper.new_sequence_arg(b, |s: &mut Self, _digit_idx| s.update()),
                 c: VecBuffer::new(c),
-                proj_helper
+                _proj_helper: proj_helper
             }
         ));
         add

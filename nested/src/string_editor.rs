@@ -100,9 +100,7 @@ pub mod insert_view {
     use {
         std::{
             sync::Arc,
-            cmp::{min, max},
-            any::Any,
-            collections::HashSet
+            cmp::{min, max}
         },
         cgmath::Point2,
         std::sync::RwLock,
@@ -113,7 +111,7 @@ pub mod insert_view {
             singleton::{SingletonView},
             sequence::{SequenceView},
             index::{IndexView},
-            projection::{ProjectionHelper, ProjectionArg},
+            projection::{ProjectionHelper},
         }
     };
 
@@ -144,7 +142,7 @@ pub mod insert_view {
                         if i < self.cur_pos {
                             TerminalAtom::from(data.get(&i)?)
                         } else if i == self.cur_pos {
-                            TerminalAtom::new('|', TerminalStyle::fg_color((200, 0, 0)))
+                            TerminalAtom::new('|', TerminalStyle::fg_color((0, 200, 0)))
                         } else {
                             TerminalAtom::from(data.get(&(i - 1))?)
                         }

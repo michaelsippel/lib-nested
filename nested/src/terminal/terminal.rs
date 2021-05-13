@@ -127,7 +127,8 @@ impl Observer<dyn TerminalView> for TermOutObserver {
         if let Some(view) = view {
             for pos in view.area().unwrap_or(
                 GridWindowIterator::from(
-                    Point2::new(0, 0) .. Point2::new(w as i16, h as i16)).collect()
+                    Point2::new(0, 0) .. Point2::new(w as i16, h as i16)
+                ).collect()
             ) {
                 self.dirty_pos_tx.send(pos);
             }
@@ -148,7 +149,7 @@ pub struct TermOutWriter {
 impl TermOutWriter {
     fn reset(&self) {
         let mut out = self.out.write().unwrap();
-        write!(out, "{}", termion::clear::All).ok();        
+        write!(out, "{}", termion::clear::All).ok();
     }
 }
 

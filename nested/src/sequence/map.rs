@@ -5,7 +5,7 @@ use {
         sequence::{SequenceView},
         core::{
             Observer, ObserverExt, ObserverBroadcast,
-            View, ViewPort, InnerViewPort, OuterViewPort
+            View, ViewPort, OuterViewPort
         }
     }
 };

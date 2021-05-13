@@ -1,10 +1,6 @@
 use {
     std::{
-        sync::Arc,
-        any::Any,
-        ops::Deref,
-        collections::HashMap,
-        iter::Peekable
+        collections::HashMap
     },
     crate::{
         bimap::Bimap,
@@ -32,7 +28,7 @@ impl TypeTerm {
     }
 
     pub fn arg(&mut self, t: TypeTerm) -> &mut Self {
-        if let TypeTerm::Type{ id, args } = self {
+        if let TypeTerm::Type{ id: _, args } = self {
             args.push(t);
         }
 
@@ -54,7 +50,7 @@ impl TypeTerm {
                 ")" => {
                     let t = term_stack.pop().unwrap();
                     if term_stack.len() > 0 {
-                        let mut f = term_stack.last_mut().unwrap();
+                        let f = term_stack.last_mut().unwrap();
                         if let Some(f) = f {
                             f.arg(t.unwrap());
                         } else {
@@ -65,7 +61,7 @@ impl TypeTerm {
                     }
                 },
                 atom => {
-                    let mut f = term_stack.last_mut().unwrap();
+                    let f = term_stack.last_mut().unwrap();
 
                     match f {
                         Some(f) =>

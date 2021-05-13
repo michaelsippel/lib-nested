@@ -1,7 +1,6 @@
 use {
     std::{
-        sync::{Arc},
-        collections::HashSet
+        sync::{Arc}
     },
     std::sync::RwLock,
     cgmath::Point2,
@@ -9,7 +8,7 @@ use {
         core::{ViewPort, Observer, ObserverExt, ObserverBroadcast, InnerViewPort, OuterViewPort},
         index::{ImplIndexView},
         terminal::{TerminalAtom, TerminalView, TerminalStyle},
-        projection::{ProjectionHelper, ProjectionArg}
+        projection::{ProjectionHelper}
     }
 };
 
