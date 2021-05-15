@@ -2,6 +2,7 @@
 pub mod seq2idx;
 pub mod vec_buffer;
 pub mod map;
+pub mod filter;
 pub mod flatten;
 
 pub use {
