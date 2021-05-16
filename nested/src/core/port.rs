@@ -18,14 +18,14 @@ use {
                     \*/
 pub struct ViewPort<V: View + ?Sized> {
     view: Arc<RwLock<Option<Arc<V>>>>,
-    observers: Arc<RwLock<ObserverBroadcast<V>>>
+    cast: Arc<RwLock<ObserverBroadcast<V>>>
 }
 
 impl<V: View + ?Sized> ViewPort<V> {
     pub fn new() -> Self {
         ViewPort {
             view: Arc::new(RwLock::new(None)),
-            observers: Arc::new(RwLock::new(ObserverBroadcast::new()))
+            cast: Arc::new(RwLock::new(ObserverBroadcast::new()))
         }
     }
 
@@ -37,28 +37,28 @@ impl<V: View + ?Sized> ViewPort<V> {
 
     pub fn set_view(&self, view: Option<Arc<V>>) {
         *self.view.write().unwrap() = view.clone();
-        self.observers.write().unwrap().reset(view);
+        self.cast.write().unwrap().reset(view);
     }
 
     pub fn add_observer(&self, observer: Arc<RwLock<dyn Observer<V>>>) {
-        self.observers.write().unwrap().add_observer(Arc::downgrade(&observer));
+        self.cast.write().unwrap().add_observer(Arc::downgrade(&observer));
         observer.write().unwrap().reset(self.view.read().unwrap().clone());
     }
 
     pub fn inner(&self) -> InnerViewPort<V> {
-        InnerViewPort(ViewPort{ view: self.view.clone(), observers: self.observers.clone() })
+        InnerViewPort(ViewPort{ view: self.view.clone(), cast: self.cast.clone() })
     }
 
     pub fn outer(&self) -> OuterViewPort<V> {
-        OuterViewPort(ViewPort{ view: self.view.clone(), observers: self.observers.clone() })
+        OuterViewPort(ViewPort{ view: self.view.clone(), cast: self.cast.clone() })
     }
 
     pub fn into_inner(self) -> InnerViewPort<V> {
-        InnerViewPort(ViewPort{ view: self.view, observers: self.observers })
+        InnerViewPort(ViewPort{ view: self.view, cast: self.cast })
     }
 
     pub fn into_outer(self) -> OuterViewPort<V> {
-        OuterViewPort(ViewPort{ view: self.view, observers: self.observers })
+        OuterViewPort(ViewPort{ view: self.view, cast: self.cast })
     }
 }
 
@@ -66,7 +66,7 @@ impl<V: View + ?Sized> Clone for ViewPort<V> {
     fn clone(&self) -> Self {
         ViewPort {
             view: self.view.clone(),
-            observers: self.observers.clone()
+            cast: self.cast.clone()
         }
     }
 }
@@ -80,7 +80,7 @@ pub struct OuterViewPort<V: View + ?Sized>(ViewPort<V>);
 
 impl<V: View + ?Sized> InnerViewPort<V> {
     pub fn get_broadcast(&self) -> Arc<RwLock<ObserverBroadcast<V>>> {
-        self.0.observers.clone()
+        self.0.cast.clone()
     }
 
     pub fn set_view(&self, view: Option<Arc<V>>) -> Arc<RwLock<ObserverBroadcast<V>>> {
@@ -93,7 +93,7 @@ impl<V: View + ?Sized> InnerViewPort<V> {
     }
 
     pub fn notify(&self, msg: &V::Msg) {
-        self.0.observers.read().unwrap().notify(msg);
+        self.0.cast.read().unwrap().notify(msg);
     }
 }
 
@@ -163,16 +163,16 @@ where V::Msg: Clone {
 #[derive(Debug, Clone)]
 pub struct AnyViewPort {
     view: Arc<dyn Any + Send + Sync + 'static>,
-    observers: Arc<dyn Any + Send + Sync + 'static>
+    cast: Arc<dyn Any + Send + Sync + 'static>
 }
 
 impl AnyViewPort {
     pub fn downcast<V: View + ?Sized + 'static>(self) -> Result<ViewPort<V>, AnyViewPort> {
         match (
             self.view.clone().downcast::<RwLock<Option<Arc<V>>>>(),
-            self.observers.clone().downcast::<RwLock<ObserverBroadcast<V>>>()
+            self.cast.clone().downcast::<RwLock<ObserverBroadcast<V>>>()
         ) {
-            (Ok(view), Ok(observers)) => Ok(ViewPort{view, observers}),
+            (Ok(view), Ok(cast)) => Ok(ViewPort{view, cast}),
             _ => Err(self)
         }
     }
@@ -182,7 +182,7 @@ impl<V: View + ?Sized + 'static> From<ViewPort<V>> for AnyViewPort {
     fn from(port: ViewPort<V>) -> Self {
         AnyViewPort {
             view: port.view as Arc<dyn Any + Send + Sync + 'static>,
-            observers: port.observers as Arc<dyn Any + Send + Sync + 'static>
+            cast: port.cast as Arc<dyn Any + Send + Sync + 'static>
         }
     }
 }
@@ -205,7 +205,7 @@ impl<V: View + ?Sized + 'static> From<OuterViewPort<V>> for AnyOuterViewPort {
     fn from(port: OuterViewPort<V>) -> Self {
         AnyOuterViewPort(AnyViewPort{
             view: port.0.view as Arc<dyn Any + Send + Sync + 'static>,
-            observers: port.0.observers as Arc<dyn Any + Send + Sync + 'static>
+            cast: port.0.cast as Arc<dyn Any + Send + Sync + 'static>
         })
     }
 }
@@ -220,7 +220,7 @@ impl<V: View + ?Sized + 'static> From<InnerViewPort<V>> for AnyInnerViewPort {
     fn from(port: InnerViewPort<V>) -> Self {
         AnyInnerViewPort(AnyViewPort{
             view: port.0.view as Arc<dyn Any + Send + Sync + 'static>,
-            observers: port.0.observers as Arc<dyn Any + Send + Sync + 'static>
+            cast: port.0.cast as Arc<dyn Any + Send + Sync + 'static>
         })
     }
 }
