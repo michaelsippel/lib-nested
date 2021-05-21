@@ -80,7 +80,7 @@ async fn main() {
 
     let mut args = std::env::args();
     args.next().expect("Arg $0 missing!");
-    
+
     let src_radix_str = args.next().expect("Arg $1 required!");
     let dst_radix_str = args.next().expect("Arg $2 required!");
 
@@ -103,7 +103,7 @@ async fn main() {
     );
 
     // output dst digits
-    let _writer = {
+    let writer = {
         use std::{
             os::unix::io::FromRawFd
         };
@@ -119,5 +119,7 @@ async fn main() {
 
         src_digits.from_json(unsafe { async_std::fs::File::from_raw_fd(0) }).await;
     }
+
+    drop(writer);
 }
 
