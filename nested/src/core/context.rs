@@ -76,8 +76,8 @@ pub struct Object {
 }
 
 impl Object {
-    pub fn get_port<V: View + ?Sized + 'static>(&self) -> Option<OuterViewPort<V>> {
-        Some(self.repr.read().unwrap().port.clone()?.downcast::<V>().unwrap())
+    pub fn get_port<V: View + ?Sized + 'static>(&self) -> Option<OuterViewPort<V>> where V::Msg: Clone {
+        Some(self.repr.read().unwrap().port.clone()?.downcast::<V>().ok().unwrap())
     }
 
     pub fn downcast(&self, dst_type: TypeTerm) -> Option<Object> {
@@ -201,6 +201,8 @@ impl Object {
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
+pub struct TypeLadder(Vec<TypeTerm>);
+
 #[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub enum MorphismMode {
     /// Isomorphism
@@ -310,7 +312,8 @@ impl Context {
         &self,
         name: &str,
         type_ladder: impl Iterator<Item = &'a str>
-    ) -> Option<OuterViewPort<V>> {
+    ) -> Option<OuterViewPort<V>>
+    where V::Msg: Clone {
         self.get_obj(&name.into())?
             .downcast_ladder(
                 type_ladder.map(|tn| self.type_dict.type_term_from_str(tn).unwrap())
@@ -367,7 +370,8 @@ impl Context {
         &mut self,
         name: &str,
         type_ladder: impl Iterator<Item = &'a str>
-    ) -> Option<OuterViewPort<V>> {
+    ) -> Option<OuterViewPort<V>>
+    where V::Msg: Clone {
         if let Some(p) = self.get_obj_port(name, type_ladder) {
             Some(p)
         } else {

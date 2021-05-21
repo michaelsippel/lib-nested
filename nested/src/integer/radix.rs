@@ -82,7 +82,7 @@ impl Observer<dyn SequenceView<Item = usize>> for RadixProjection {
         self.src_digits = view;
     }
 
-    fn notify(&self, _idx: &usize) {
+    fn notify(&mut self, _idx: &usize) {
         // todo:
         // src digit i changed.
         // which dst-digits does it affect?

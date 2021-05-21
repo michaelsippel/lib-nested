@@ -35,7 +35,7 @@ impl LeveledTermView {
         src_port: OuterViewPort<dyn TerminalView>,
         dst_port: InnerViewPort<dyn TerminalView>
     ) -> Arc<RwLock<Self>> {
-        let mut proj_helper = ProjectionHelper::new();
+        let mut proj_helper = ProjectionHelper::new(dst_port.0.update_hooks.clone());
 
         let v = Arc::new(RwLock::new(
             LeveledTermView {

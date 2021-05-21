@@ -21,6 +21,8 @@ impl<Item: 'static> OuterViewPort<dyn SequenceView<Item = Item>> {
         f: F
     ) -> OuterViewPort<dyn SequenceView<Item = DstItem>> {
         let port = ViewPort::new();
+        port.add_update_hook(Arc::new(self.0.clone()));
+
         let map = Arc::new(RwLock::new(MapSequenceItem {
             src_view: None,
             f,
@@ -83,7 +85,7 @@ where SrcView: SequenceView + ?Sized,
         if let Some(len) = new_len { self.cast.notify_each(0 .. len ); }
     }
 
-    fn notify(&self, msg: &usize) {
+    fn notify(&mut self, msg: &usize) {
         self.cast.notify(msg);
     }
 }

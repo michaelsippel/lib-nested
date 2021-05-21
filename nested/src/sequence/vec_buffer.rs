@@ -61,6 +61,8 @@ impl<T> OuterViewPort<RwLock<Vec<T>>>
 where T: Clone + Send + Sync + 'static {
     pub fn to_sequence(&self) -> OuterViewPort<dyn SequenceView<Item = T>> {
         let port = ViewPort::new();
+        port.add_update_hook(Arc::new(self.0.clone()));
+
         let vec_seq = VecSequence::new(port.inner());
         self.add_observer(vec_seq.clone());
         port.into_outer()
@@ -114,7 +116,7 @@ where T: Clone + Serialize + Send + Sync + 'static,
         out.flush().expect("");
     }
 
-    fn notify(&self, diff: &VecDiff<T>) {
+    fn notify(&mut self, diff: &VecDiff<T>) {
         let mut out = self.out.write().unwrap();
         out.write(&bincode::serialized_size(diff).unwrap().to_le_bytes()).expect("");
         out.write(&bincode::serialize(diff).unwrap()).expect("");
@@ -142,7 +144,7 @@ where T: Clone + Serialize + Send + Sync + 'static,
         self.out.write().unwrap().flush().expect("");
     }
 
-    fn notify(&self, diff: &VecDiff<T>) {
+    fn notify(&mut self, diff: &VecDiff<T>) {
         self.out.write().unwrap().write(serde_json::to_string(diff).unwrap().as_bytes()).expect("");
         self.out.write().unwrap().write(b"\n").expect("");
         self.out.write().unwrap().flush().expect("");
@@ -184,7 +186,7 @@ where T: Clone + Send + Sync + 'static {
         self.cast.notify_each(0 .. std::cmp::max(old_len, new_len));
     }
 
-    fn notify(&self, diff: &VecDiff<T>) {
+    fn notify(&mut self, diff: &VecDiff<T>) {
         match diff {
             VecDiff::Clear => {
                 let l = {

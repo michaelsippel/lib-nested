@@ -53,7 +53,7 @@ impl Add {
         b: OuterViewPort<dyn SequenceView<Item = usize>>,
         c: InnerViewPort<RwLock<Vec<usize>>>//<dyn SequenceView<Item = usize>>
     ) -> Arc<RwLock<Self>> {
-        let mut proj_helper = ProjectionHelper::new();
+        let mut proj_helper = ProjectionHelper::new(c.0.update_hooks.clone());
         let add = Arc::new(RwLock::new(
             Add {
                 radix,

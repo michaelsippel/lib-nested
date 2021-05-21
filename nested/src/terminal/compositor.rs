@@ -30,7 +30,7 @@ impl TerminalCompositor {
             TerminalCompositor {
                 layers: Vec::new(),
                 cast: port.get_broadcast(),
-                proj_helper: ProjectionHelper::new()
+                proj_helper: ProjectionHelper::new(port.0.update_hooks.clone())
             }
         ));
 

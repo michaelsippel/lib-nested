@@ -2,21 +2,19 @@ use {
     std::{
         cmp::{max},
         any::Any,
-        sync::{Arc, Weak},
-    },
-    async_std::{
-        stream::StreamExt
+        sync::{Arc, Weak}
     },
     std::sync::RwLock,
     crate::{
         core::{
             View,
             Observer, ObserverExt,
+            port::UpdateTask,
             OuterViewPort,
             channel::{
-                channel,
+                ChannelSender, ChannelReceiver,
                 ChannelData,
-                ChannelSender
+                channel
             }
         },
         singleton::{SingletonView},
@@ -29,14 +27,16 @@ use {
 
 pub struct ProjectionHelper<P: Send + Sync + 'static> {
     keepalive: Vec<Arc<dyn Any + Send + Sync>>,
-    proj: Arc<RwLock<Weak<RwLock<P>>>>
+    proj: Arc<RwLock<Weak<RwLock<P>>>>,
+    update_hooks: Arc<RwLock<Vec<Arc<dyn UpdateTask>>>>
 }
 
 impl<P: Send + Sync + 'static> ProjectionHelper<P> {
-    pub fn new() -> Self {
+    pub fn new(update_hooks: Arc<RwLock<Vec<Arc<dyn UpdateTask>>>>) -> Self {
         ProjectionHelper {
             keepalive: Vec::new(),
-            proj: Arc::new(RwLock::new(Weak::new()))
+            proj: Arc::new(RwLock::new(Weak::new())),
+            update_hooks
         }
     }
 
@@ -52,6 +52,7 @@ impl<P: Send + Sync + 'static> ProjectionHelper<P> {
         port: OuterViewPort<dyn SingletonView<Item = Item>>,
         notify: impl Fn(&mut P, &()) + Send + Sync + 'static
     ) -> Arc<RwLock<Option<Arc<dyn SingletonView<Item = Item>>>>> {
+        self.update_hooks.write().unwrap().push(Arc::new(port.0.clone()));
         port.add_observer(self.new_arg(notify));
         port.get_view_arc()
     }
@@ -61,6 +62,7 @@ impl<P: Send + Sync + 'static> ProjectionHelper<P> {
         port: OuterViewPort<dyn SequenceView<Item = Item>>,
         notify: impl Fn(&mut P, &usize) + Send + Sync + 'static
     ) -> Arc<RwLock<Option<Arc<dyn SequenceView<Item = Item>>>>> {
+        self.update_hooks.write().unwrap().push(Arc::new(port.0.clone()));
         port.add_observer(self.new_arg(notify));
         port.get_view_arc()
     }
@@ -70,7 +72,10 @@ impl<P: Send + Sync + 'static> ProjectionHelper<P> {
         port: OuterViewPort<dyn IndexView<Key, Item = Item>>,
         notify: impl Fn(&mut P, &Key) + Send + Sync + 'static
     ) -> Arc<RwLock<Option<Arc<dyn IndexView<Key, Item = Item>>>>> {
-        port.add_observer(self.new_arg(notify));
+        self.update_hooks.write().unwrap().push(Arc::new(port.0.clone()));
+
+        let arg = self.new_arg(notify);
+        port.add_observer(arg);
         port.get_view_arc()
     }
 
@@ -79,46 +84,76 @@ impl<P: Send + Sync + 'static> ProjectionHelper<P> {
     >(
         &mut self,
         notify: impl Fn(&mut P, &V::Msg) + Send + Sync + 'static
-    ) -> Arc<RwLock<ProjectionArg<V, Vec<V::Msg>>>>
-    where V::Msg: Send + Sync {
-        let (tx, mut rx) = channel::<Vec<V::Msg>>();
-
+    ) -> Arc<RwLock<ProjectionArg<P, V, Vec<V::Msg>>>>
+    where V::Msg: Send + Sync
+    {
+        let (tx, rx) = channel::<Vec<V::Msg>>();
         let arg = Arc::new(RwLock::new(
             ProjectionArg {
                 src: None,
-                sender: tx
+                notify: Box::new(notify),
+                proj: self.proj.clone(),
+                rx, tx
             }));
-
-        let proj = self.proj.clone();
-        async_std::task::spawn(async move {
-            while let Some(msg) = rx.next().await {
-                if let Some(proj) = proj.read().unwrap().upgrade() {
-                    notify(&mut *proj.write().unwrap(), &msg);
-                }
-            }
-        });
 
         self.keepalive.push(arg.clone());
 
+        self.update_hooks.write().unwrap().push(arg.clone());
         arg
     }
 }
 
 /// Special Observer which can access the state of the projection on notify
-/// also handles the reset() and default behaviour of unitinitalized inputs
-pub struct ProjectionArg<V, D>
-where V: View + ?Sized,
+/// also handles the reset()
+pub struct ProjectionArg<P, V, D>
+where P: Send + Sync + 'static,
+      V: View + ?Sized,
       D: ChannelData<Item = V::Msg>,
       D::IntoIter: Send + Sync
 {
     src: Option<Arc<V>>,
-    sender: ChannelSender<D>
+    notify: Box<dyn Fn(&mut P, &V::Msg) + Send + Sync + 'static>,
+    proj: Arc<RwLock<Weak<RwLock<P>>>>,
+    rx: ChannelReceiver<D>,
+    tx: ChannelSender<D>
+}
+
+impl<P, V, D> UpdateTask for ProjectionArg<P, V, D>
+where P: Send + Sync + 'static,
+      V: View + ?Sized,
+      D: ChannelData<Item = V::Msg>,
+      D::IntoIter: Send + Sync
+{
+    fn update(&self) {        
+        if let Some(p) = self.proj.read().unwrap().upgrade() {
+            if let Some(data) = self.rx.try_recv() {
+                for msg in data {
+                    (self.notify)(
+                        &mut *p.write().unwrap(),
+                        &msg
+                    );
+                }
+            }
+        }
+    }
+}
+
+impl<P, V, D> UpdateTask for RwLock<ProjectionArg<P, V, D>>
+where P: Send + Sync + 'static,
+      V: View + ?Sized,
+      D: ChannelData<Item = V::Msg>,
+      D::IntoIter: Send + Sync
+{
+    fn update(&self) {
+        self.read().unwrap().update();
+    }
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-impl<Item, D> Observer<dyn SingletonView<Item = Item>> for ProjectionArg<dyn SingletonView<Item = Item>, D>
-where D: ChannelData<Item = ()>,
+impl<P, Item, D> Observer<dyn SingletonView<Item = Item>> for ProjectionArg<P, dyn SingletonView<Item = Item>, D>
+where P: Send + Sync + 'static,
+      D: ChannelData<Item = ()>,
       D::IntoIter: Send + Sync
 {
     fn reset(&mut self, new_src: Option<Arc<dyn SingletonView<Item = Item>>>) {
@@ -126,15 +161,16 @@ where D: ChannelData<Item = ()>,
         self.notify(&());
     }
 
-    fn notify(&self, msg: &()) {
-        self.sender.send(*msg);
+    fn notify(&mut self, msg: &()) {
+        self.tx.send(msg.clone());
     }
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-impl<Item, D> Observer<dyn SequenceView<Item = Item>> for ProjectionArg<dyn SequenceView<Item = Item>, D>
-where D: ChannelData<Item = usize>,
+impl<P, Item, D> Observer<dyn SequenceView<Item = Item>> for ProjectionArg<P, dyn SequenceView<Item = Item>, D>
+where P: Send + Sync + 'static,
+      D: ChannelData<Item = usize>,
       D::IntoIter: Send + Sync
 {
     fn reset(&mut self, new_src: Option<Arc<dyn SequenceView<Item = Item>>>) {
@@ -145,15 +181,17 @@ where D: ChannelData<Item = usize>,
         self.notify_each(0 .. max(old_len, new_len));
     }
 
-    fn notify(&self, msg: &usize) {
-        self.sender.send(*msg);
+    fn notify(&mut self, msg: &usize) {
+        self.tx.send(*msg);
     }
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-impl<Key: Clone, Item, D> Observer<dyn IndexView<Key, Item = Item>> for ProjectionArg<dyn IndexView<Key, Item = Item>, D>
-where D: ChannelData<Item = Key>,
+impl<P, Key, Item, D> Observer<dyn IndexView<Key, Item = Item>> for ProjectionArg<P, dyn IndexView<Key, Item = Item>, D>
+where P: Send + Sync + 'static,
+      Key: Clone + Send + Sync,
+      D: ChannelData<Item = Key>,
       D::IntoIter: Send + Sync
 {
     fn reset(&mut self, new_src: Option<Arc<dyn IndexView<Key, Item = Item>>>) {
@@ -165,8 +203,8 @@ where D: ChannelData<Item = Key>,
         if let Some(area) = new_area { self.notify_each(area); }
     }
 
-    fn notify(&self, msg: &Key) {
-        self.sender.send(msg.clone());
+    fn notify(&mut self, msg: &Key) {
+        self.tx.send(msg.clone());
     }
 }
 

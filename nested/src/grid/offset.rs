@@ -77,7 +77,7 @@ impl<V: GridView + ?Sized> Observer<V> for GridOffset<V> {
         if let Some(area) = new_area { self.cast.notify_each(area); }
     }
 
-    fn notify(&self, msg: &Point2<i16>) {
+    fn notify(&mut self, msg: &Point2<i16>) {
         self.cast.notify(&(msg + self.offset));
     }
 }

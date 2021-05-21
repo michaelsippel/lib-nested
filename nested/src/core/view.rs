@@ -6,7 +6,7 @@
                     \*/
 pub trait View : Send + Sync {
     /// Notification message for the observers
-    type Msg;
+    type Msg : Send + Sync;
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>

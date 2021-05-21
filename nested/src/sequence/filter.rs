@@ -18,6 +18,8 @@ impl<V: SequenceView + ?Sized + 'static> OuterViewPort<V>
         P: Fn(&V::Item) -> bool + Send + Sync + 'static
     >(&self, pred: P) -> OuterViewPort<dyn SequenceView<Item = V::Item>> {
         let port = ViewPort::new();
+        port.add_update_hook(Arc::new(self.0.clone()));
+
         let filter = Arc::new(RwLock::new(
             Filter {
                 src_view: None,
@@ -115,7 +117,7 @@ where SrcView: SequenceView + ?Sized + 'static,
         if let Some(len) = new_len { self.cast.notify_each(0 .. len); }
     }
 
-    fn notify(&self, idx: &usize) {
+    fn notify(&mut self, idx: &usize) {
         let l = self.len().unwrap_or(0)+1;
         let np = 
             if let Some(x) = self.src_view.get(idx) {

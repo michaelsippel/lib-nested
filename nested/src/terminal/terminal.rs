@@ -135,7 +135,7 @@ impl Observer<dyn TerminalView> for TermOutObserver {
         }
     }
 
-    fn notify(&self, pos: &Point2<i16>) {
+    fn notify(&mut self, pos: &Point2<i16>) {
         self.dirty_pos_tx.send(*pos);
     }
 }

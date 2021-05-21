@@ -39,6 +39,7 @@ where SrcView: SequenceView + ?Sized + 'static {
 impl<Item: 'static> OuterViewPort<dyn SequenceView<Item = Item>> {
     pub fn to_index(&self) -> OuterViewPort<dyn IndexView<usize, Item = Item>> {
         let port = ViewPort::new();
+        port.add_update_hook(Arc::new(self.0.clone()));
         self.add_observer(Sequence2Index::new(port.inner()));
         port.into_outer()
     }
@@ -73,7 +74,7 @@ where SrcView: SequenceView + ?Sized + 'static {
         if let Some(area) = new_area { self.cast.notify_each(area); }
     }
 
-    fn notify(&self, msg: &usize) {
+    fn notify(&mut self, msg: &usize) {
         self.cast.notify(msg);
     }
 }

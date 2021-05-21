@@ -65,7 +65,7 @@ where V1: SequenceView<Item = OuterViewPort<V2>> + ?Sized + 'static,
         self.notify_each(0 .. std::cmp::max(old_len, new_len));
     }
 
-    fn notify(&self, chunk_idx: &usize) {
+    fn notify(&mut self, chunk_idx: &usize) {
         self.sender.send(*chunk_idx);
     }
 }
@@ -81,7 +81,7 @@ where V2: SequenceView + ?Sized + 'static
         self.notify_each(0 .. std::cmp::max(old_len, new_len));
     }
 
-    fn notify(&self, idx: &usize) {
+    fn notify(&mut self, idx: &usize) {
         self.sender.send(*idx);
     }
 }
@@ -139,7 +139,7 @@ where V1: SequenceView<Item = OuterViewPort<V2>> + ?Sized + 'static,
             while let Some(chunk_idx) = recv.next().await {
                 if let Some(mut chunk_rcv) = f.write().unwrap().update_chunk(chunk_idx) {
                     let f = f.clone();
-                    let cast = cast.clone();
+                    let mut cast = cast.clone();
                     async_std::task::spawn(async move {
                         while let Some(idx) = chunk_rcv.next().await {
                             let mut flat = f.write().unwrap();

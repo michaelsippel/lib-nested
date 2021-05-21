@@ -166,7 +166,7 @@ pub mod insert_view {
             data_port: OuterViewPort<dyn SequenceView<Item = char>>,
             out_port: InnerViewPort<dyn TerminalView>
         ) -> Arc<RwLock<Self>> {
-            let mut proj_helper = ProjectionHelper::new();
+            let mut proj_helper = ProjectionHelper::new(out_port.0.update_hooks.clone());
 
             let proj = Arc::new(RwLock::new(
                 StringInsertView {

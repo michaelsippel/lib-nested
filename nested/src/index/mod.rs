@@ -13,7 +13,8 @@ use {
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-pub trait IndexView<Key> : View<Msg = Key> {
+pub trait IndexView<Key> : View<Msg = Key>
+where Key: Send + Sync {
     type Item;
 
     fn get(&self, key: &Key) -> Option<Self::Item>;
@@ -26,7 +27,10 @@ pub trait IndexView<Key> : View<Msg = Key> {
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-impl<Key, V: IndexView<Key> + ?Sized> IndexView<Key> for RwLock<V> {
+impl<Key, V> IndexView<Key> for RwLock<V>
+where Key: Send + Sync,
+      V: IndexView<Key> + ?Sized
+{
     type Item = V::Item;
 
     fn get(&self, key: &Key) -> Option<Self::Item> {
@@ -38,7 +42,11 @@ impl<Key, V: IndexView<Key> + ?Sized> IndexView<Key> for RwLock<V> {
     }
 }
 
-impl<Key, V: IndexView<Key> + ?Sized> IndexView<Key> for Arc<V> {
+impl<Key, V> IndexView<Key> for Arc<V>
+where Key: Send + Sync,
+      V: IndexView<Key> + ?Sized
+{
+
     type Item = V::Item;
 
     fn get(&self, key: &Key) -> Option<Self::Item> {
@@ -50,7 +58,10 @@ impl<Key, V: IndexView<Key> + ?Sized> IndexView<Key> for Arc<V> {
     }
 }
 
-impl<Key, V: IndexView<Key>> IndexView<Key> for Option<V> {
+impl<Key, V> IndexView<Key> for Option<V>
+where Key: Send + Sync,
+      V: IndexView<Key>
+{
     type Item = V::Item;
 
     fn get(&self, key: &Key) -> Option<Self::Item> {
@@ -69,7 +80,7 @@ impl<Key, V: IndexView<Key>> IndexView<Key> for Option<V> {
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub trait ImplIndexView : Send + Sync {
-    type Key;
+    type Key : Send + Sync;
     type Value;
 
     fn get(&self, key: &Self::Key) -> Option<Self::Value>;
