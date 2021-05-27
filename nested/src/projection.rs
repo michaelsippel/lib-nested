@@ -2,7 +2,8 @@ use {
     std::{
         cmp::{max},
         any::Any,
-        sync::{Arc, Weak}
+        sync::{Arc, Weak},
+        hash::Hash
     },
     std::sync::RwLock,
     crate::{
@@ -14,7 +15,7 @@ use {
             channel::{
                 ChannelSender, ChannelReceiver,
                 ChannelData,
-                channel
+                set_channel
             }
         },
         singleton::{SingletonView},
@@ -53,7 +54,7 @@ impl<P: Send + Sync + 'static> ProjectionHelper<P> {
         notify: impl Fn(&mut P, &()) + Send + Sync + 'static
     ) -> Arc<RwLock<Option<Arc<dyn SingletonView<Item = Item>>>>> {
         self.update_hooks.write().unwrap().push(Arc::new(port.0.clone()));
-        port.add_observer(self.new_arg(notify));
+        port.add_observer(self.new_arg(notify, set_channel()));
         port.get_view_arc()
     }
 
@@ -63,31 +64,34 @@ impl<P: Send + Sync + 'static> ProjectionHelper<P> {
         notify: impl Fn(&mut P, &usize) + Send + Sync + 'static
     ) -> Arc<RwLock<Option<Arc<dyn SequenceView<Item = Item>>>>> {
         self.update_hooks.write().unwrap().push(Arc::new(port.0.clone()));
-        port.add_observer(self.new_arg(notify));
+        port.add_observer(self.new_arg(notify, set_channel()));
         port.get_view_arc()
     }
 
-    pub fn new_index_arg<Key: Clone + Send + Sync + 'static, Item: 'static>(
+    pub fn new_index_arg<Key: Hash + Eq + Clone + Send + Sync + 'static, Item: 'static>(
         &mut self,
         port: OuterViewPort<dyn IndexView<Key, Item = Item>>,
         notify: impl Fn(&mut P, &Key) + Send + Sync + 'static
     ) -> Arc<RwLock<Option<Arc<dyn IndexView<Key, Item = Item>>>>> {
         self.update_hooks.write().unwrap().push(Arc::new(port.0.clone()));
 
-        let arg = self.new_arg(notify);
+        let arg = self.new_arg(notify, set_channel());
         port.add_observer(arg);
         port.get_view_arc()
     }
 
     pub fn new_arg<
-        V: View + ?Sized + 'static
+        V: View + ?Sized + 'static,
+        D: ChannelData<Item = V::Msg> + 'static
     >(
         &mut self,
-        notify: impl Fn(&mut P, &V::Msg) + Send + Sync + 'static
-    ) -> Arc<RwLock<ProjectionArg<P, V, Vec<V::Msg>>>>
-    where V::Msg: Send + Sync
+        notify: impl Fn(&mut P, &V::Msg) + Send + Sync + 'static,
+        (tx, rx): (ChannelSender<D>, ChannelReceiver<D>)
+    )
+        -> Arc<RwLock<ProjectionArg<P, V, D>>>
+    where V::Msg: Send + Sync,
+          D::IntoIter: Send + Sync + 'static
     {
-        let (tx, rx) = channel::<Vec<V::Msg>>();
         let arg = Arc::new(RwLock::new(
             ProjectionArg {
                 src: None,
