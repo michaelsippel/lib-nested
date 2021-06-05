@@ -24,6 +24,7 @@ impl RadixProjection {
         src_digits: OuterViewPort<dyn SequenceView<Item = usize>>,
         dst_digits: InnerViewPort<RwLock<Vec<usize>>>
     ) -> Arc<RwLock<Self>> {
+        dst_digits.0.add_update_hook(Arc::new(src_digits.0.clone()));
         let proj = Arc::new(RwLock::new(
             RadixProjection {
                 src_radix,
