@@ -74,9 +74,7 @@ impl<P: Send + Sync + 'static> ProjectionHelper<P> {
         notify: impl Fn(&mut P, &Key) + Send + Sync + 'static
     ) -> Arc<RwLock<Option<Arc<dyn IndexView<Key, Item = Item>>>>> {
         self.update_hooks.write().unwrap().push(Arc::new(port.0.clone()));
-
-        let arg = self.new_arg(notify, set_channel());
-        port.add_observer(arg);
+        port.add_observer(self.new_arg(notify, set_channel()));
         port.get_view_arc()
     }
 
@@ -128,7 +126,7 @@ where P: Send + Sync + 'static,
       D: ChannelData<Item = V::Msg>,
       D::IntoIter: Send + Sync
 {
-    fn update(&self) {        
+    fn update(&self) {
         if let Some(p) = self.proj.read().unwrap().upgrade() {
             if let Some(data) = self.rx.try_recv() {
                 for msg in data {
