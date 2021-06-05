@@ -1,0 +1,13 @@
+[package]
+name = "shell"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+nested = { path = "../nested" }
+cgmath = "*"
+termion = "*"
+
+[dependencies.async-std]
+version = "1.9.0"
+features = ["unstable", "attributes"]
