@@ -24,6 +24,8 @@ use {
     }
 };
 
+pub mod list;
+
 #[async_std::main]
 async fn main() {
     /* todo:
@@ -282,7 +284,7 @@ write::
             let hex_label = VecBuffer::<char>::with_data("x0".chars().collect(), hex_label_port.inner());
             
             let delim_port = ViewPort::new();
-            let delim = VecBuffer::<char>::with_data(" ,".chars().collect(), delim_port.inner());
+            let delim = VecBuffer::<char>::with_data(",".chars().collect(), delim_port.inner());
 
             let closing_port = ViewPort::new();
             let closing = VecBuffer::<char>::with_data("[".chars().collect(), closing_port.inner());
@@ -337,17 +339,55 @@ write::
                 );
             }
 
-            compositor.write().unwrap().push(
-                arg1_hex_unic_port
-                    .to_index()
-                    .map_key(
-                        |idx| Point2::new(40 - *idx as i16, 3 as i16),
-                        |pt| if pt.y == 3 { Some(40 - pt.x as usize) } else { None }
-                    )
-                    .map_item(
-                        |_idx, digit| TerminalAtom::from(digit)
-                    )
-            );
+            {
+                let items_port = ViewPort::new();
+                let items = VecBuffer::with_data(
+                    vec![
+                        arg1_dec_mint_port
+                            .map(|val| char::from_digit(*val as u32, 16).unwrap())
+                            .map(|c| TerminalAtom::from(c)),
+                        arg1_hex_unic_port.clone()
+                            .map(|c| TerminalAtom::from(c)),
+                        arg1_hex_unic_port.clone()
+                            .map(|c| TerminalAtom::from(c)),
+                    ],
+                    items_port.inner()
+                );
+
+                let liport = ViewPort::new();
+                let list_decorator = list::ListDecorator::lisp_style(
+                    1,
+                    items_port.outer().to_sequence(),
+                    liport.inner()
+                );
+
+                let par_items_port = ViewPort::new();
+                let par_items = VecBuffer::with_data(
+                    vec![
+                        liport.outer().flatten(),
+                        arg1_hex_unic_port.clone()
+                            .map(|c| TerminalAtom::from(c)),
+                    ],
+                    par_items_port.inner()
+                );
+
+                let par_liport = ViewPort::new();
+                let par_list_decorator = list::ListDecorator::lisp_style(
+                    0,
+                    par_items_port.outer().to_sequence(),
+                    par_liport.inner()
+                );
+
+                compositor.write().unwrap().push(
+                    par_liport.outer()
+                        .flatten()
+                        .to_index()
+                        .map_key(
+                            |idx| Point2::new(*idx as i16, 3),
+                            |pt| if pt.y == 3 { Some(pt.x as usize) } else { None }
+                        )
+                );
+            }
 
             let magic_vec_port = ViewPort::new();
             let _magic_vec = VecBuffer::with_data("<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>".chars().collect::<Vec<char>>(), magic_vec_port.inner());
@@ -393,7 +433,7 @@ write::
                     TerminalEvent::Input(Event::Key(Key::Home)) => ed.goto_end(),
                     TerminalEvent::Input(Event::Key(Key::End)) => ed.goto(0),
                     TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {},
-                    TerminalEvent::Input(Event::Key(Key::Char(c))) => { ed.insert(c); ed.prev() },
+                    TerminalEvent::Input(Event::Key(Key::Char(c))) => { ed.insert(c); ed.prev(); },
                     TerminalEvent::Input(Event::Key(Key::Delete)) => ed.delete_prev(),
                     TerminalEvent::Input(Event::Key(Key::Backspace)) => ed.delete(),
                     TerminalEvent::Input(Event::Key(Key::Ctrl('c'))) => break,
