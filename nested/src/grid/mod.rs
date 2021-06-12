@@ -9,7 +9,6 @@ use {
 };
 
 pub mod offset;
-pub use offset::GridOffset;
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
