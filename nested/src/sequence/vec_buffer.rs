@@ -37,7 +37,7 @@ where T: Clone + Send + Sync + 'static {
 /// Adapter View implementing `Sequence` for `Vec`
 pub struct VecSequence<T>
 where T: Clone + Send + Sync + 'static {
-    cur_len: RwLock<usize>,
+    cur_len: usize,
     data: Option<Arc<RwLock<Vec<T>>>>,
     cast: Arc<RwLock<ObserverBroadcast<dyn SequenceView<Item = T>>>>
 }
@@ -158,7 +158,7 @@ where T: Clone + Send + Sync + 'static {
     ) -> Arc<RwLock<Self>> {
         let seq = Arc::new(RwLock::new(
             VecSequence {
-                cur_len: RwLock::new(0),
+                cur_len: 0,
                 data: None,
                 cast: port.get_broadcast()
             }
@@ -171,55 +171,35 @@ where T: Clone + Send + Sync + 'static {
 impl<T> Observer<RwLock<Vec<T>>> for VecSequence<T>
 where T: Clone + Send + Sync + 'static {
     fn reset(&mut self, view: Option<Arc<RwLock<Vec<T>>>>) {
-        let old_len = self.len().unwrap();
+        let old_len = self.cur_len;
         self.data = view;
-
-        *self.cur_len.write().unwrap() =
+        self.cur_len =
             if let Some(data) = self.data.as_ref() {
                 data.read().unwrap().len()
             } else {
                 0
             };
 
-        let new_len = self.len().unwrap();
-
-        self.cast.notify_each(0 .. std::cmp::max(old_len, new_len));
+        self.cast.notify_each(0 .. std::cmp::max(old_len, self.cur_len));
     }
 
     fn notify(&mut self, diff: &VecDiff<T>) {
         match diff {
             VecDiff::Clear => {
-                let l = {
-                    let mut l = self.cur_len.write().unwrap();
-                    let old_l = *l;
-                    *l = 0;
-                    old_l
-                };
-                self.cast.notify_each(0 .. l)
+                self.cast.notify_each(0 .. self.cur_len);
+                self.cur_len = 0
             },
             VecDiff::Push(_) => {
-                let l = {
-                    let mut l = self.cur_len.write().unwrap();
-                    *l += 1;
-                    *l
-                };
-                self.cast.notify(&(l - 1));
+                self.cast.notify(&self.cur_len);
+                self.cur_len += 1;
             },
             VecDiff::Remove(idx) => {
-                let l = {
-                    let mut l = self.cur_len.write().unwrap();
-                    *l -= 1;
-                    *l + 1
-                };
-                self.cast.notify_each(*idx .. l);
+                self.cast.notify_each(*idx .. self.cur_len);
+                self.cur_len -= 1;
             },
             VecDiff::Insert{ idx, val: _ } => {
-                let l = {
-                    let mut l = self.cur_len.write().unwrap();
-                    *l += 1;
-                    *l
-                };
-                self.cast.notify_each(*idx .. l);
+                self.cur_len += 1;
+                self.cast.notify_each(*idx .. self.cur_len);
             },
             VecDiff::Update{ idx, val: _ } => {
                 self.cast.notify(&idx);
@@ -244,7 +224,7 @@ where T: Clone + Send + Sync + 'static {
     }
 
     fn len(&self) -> Option<usize> {
-        Some(*self.cur_len.read().unwrap())
+        Some(self.cur_len)
     }
 }
 
