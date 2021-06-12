@@ -22,3 +22,24 @@ pub trait TerminalView = GridView<Item = TerminalAtom>;
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
+use {
+    crate::{
+        sequence::VecBuffer,
+        core::{ViewPort, OuterViewPort}
+    },
+    cgmath::Point2
+};
+
+pub fn make_label(s: &str) -> OuterViewPort<dyn TerminalView> {
+    let label_port = ViewPort::new();
+    let label = VecBuffer::with_data(s.chars().collect(), label_port.inner());
+    label_port.outer()
+        .to_sequence()
+        .map(|c| TerminalAtom::from(c))
+        .to_index()
+        .map_key(
+            |idx| Point2::new(*idx as i16, 0),
+            |pt| if pt.y == 0 { Some(pt.x as usize) } else { None }
+        )
+}
+
