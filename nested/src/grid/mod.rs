@@ -9,6 +9,7 @@ use {
 };
 
 pub mod offset;
+pub mod flatten;
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
@@ -17,20 +18,21 @@ pub trait GridView = IndexView<Point2<i16>>;
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 impl<Item> dyn GridView<Item = Item> {
-    pub fn range(&self) -> RangeInclusive<Point2<i16>> {
-        let area = self.area().unwrap_or(Vec::new());
-
-        Point2::new(
-            area.iter().map(|p| p.x).min().unwrap_or(i16::MIN),
-            area.iter().map(|p| p.y).min().unwrap_or(i16::MIN)
-        ) ..=
-        Point2::new(
-            area.iter().map(|p| p.x).max().unwrap_or(i16::MAX),
-            area.iter().map(|p| p.y).max().unwrap_or(i16::MAX)
-        )            
+    pub fn range(&self) -> Range<Point2<i16>> {
+        if let Some(area) = self.area() {
+            Point2::new(
+                area.iter().map(|p| p.x).min().unwrap_or(0),
+                area.iter().map(|p| p.y).min().unwrap_or(0)
+            ) ..
+                Point2::new(
+                    area.iter().map(|p| p.x+1).max().unwrap_or(0),
+                    area.iter().map(|p| p.y+1).max().unwrap_or(0)
+                )
+        } else {
+            Point2::new(i16::MIN, i16::MIN) .. Point2::new(i16::MAX, i16::MAX)
+        }
     }
 }
-
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
