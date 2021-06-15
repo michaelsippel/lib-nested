@@ -1,15 +1,12 @@
 use {
-    std::sync::Arc,
-    cgmath::{Point2, Vector2},
-    std::sync::RwLock,
+    cgmath::Vector2,
     crate::{
-        core::{
-            OuterViewPort
-        },
-        grid::{GridView}
+        core::OuterViewPort,
+        grid::GridView
     }
 };
 
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 impl<Item> OuterViewPort<dyn GridView<Item = Item>>
 where Item: 'static {

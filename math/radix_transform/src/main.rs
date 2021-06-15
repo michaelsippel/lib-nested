@@ -5,7 +5,7 @@ use {
             ViewPort,
             TypeDict
         },
-        sequence::{VecBuffer},
+        vec::{VecBuffer},
         integer::{RadixProjection}
     }
 };

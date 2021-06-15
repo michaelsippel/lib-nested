@@ -7,6 +7,7 @@ pub mod singleton;
 pub mod index;
 pub mod grid;
 pub mod sequence;
+pub mod vec;
 pub mod terminal;
 pub mod integer;
 

@@ -73,9 +73,11 @@ impl ImplIndexView for LeveledTermView {
     fn get(&self, pos: &Point2<i16>) -> Option<TerminalAtom> {
         self.src.get(pos).map(
             |a| a.add_style_front(
-                if self.level > 0 {
+                if self.level > 1 {
                     TerminalStyle::bold(true)
                         .add(TerminalStyle::bg_color((0, 0, 0)))
+                } else if self.level > 0 {
+                    TerminalStyle::bg_color((40, 40, 40))
                 } else {
                     TerminalStyle::bold(false)
                 })

@@ -1,15 +1,13 @@
 use {
-    async_std::stream::StreamExt,
     std::{
-        sync::{Arc},
-        collections::{BTreeMap, HashSet}
+        sync::Arc,
+        collections::BTreeMap
     },
     std::sync::RwLock,
     crate::{
         core::{
             View, Observer, ObserverBroadcast, ObserverExt,
             ViewPort, InnerViewPort, OuterViewPort,
-            channel::{ChannelSender, ChannelReceiver},
             port::UpdateTask
         },
         sequence::SequenceView,
@@ -144,7 +142,7 @@ where Item: 'static
         let mut dirty_idx = Vec::new();
         let mut cur_offset = 0;
 
-        for (chunk_idx, chunk) in self.chunks.iter_mut() {
+        for (_chunk_idx, chunk) in self.chunks.iter_mut() {
             let old_offset = chunk.offset;
             chunk.offset = cur_offset;
             chunk.len = chunk.view.len().unwrap_or(0);

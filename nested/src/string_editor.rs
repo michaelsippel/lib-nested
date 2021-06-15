@@ -3,7 +3,7 @@ use {
     crate::{
         core::{ViewPort, OuterViewPort},
         singleton::{SingletonView, SingletonBuffer},
-        sequence::VecBuffer,
+        vec::VecBuffer,
         terminal::{TerminalView}
     }
 };

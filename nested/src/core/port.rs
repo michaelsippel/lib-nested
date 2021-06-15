@@ -100,7 +100,7 @@ where V::Msg: Clone {
 
 impl<V: View + ?Sized> UpdateTask for ViewPort<V> where V::Msg: Clone + Send + Sync{
     fn update(&self) {
-        let mut v = {
+        let v = {
             let t = self.update_hooks.read().unwrap();
             t.iter().cloned().collect::<Vec<_>>()
         };

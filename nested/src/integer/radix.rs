@@ -6,7 +6,8 @@ use {
             InnerViewPort,
             OuterViewPort
         },
-        sequence::{SequenceView, VecBuffer}
+        sequence::SequenceView,
+        vec::VecBuffer
     }
 };
 

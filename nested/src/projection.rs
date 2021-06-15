@@ -68,7 +68,7 @@ impl<P: Send + Sync + 'static> ProjectionHelper<P> {
         port.get_view_arc()
     }
 
-    pub fn new_index_arg<Key: Hash + Eq + Clone + Send + Sync + 'static, Item: 'static>(
+    pub fn new_index_arg<Key: Hash + Eq + Clone + Send + Sync + std::fmt::Debug + 'static, Item: 'static>(
         &mut self,
         port: OuterViewPort<dyn IndexView<Key, Item = Item>>,
         notify: impl Fn(&mut P, &Key) + Send + Sync + 'static
@@ -87,7 +87,7 @@ impl<P: Send + Sync + 'static> ProjectionHelper<P> {
         (tx, rx): (ChannelSender<D>, ChannelReceiver<D>)
     )
         -> Arc<RwLock<ProjectionArg<P, V, D>>>
-    where V::Msg: Send + Sync,
+    where V::Msg: Send + Sync + std::fmt::Debug,
           D::IntoIter: Send + Sync + 'static
     {
         let arg = Arc::new(RwLock::new(
@@ -124,18 +124,22 @@ impl<P, V, D> UpdateTask for ProjectionArg<P, V, D>
 where P: Send + Sync + 'static,
       V: View + ?Sized,
       D: ChannelData<Item = V::Msg>,
-      D::IntoIter: Send + Sync
+      D::IntoIter: Send + Sync,
+V::Msg: std::fmt::Debug
 {
     fn update(&self) {
         if let Some(p) = self.proj.read().unwrap().upgrade() {
             if let Some(data) = self.rx.try_recv() {
                 for msg in data {
+                    //eprintln!("proj update {:?}", msg);
                     (self.notify)(
                         &mut *p.write().unwrap(),
                         &msg
                     );
                 }
             }
+        } else {
+            eprintln!("proj update: upgrade fail");
         }
     }
 }
@@ -144,7 +148,8 @@ impl<P, V, D> UpdateTask for RwLock<ProjectionArg<P, V, D>>
 where P: Send + Sync + 'static,
       V: View + ?Sized,
       D: ChannelData<Item = V::Msg>,
-      D::IntoIter: Send + Sync
+      D::IntoIter: Send + Sync,
+V::Msg: std::fmt::Debug
 {
     fn update(&self) {
         self.read().unwrap().update();

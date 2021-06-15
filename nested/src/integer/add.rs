@@ -2,7 +2,8 @@ use {
     std::sync::{Arc, RwLock},
     crate::{
         core::{InnerViewPort, OuterViewPort},
-        sequence::{SequenceView, VecBuffer},
+        sequence::SequenceView,
+        vec::VecBuffer,
         projection::ProjectionHelper
     }
 };

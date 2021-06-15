@@ -24,7 +24,7 @@ pub trait TerminalView = GridView<Item = TerminalAtom>;
 
 use {
     crate::{
-        sequence::VecBuffer,
+        vec::VecBuffer,
         core::{ViewPort, OuterViewPort}
     },
     cgmath::Point2
@@ -32,7 +32,7 @@ use {
 
 pub fn make_label(s: &str) -> OuterViewPort<dyn TerminalView> {
     let label_port = ViewPort::new();
-    let label = VecBuffer::with_data(s.chars().collect(), label_port.inner());
+    let _label = VecBuffer::with_data(s.chars().collect(), label_port.inner());
     label_port.outer()
         .to_sequence()
         .map(|c| TerminalAtom::from(c))

@@ -1,8 +1,7 @@
 use {
-    async_std::stream::StreamExt,
     std::{
-        sync::{Arc},
-        collections::{HashMap, HashSet}
+        sync::Arc,
+        collections::HashMap
     },
     std::sync::RwLock,
     cgmath::{Point2, Vector2},
@@ -10,7 +9,6 @@ use {
         core::{
             View, Observer, ObserverBroadcast, ObserverExt,
             ViewPort, InnerViewPort, OuterViewPort,
-            channel::{ChannelSender, ChannelReceiver},
             port::UpdateTask
         },
         grid::{GridView, GridWindowIterator},
@@ -21,7 +19,7 @@ use {
 
 impl<Item> OuterViewPort<dyn GridView<Item = OuterViewPort<dyn GridView<Item = Item>>>>
 where Item: 'static{
-    pub fn flatten(&self) -> OuterViewPort<dyn GridView<Item = Item>> {
+    pub fn flatten(&self) -> OuterViewPort<dyn GridView<Item = Item> + 'static> {
         let port = ViewPort::new();
         port.add_update_hook(Arc::new(self.0.clone()));
         Flatten::new(self.clone(), port.inner());
@@ -177,7 +175,7 @@ where Item: 'static
             }
         }
 
-        let old_limit = self.limit;
+        //let old_limit = self.limit;
         self.limit = Point2::new(
             (0 .. top_range.end.x as usize).map(|x| col_widths[x]).sum(),
             (0 .. top_range.end.y as usize).map(|y| row_heights[y]).sum()
