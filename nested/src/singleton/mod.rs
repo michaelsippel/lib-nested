@@ -1,5 +1,6 @@
 
 pub mod buffer;
+pub mod map;
 
 use {
     std::{
