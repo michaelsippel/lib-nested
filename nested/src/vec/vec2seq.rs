@@ -43,13 +43,14 @@ where T: Clone + Send + Sync + 'static {
     fn reset(&mut self, view: Option<Arc<RwLock<Vec<T>>>>) {
         let old_len = self.cur_len;
         self.data = view;
-        self.cur_len =
+        self.cur_len = 0;
+        /*
             if let Some(data) = self.data.as_ref() {
                 data.read().unwrap().len()
             } else {
                 0
             };
-
+*/
         self.cast.notify_each(0 .. std::cmp::max(old_len, self.cur_len));
     }
 

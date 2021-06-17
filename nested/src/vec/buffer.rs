@@ -34,13 +34,18 @@ where T: Clone + Send + Sync + 'static
         data: Vec<T>,
         port: InnerViewPort<RwLock<Vec<T>>>
     ) -> Self {
-        let data = Arc::new(RwLock::new(data));
-        port.set_view(Some(data.clone()));
-        VecBuffer { data, cast: port.get_broadcast() }
+        let mut b = VecBuffer::new(port);
+        for x in data.into_iter() {
+            b.push(x);
+        }
+
+        b
     }
 
     pub fn new(port: InnerViewPort<RwLock<Vec<T>>>) -> Self {
-        VecBuffer::with_data(Vec::new(), port)
+        let data = Arc::new(RwLock::new(Vec::new()));
+        port.set_view(Some(data.clone()));
+        VecBuffer { data, cast: port.get_broadcast() }
     }
 
     pub fn apply_diff(&mut self, diff: VecDiff<T>) {
