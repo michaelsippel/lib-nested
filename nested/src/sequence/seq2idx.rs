@@ -9,7 +9,8 @@ use {
             ViewPort, InnerViewPort, OuterViewPort
         },
         sequence::SequenceView,
-        index::IndexView
+        index::IndexView,
+        grid::GridView
     }
 };
 
@@ -42,6 +43,14 @@ impl<Item: 'static> OuterViewPort<dyn SequenceView<Item = Item>> {
         port.add_update_hook(Arc::new(self.0.clone()));
         self.add_observer(Sequence2Index::new(port.inner()));
         port.into_outer()
+    }
+
+    pub fn to_grid_horizontal(&self) -> OuterViewPort<dyn GridView<Item = Item>> {
+        self.to_index().to_grid_horizontal()
+    }
+
+    pub fn to_grid_vertical(&self) -> OuterViewPort<dyn GridView<Item = Item>> {
+        self.to_index().to_grid_vertical()
     }
 }
 

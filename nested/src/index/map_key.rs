@@ -14,7 +14,8 @@ pub use {
             InnerViewPort,
             OuterViewPort
         },
-        index::{IndexView}
+        index::{IndexView},
+        grid::{GridView}
     }
 };
 
@@ -37,6 +38,24 @@ where SrcKey: Clone + Send + Sync + 'static,
         let map = MapIndexKey::new(port.inner(), f1, f2);
         self.add_observer(map.clone());
         port.into_outer()
+    }
+}
+
+impl<Item> OuterViewPort<dyn IndexView<usize, Item = Item>>
+where Item: 'static
+{
+    pub fn to_grid_horizontal(&self) -> OuterViewPort<dyn GridView<Item = Item>> {
+        self.map_key(
+            |idx| cgmath::Point2::new(*idx as i16, 0),
+            |pt| if pt.y == 0 { Some(pt.x as usize) } else { None }
+        )
+    }
+
+    pub fn to_grid_vertical(&self) -> OuterViewPort<dyn GridView<Item = Item>> {
+        self.map_key(
+            |idx| cgmath::Point2::new(0, *idx as i16),
+            |pt| if pt.x == 0 { Some(pt.y as usize) } else { None }
+        )        
     }
 }
 
