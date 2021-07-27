@@ -44,6 +44,7 @@ where V::Msg: Clone {
     }
 
     pub fn set_view(&self, view: Option<Arc<V>>) {
+        self.update();
         *self.view.write().unwrap() = view.clone();
         self.cast.write().unwrap().reset(view);
     }
