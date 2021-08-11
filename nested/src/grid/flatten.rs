@@ -19,7 +19,7 @@ use {
 
 impl<Item> OuterViewPort<dyn GridView<Item = OuterViewPort<dyn GridView<Item = Item>>>>
 where Item: 'static{
-    pub fn flatten(&self) -> OuterViewPort<dyn GridView<Item = Item> + 'static> {
+    pub fn flatten(&self) -> OuterViewPort<dyn GridView<Item = Item>> {
         let port = ViewPort::new();
         port.add_update_hook(Arc::new(self.0.clone()));
         Flatten::new(self.clone(), port.inner());
@@ -100,49 +100,61 @@ where Item: 'static
     /// create a new observer for the contained sub sequence
     fn update_chunk(&mut self, chunk_idx: Point2<i16>) {
         if let Some(chunk_port) = self.top.get(&chunk_idx) {
-            self.chunks.insert(
-                chunk_idx,
-                Chunk {
-                    offset: Vector2::new(0, 0),
-                    limit: Point2::new(0, 0),
-                    view: self.proj_helper.new_index_arg(
-                        chunk_port.clone(),
-                        move |s: &mut Self, idx| {
-                            if let Some(chunk) = s.chunks.get(&chunk_idx) {
-                                let chunk_offset = chunk.offset;
-                                let chunk_limit = chunk.view.range().end;
-
-                                let mut dirty_idx = Vec::new();
-                                if chunk.limit != chunk_limit {
-                                    dirty_idx = s.update_all_offsets();
-                                }
-
-                                s.cast.notify(&(idx + chunk_offset));
-                                s.cast.notify_each(dirty_idx);
-                            }
+            let view = self.proj_helper.new_index_arg(
+                chunk_port.clone(),
+                move |s: &mut Self, idx| {
+                    if let Some(chunk) = s.chunks.get(&chunk_idx) {
+                        if chunk.limit != chunk.view.range().end {
+                            s.update_all_offsets();
                         }
-                    )
+                    }
+                    if let Some(chunk) = s.chunks.get(&chunk_idx) {
+                        s.cast.notify(&(idx + chunk.offset));
+                    }
                 }
             );
+/*
+            if let Some(chunk) = self.chunks.get_mut(&chunk_idx) {
+                chunk.view = view;
+            } else {
+*/
+                self.chunks.insert(
+                    chunk_idx,
+                    Chunk {
+                        offset: Vector2::new(-1, -1),
+                        limit: Point2::new(-1, -1),
+                        view
+                    }
+                );
+                /*
+            }
+             */
 
             chunk_port.0.update();
-
-            let dirty_idx = self.update_all_offsets();
-            self.cast.notify_each(dirty_idx);
+            self.update_all_offsets();
+            chunk_port.0.update();
         } else {
             // todo:
             //self.proj_helper.remove_arg();
 
-            self.chunks.remove(&chunk_idx);
+            let mut dirty_idx = Vec::new();
+            if let Some(chunk) = self.chunks.get_mut(&chunk_idx) {
+                dirty_idx.extend(
+                    GridWindowIterator::from(
+                        Point2::new(chunk.offset.x, chunk.offset.y)
+                            .. Point2::new(chunk.offset.x + chunk.limit.x, chunk.offset.y + chunk.limit.y))
+                );
+            }
 
-            let dirty_idx = self.update_all_offsets();
+            self.chunks.remove(&chunk_idx);
             self.cast.notify_each(dirty_idx);
+            self.update_all_offsets();
         }
     }
 
     /// recalculate all chunk offsets
     /// and update size of flattened grid
-    fn update_all_offsets(&mut self) -> Vec<Point2<i16>> {
+    fn update_all_offsets(&mut self) {
         let mut dirty_idx = Vec::new();
 
         let top_range = self.top.range();
@@ -168,36 +180,43 @@ where Item: 'static
                         GridWindowIterator::from(
                             Point2::new(std::cmp::min(old_offset.x, chunk.offset.x),
                                         std::cmp::min(old_offset.y, chunk.offset.y))
-                                .. Point2::new(std::cmp::max(old_offset.x, chunk.offset.x) + std::cmp::max(old_limit.x, chunk.limit.x),
-                                               std::cmp::max(old_offset.y, chunk.offset.y) + std::cmp::max(old_limit.y, chunk.limit.y)))
+                                .. Point2::new(std::cmp::max(old_offset.x + old_limit.x, chunk.offset.x + chunk.limit.x),
+                                               std::cmp::max(old_offset.y + old_limit.y, chunk.offset.y + chunk.limit.y)))
                     );
                 }
             }
         }
 
-        //let old_limit = self.limit;
+        let old_limit = self.limit;
         self.limit = Point2::new(
             (0 .. top_range.end.x as usize).map(|x| col_widths[x]).sum(),
             (0 .. top_range.end.y as usize).map(|y| row_heights[y]).sum()
         );
 
-        dirty_idx
+        // fixme: dirty hack to mitigate the buggy notifications, not efficien
+        dirty_idx.extend(
+            GridWindowIterator::from(
+                Point2::new(0, 0) .. Point2::new(
+                    std::cmp::max(old_limit.x, self.limit.x),
+                    std::cmp::max(old_limit.y, self.limit.y)
+                )
+            )
+        );
+
+        self.cast.notify_each(dirty_idx);
     }
 
     /// given an index in the flattened sequence,
     /// which sub-sequence does it belong to?
     fn get_chunk_idx(&self, glob_pos: Point2<i16>) -> Option<Point2<i16>> {
-        let mut offset = Point2::new(0, 0);
-
         for chunk_idx in GridWindowIterator::from(self.top.range()) {
             if let Some(chunk) = self.chunks.get(&chunk_idx) {
                 let chunk_range = chunk.view.range();
+                let end = chunk_range.end + chunk.offset;
 
-                offset += Vector2::new(chunk_range.end.x, chunk_range.end.y);
-
-                if glob_pos.x < offset.x && glob_pos.y < offset.y {
+                if glob_pos.x < end.x && glob_pos.y < end.y {
                     return Some(chunk_idx);
-                }                
+                }
             }
         }
 
