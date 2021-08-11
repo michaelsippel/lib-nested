@@ -50,6 +50,7 @@ where V::Msg: Clone {
     }
 
     pub fn add_observer(&self, observer: Arc<RwLock<dyn Observer<V>>>) {
+        self.update();
         self.cast.write().unwrap().add_observer(Arc::downgrade(&observer));
         observer.write().unwrap().reset(self.view.read().unwrap().clone());
     }
