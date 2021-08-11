@@ -1,30 +1,53 @@
-use {
-    std::sync::RwLock,
-    cgmath::Point2,    
+
+//mod monstera;
+
+use{
+    std::sync::{Arc, RwLock},
+    cgmath::{Point2, Vector2},
     termion::event::{Event, Key},
     nested::{
         core::{
+            View,
             ViewPort,
             OuterViewPort,
-            context::{
-                ReprTree,
-                Object,
-                MorphismType,
-                MorphismMode,
-                Context
-            },
-            port::{
-                UpdateTask
-            }
-        },
-        sequence::{SequenceView, VecBuffer},
+            Observer,
+            ObserverExt,
+            context::{ReprTree, Object, MorphismType, MorphismMode, Context},
+            port::{UpdateTask}},
+        index::{IndexView},
+        sequence::{SequenceView},
+        vec::{VecBuffer},
         integer::{RadixProjection},
-        terminal::{Terminal, TerminalAtom, TerminalStyle, TerminalCompositor, TerminalEvent},
-        string_editor::StringEditor
+        terminal::{
+            Terminal,
+            TerminalStyle,
+            TerminalAtom,
+            TerminalCompositor,
+            TerminalEvent,
+            make_label,
+            TerminalView,
+            TerminalEditor},
+        string_editor::StringEditor,
+        list::{SExprView, ListEditor}
     }
 };
 
-pub mod list;
+struct GridFill<T: Send + Sync + Clone>(T);
+impl<T: Send + Sync + Clone> View for GridFill<T> {
+    type Msg = Point2<i16>;
+}
+
+impl<T: Send + Sync + Clone> IndexView<Point2<i16>> for GridFill<T> {
+    type Item = T;
+
+    fn area(&self) -> Option<Vec<Point2<i16>>> {
+        None
+    }
+
+    fn get(&self, _: &Point2<i16>) -> Option<T> {
+        Some(self.0.clone())
+    }
+}
 
 #[async_std::main]
 async fn main() {
@@ -58,25 +81,27 @@ write::
     */
 
     let mut args = std::env::args();
-
+/*
     let arg0_port = ViewPort::new();
     let _arg0 = VecBuffer::<char>::with_data(
         args.next().expect("Arg $0 missing!")
             .chars().collect::<Vec<char>>(),
         arg0_port.inner()
     );
-/*
+*/
     let arg1_vec_port = ViewPort::new();
     let mut arg1 = VecBuffer::<char>::with_data(
+        vec!['1'],
+/*
         args.next().expect("Arg $1 missing!")
             .chars().collect::<Vec<char>>(),
+*/
         arg1_vec_port.inner()
     );
-*/
-
-    let arg1_vec = args.next().expect("Arg $1 missing!")
+/*
+    let _arg1_vec = args.next().expect("Arg $1 missing!")
             .chars().collect::<Vec<char>>();
-
+*/
     let term_port = ViewPort::new();
     let compositor = TerminalCompositor::new(term_port.inner());
 
@@ -171,7 +196,7 @@ write::
                 })
             );
              */
-
+ 
             let arg1_vec_port = ed.get_data_port();
 
             ctx.add_obj("$1".into(), "( Vec UnicodeChar )");
@@ -247,202 +272,242 @@ write::
                 arg1_hex_unic_port.clone().into()
             );
 
-            compositor.write().unwrap().push(
-                ed.insert_view()
-                    .map_key(
-                        |pt| Point2::new(40 as i16 - pt.x, 1 as i16),
-                        |pt| if pt.y == 1 { Some(Point2::new(40 as i16 - pt.x, 0)) } else { None }
-                    )
+                let magic = make_label("<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>")
                     .map_item(
-                        |_pos, atom|
-                        TerminalAtom::new(
-                            atom.c.unwrap_or(' '),
+                        |pos, atom|
+                        atom.add_style_back(
                             TerminalStyle::fg_color(
-                                if let Some(c) = atom.c {
-                                    if c == '|' {
-                                        (200, 200, 90)
-                                    } else if c.is_digit(10) {
-                                        (0, 200, 0)
-                                    } else {
-                                        (255, 0, 0)
-                                    }
-                                } else {
-                                    (0, 0, 0)
-                                }
+                                (5,
+                                 ((80+(pos.x*30)%100) as u8),
+                                 (55+(pos.x*15)%180) as u8)
                             )
                         )
-                    )
-            );
-
-            let opening_port = ViewPort::new();
-            let opening = VecBuffer::<char>::with_data("]".chars().collect(), opening_port.inner());
-
-            let dec_label_port = ViewPort::new();
-            let dec_label = VecBuffer::<char>::with_data("d0".chars().collect(), dec_label_port.inner());
-
-            let hex_label_port = ViewPort::new();
-            let hex_label = VecBuffer::<char>::with_data("x0".chars().collect(), hex_label_port.inner());
-            
-            let delim_port = ViewPort::new();
-            let delim = VecBuffer::<char>::with_data(",".chars().collect(), delim_port.inner());
-
-            let closing_port = ViewPort::new();
-            let closing = VecBuffer::<char>::with_data("[".chars().collect(), closing_port.inner());
-            for c in arg1_vec {
-                ed.insert(c);
-                ed.prev();
-            }
+                    );
 
             {
-                let tree_port = ViewPort::new();
-                let mut tree = VecBuffer::with_data(
-                    vec![
-                        opening_port.outer()
-                            .to_sequence()
-                            .map(|c| TerminalAtom::new(*c, TerminalStyle::fg_color((170, 170, 30)))),
-
-                        arg1_dec_mint_port
-                            .map(|val| char::from_digit(*val as u32, 16).unwrap())
-                            .map(|c| TerminalAtom::new(*c, TerminalStyle::fg_color((255, 255, 255)))),
-
-                        dec_label_port.outer()
-                            .to_sequence()
-                            .map(|c| TerminalAtom::new(*c, TerminalStyle::fg_color((170, 170, 170)))),
-
-                        delim_port.outer()
-                            .to_sequence()
-                            .map(|c| TerminalAtom::new(*c, TerminalStyle::fg_color((170, 170, 30)))),
-
-                        arg1_hex_unic_port.clone()
-                            .map(|c| TerminalAtom::new(*c, TerminalStyle::fg_color((255, 255, 255)))),
-
-                        hex_label_port.outer()
-                            .to_sequence()
-                            .map(|c| TerminalAtom::new(*c, TerminalStyle::fg_color((170, 170, 170)))),
-
-                        closing_port.outer()
-                            .to_sequence()
-                            .map(|c| TerminalAtom::new(*c, TerminalStyle::fg_color((170, 170, 30)))),
-                    ],
-                    tree_port.inner()
-                );
-
-                compositor.write().unwrap().push(
-                    tree_port.outer()
-                        .to_sequence()
-                        .flatten()
-                        .to_index()
-                        .map_key(
-                            |idx| Point2::new(40 - *idx as i16, 2 as i16),
-                            |pt| if pt.y == 2 { Some(40 - pt.x as usize) } else { None }
-                        )
-                );
+                compositor.write().unwrap().push(magic.offset(Vector2::new(40, 4)));
+                //compositor.write().unwrap().push(magic.offset(Vector2::new(40, 20)));
+/*
+                let monstera_port = monstera::make_monstera();
+                compositor.write().unwrap().push(monstera_port.clone());
+                compositor.write().unwrap().push(monstera_port.offset(Vector2::new(83,0)));
+*/
             }
 
+/*
+
+            // list views
             {
                 let items_port = ViewPort::new();
                 let items = VecBuffer::with_data(
                     vec![
-                        arg1_dec_mint_port
-                            .map(|val| char::from_digit(*val as u32, 16).unwrap())
-                            .map(|c| TerminalAtom::from(c)),
                         arg1_hex_unic_port.clone()
-                            .map(|c| TerminalAtom::from(c)),
+                            .map(|c| TerminalAtom::from(c))
+                            .to_index()
+                            .map_key(
+                                |idx| Point2::new(*idx as i16, 0 as i16),
+                                |pt| if pt.y == 0 { Some(pt.x as usize) } else { None }
+                            ),
+                        ed.insert_view()
+                            .map_item(
+                                |_pos, atom|
+                                TerminalAtom::new(
+                                    atom.c.unwrap_or(' '),
+                                    TerminalStyle::fg_color(
+                                        if let Some(c) = atom.c {
+                                            if c == '|' {
+                                                (200, 200, 90)
+                                            } else if c.is_digit(10) {
+                                                (0, 200, 0)
+                                            } else {
+                                                (255, 0, 0)
+                                            }
+                                        } else {
+                                            (0, 0, 0)
+                                        }
+                                    ).add(
+                                        TerminalStyle::bg_color((0,0,0))
+                                    )
+                                )
+                            ),
                         arg1_hex_unic_port.clone()
-                            .map(|c| TerminalAtom::from(c)),
+                            .map(|c| TerminalAtom::from(c))
+                            .to_index()
+                            .map_key(
+                                |idx| Point2::new(*idx as i16, 0 as i16),
+                                |pt| if pt.y == 0 { Some(pt.x as usize) } else { None }
+                            ),
                     ],
                     items_port.inner()
-                );
-
-                let liport = ViewPort::new();
-                let list_decorator = list::ListDecorator::lisp_style(
-                    1,
-                    items_port.outer().to_sequence(),
-                    liport.inner()
                 );
 
                 let par_items_port = ViewPort::new();
                 let par_items = VecBuffer::with_data(
                     vec![
-                        liport.outer().flatten(),
+                        items_port.outer().to_sequence().sexpr_view(1),
                         arg1_hex_unic_port.clone()
-                            .map(|c| TerminalAtom::from(c)),
+                            .map(|c| TerminalAtom::from(c))
+                            .to_index()
+                            .map_key(
+                                |idx| Point2::new(*idx as i16, 0 as i16),
+                                |pt| if pt.y == 0 { Some(pt.x as usize) } else { None }
+                            ),
                     ],
                     par_items_port.inner()
                 );
 
-                let par_liport = ViewPort::new();
-                let par_list_decorator = list::ListDecorator::lisp_style(
-                    0,
-                    par_items_port.outer().to_sequence(),
-                    par_liport.inner()
-                );
-
                 compositor.write().unwrap().push(
-                    par_liport.outer()
-                        .flatten()
-                        .to_index()
-                        .map_key(
-                            |idx| Point2::new(*idx as i16, 3),
-                            |pt| if pt.y == 3 { Some(pt.x as usize) } else { None }
-                        )
+                    par_items_port.outer()
+                        .to_sequence()
+                        .sexpr_view(0)
+                        .offset(Vector2::new(45, 5))
                 );
             }
 
-            let magic_vec_port = ViewPort::new();
-            let _magic_vec = VecBuffer::with_data("<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>".chars().collect::<Vec<char>>(), magic_vec_port.inner());
+            for c in _arg1_vec {
+                ed.insert(c);
+            }
+*/
+
+            let cur_size_port = ViewPort::new();
+            let mut cur_size = nested::singleton::SingletonBuffer::new(Vector2::new(10, 10), cur_size_port.inner());
+
+//            compositor.write().unwrap()
+//                .push(
+                    let label_port = cur_size_port.outer()
+                        .map(
+                            |size| make_label(format!("Current Size: {:?}", size).as_str())
+                        );
+//                );
+
+            //term_port.update();
+            //eprintln!("start loop:");
+
+            {
+//                let history_port = ViewPort::new();
+//                let mut history = VecBuffer::new(history_port.inner());
+/*
+                compositor.write().unwrap().push(
+                    history_port.into_outer()
+                        .to_sequence()
+                        .map(
+                            |
+                        )
+                        .to_grid_vertical()
+                        .flatten()
+                        .offset(Vector2::new(45, 5))
+                );
+*/
+            };
+            let mut y = 5;
+
+
+            // TypeEditor
+
+            let make_sub_editor = || {
+                std::sync::Arc::new(std::sync::RwLock::new(StringEditor::new()))
+            };
+
+            let mut te = ListEditor::new(make_sub_editor.clone());
 
             compositor.write().unwrap().push(
-                magic_vec_port.outer()
-                    .to_sequence()
-                    .to_index()
-                    .map_item(
-                        |idx, c| TerminalAtom::new(
-                            *c,
-                            TerminalStyle::fg_color((5, ((80+(idx*30)%100) as u8), (55+(idx*15)%180) as u8))
-                        )
-                    )
-                    .map_key(
-                        |idx| Point2::new(*idx as i16, 4),
-                        |pt| if pt.y == 4 { Some(pt.x as usize) } else { None }
-                    )
+                te.segment_seq.horizontal_sexpr_view(0).offset(cgmath::Vector2::new(40,y))
             );
+            y += 1;
 
-            compositor.write().unwrap().push(
-                magic_vec_port.outer()
-                    .to_sequence()
-                    .to_index()
-                    .map_item(
-                        |idx, c| TerminalAtom::new(
-                            *c,
-                            TerminalStyle::fg_color((5, ((80+(idx*30)%100) as u8), (55+(idx*15)%180) as u8))
-                        )
-                    )
-                    .map_key(
-                        |idx| Point2::new(*idx as i16, 0),
-                        |pt| if pt.y == 0 { Some(pt.x as usize) } else { None }
-                    )
-            );
-
-            term_port.update();
+            let mut p = te.get_data_port().map(|string_editor| string_editor.read().unwrap().get_data_port());            
 
             loop {
+                term_port.update();
                 match term.next_event().await {
-                    TerminalEvent::Input(Event::Key(Key::Left)) => ed.next(),
-                    TerminalEvent::Input(Event::Key(Key::Right)) => ed.prev(),
-                    TerminalEvent::Input(Event::Key(Key::Home)) => ed.goto_end(),
-                    TerminalEvent::Input(Event::Key(Key::End)) => ed.goto(0),
-                    TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {},
-                    TerminalEvent::Input(Event::Key(Key::Char(c))) => { ed.insert(c); ed.prev(); },
-                    TerminalEvent::Input(Event::Key(Key::Delete)) => ed.delete_prev(),
-                    TerminalEvent::Input(Event::Key(Key::Backspace)) => ed.delete(),
-                    TerminalEvent::Input(Event::Key(Key::Ctrl('c'))) => break,
+                    TerminalEvent::Resize(new_size) => {
+                        cur_size.set(new_size);
+                        term_port.inner().get_broadcast().notify_each(
+                            nested::grid::GridWindowIterator::from(
+                                Point2::new(0,0) .. Point2::new(new_size.x, new_size.y)
+                            )
+                        );
+                    }
+                    TerminalEvent::Input(Event::Key(Key::Ctrl('c'))) |
+                    TerminalEvent::Input(Event::Key(Key::Ctrl('g'))) |
+                    TerminalEvent::Input(Event::Key(Key::Ctrl('d'))) => break,
+                    TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {
+                        let mut strings = Vec::new();
+
+                        let v = p.get_view().unwrap();
+                        for i in 0 .. v.len().unwrap_or(0) {
+                            strings.push(
+                                v
+                                    .get(&i).unwrap()
+                                    .get_view().unwrap()
+                                    .read().unwrap()
+                                    .iter().collect::<String>()
+                            );
+                        }
+
+                        if strings.len() == 0 { continue; }
+                        
+                        if let Ok(output) =
+                            std::process::Command::new(strings[0].as_str())
+                            .args(&strings[1..])
+                            .output()
+                        {
+                            // take output and update terminal view
+                            let mut line_port = ViewPort::new();
+                            let mut line = VecBuffer::new(line_port.inner());
+                            for byte in output.stdout {
+                                match byte {
+                                    b'\n' => {
+                                        compositor.write().unwrap().push(
+                                            line_port.outer()
+                                                .to_sequence()
+                                                .map(|c| TerminalAtom::new(*c, TerminalStyle::fg_color((130,90,90))))
+                                                .to_grid_horizontal()
+                                                .offset(Vector2::new(45, y))
+                                        );
+                                        y += 1;
+                                        line_port = ViewPort::new();
+                                        line = VecBuffer::new(line_port.inner());
+                                    }
+                                    byte => {
+                                        line.push(byte as char);
+                                    }
+                                }
+                            }
+                        } else {
+                            compositor.write().unwrap().push(
+                                make_label("Command not found")
+                                    .map_item(|idx, a| a.add_style_back(TerminalStyle::fg_color((200,0,0))))
+                                    .offset(Vector2::new(45, y))
+                            );
+                            y+=1;
+                        }
+
+                        te.handle_terminal_event(
+                            &TerminalEvent::Input(Event::Key(Key::Up))
+                        );
+                        te.handle_terminal_event(
+                            &TerminalEvent::Input(Event::Key(Key::Home))
+                        );
+                        te = ListEditor::new(make_sub_editor.clone());
+
+                        compositor.write().unwrap().push(magic.offset(Vector2::new(40, y)));
+                        y += 1;
+                        compositor.write().unwrap().push(
+                            te.segment_seq.horizontal_sexpr_view(0).offset(cgmath::Vector2::new(40,y))
+                        );
+                        y += 1;
+
+                        p = te.get_data_port().map(|string_editor| string_editor.read().unwrap().get_data_port());
+                    },
+                    ev => {
+                        te.handle_terminal_event(&ev);
+                    }
                     _ => {}
                 }
-                term_port.update();
             }
 
-            drop(term);
+            //drop(term);
         }
     );
 

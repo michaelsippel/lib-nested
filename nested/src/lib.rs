@@ -10,6 +10,7 @@ pub mod sequence;
 pub mod vec;
 pub mod terminal;
 pub mod integer;
+pub mod list;
 
 pub mod string_editor;
 pub mod leveled_term_view;
