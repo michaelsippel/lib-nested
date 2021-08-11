@@ -1,5 +1,5 @@
 
-//mod monstera;
+mod monstera;
 
 use{
     std::sync::{Arc, RwLock},
@@ -287,11 +287,11 @@ write::
             {
                 compositor.write().unwrap().push(magic.offset(Vector2::new(40, 4)));
                 //compositor.write().unwrap().push(magic.offset(Vector2::new(40, 20)));
-/*
+
                 let monstera_port = monstera::make_monstera();
                 compositor.write().unwrap().push(monstera_port.clone());
                 compositor.write().unwrap().push(monstera_port.offset(Vector2::new(83,0)));
-*/
+
             }
 
 /*
