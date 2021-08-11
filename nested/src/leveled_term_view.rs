@@ -57,13 +57,15 @@ impl LeveledTermView {
     }
 
     pub fn set_level(&mut self, l: usize) {
-        self.level = l;
+        if self.level != l {
+            self.level = l;
 
-        // update complete area
-        if let Some(a) = self.src.area() {
-            self.cast.notify_each(a);
+            // update complete area
+            if let Some(a) = self.src.area() {
+                self.cast.notify_each(a);
+            }
         }
-    }    
+    }
 }
 
 impl ImplIndexView for LeveledTermView {
