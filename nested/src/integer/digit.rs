@@ -5,41 +5,51 @@ use {
         core::{ViewPort, OuterViewPort},
         singleton::{SingletonView, SingletonBuffer},
         vec::VecBuffer,
-        terminal::{TerminalView, TerminalEvent, TerminalEditor, TerminalEditorResult},
+        terminal::{TerminalAtom, TerminalStyle, TerminalView, TerminalEvent, TerminalEditor, TerminalEditorResult},
         tree_nav::{TreeNav, TreeNavResult}
     }
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-pub struct CharEditor {
+pub struct DigitEditor {
+    radix: u32,
     data: SingletonBuffer<Option<char>>,
     data_port: ViewPort<dyn SingletonView<Item = Option<char>>>
 }
 
-impl CharEditor {
-    pub fn new() -> Self {
+impl DigitEditor {
+    pub fn new(radix: u32) -> Self {
         let mut data_port = ViewPort::new();
-        CharEditor {
+        DigitEditor {
+            radix,
             data: SingletonBuffer::new(None, data_port.inner()),
             data_port
         }
     }
 
-    pub fn get_data_port(&self) -> OuterViewPort<dyn SingletonView<Item = Option<char>>> {
-        self.data_port.outer()
+    pub fn get_data_port(&self) -> OuterViewPort<dyn SingletonView<Item = Option<u32>>> {
+        let radix = self.radix;
+        self.data_port.outer().map(
+            move |c| c.unwrap_or('?').to_digit(radix)
+        )
     }
 }
 
-impl TreeNav for CharEditor {}
-impl TerminalEditor for CharEditor {
+impl TreeNav for DigitEditor {}
+impl TerminalEditor for DigitEditor {
     fn get_term_view(&self) -> OuterViewPort<dyn TerminalView> {
-        crate::terminal::make_label(
-            &if let Some(c) = self.data.get() {
-                c.to_string()
-            } else {
-                "".to_string()
-            })
+        let radix = self.radix;
+        self.data_port.outer().map(
+            move |c| TerminalAtom::new(
+                c.unwrap_or('?'),
+                if c.unwrap_or('?').to_digit(radix).is_some() {
+                    TerminalStyle::fg_color((100, 140, 100))
+                } else {
+                    TerminalStyle::fg_color((200, 0, 0))
+                }
+            )
+        ).to_grid()
     }
 
     fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
@@ -60,4 +70,7 @@ impl TerminalEditor for CharEditor {
     }
 }
 
+struct PosIntEditor {
+    
+}
 

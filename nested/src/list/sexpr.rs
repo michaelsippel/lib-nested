@@ -34,7 +34,7 @@ impl SequenceView for ListDecorator {
 
     fn len(&self) -> Option<usize> {
         let l = self.items.len()?;
-        Some(if l == 0 { 2 } else { 2 * l + 2 })
+        Some(if l == 0 { 2 } else { 2 * l + 1 })
     }
 
     fn get(&self, idx: &usize) -> Option<Self::Item> {

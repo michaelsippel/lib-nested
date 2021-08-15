@@ -17,7 +17,7 @@ use{
         index::{IndexView},
         sequence::{SequenceView},
         vec::{VecBuffer},
-        integer::{RadixProjection},
+        integer::{RadixProjection, DigitEditor},
         terminal::{
             Terminal,
             TerminalStyle,
@@ -27,9 +27,9 @@ use{
             make_label,
             TerminalView,
             TerminalEditor},
-        string_editor::StringEditor,
+        string_editor::{CharEditor},
         tree_nav::{TreeNav, TreeNavResult, TerminalTreeEditor},
-        list::{SExprView, ListEditor}
+        list::{SExprView, ListEditor, ListEditorStyle}
     }
 };
 
@@ -81,197 +81,14 @@ write::
 
     */
 
-    let mut args = std::env::args();
-/*
-    let arg0_port = ViewPort::new();
-    let _arg0 = VecBuffer::<char>::with_data(
-        args.next().expect("Arg $0 missing!")
-            .chars().collect::<Vec<char>>(),
-        arg0_port.inner()
-    );
-*/
-    let arg1_vec_port = ViewPort::new();
-    let mut arg1 = VecBuffer::<char>::with_data(
-        vec!['1'],
-/*
-        args.next().expect("Arg $1 missing!")
-            .chars().collect::<Vec<char>>(),
-*/
-        arg1_vec_port.inner()
-    );
-/*
-    let _arg1_vec = args.next().expect("Arg $1 missing!")
-            .chars().collect::<Vec<char>>();
-*/
     let term_port = ViewPort::new();
     let compositor = TerminalCompositor::new(term_port.inner());
-
-    let mut ed = StringEditor::new();
 
     let mut term = Terminal::new(term_port.outer());
     let term_writer = term.get_writer();
 
     async_std::task::spawn(
         async move {
-            let mut ctx = Context::new();
-            for tn in vec![
-                "MachineWord", "MachineInt", "MachineSyllab", "Bits",
-                "Vec", "Stream", "Json",
-                "Sequence", "UTF-8-String", "UnicodeChar",
-                "PositionalInt", "Digit", "LittleEndian", "BigEndian",
-                "DiffStream", "ℕ"
-            ] { ctx.add_typename(tn.into()); }
-
-            let src_type =
-                ctx.type_term_from_str("( Vec UnicodeChar )").unwrap();
-
-            let dst_type =
-                ctx.type_term_from_str("( Sequence UnicodeChar )").unwrap();
-
-            ctx.add_morphism(
-                MorphismType {
-                    mode: MorphismMode::Epi,
-                    src_type: src_type.clone(),
-                    dst_type: dst_type.clone()
-                },
-                Box::new(move |src| {
-                    assert!(src.type_tag == src_type);
-                    Object {
-                        type_tag: dst_type.clone(),
-                        repr: ReprTree::new_leaf(
-                            src.get_port::<RwLock<Vec<char>>>().unwrap()
-                                .to_sequence()
-                                .into()
-                        )
-                    }
-                })
-            );
-
-            let src_type = ctx.type_term_from_str("( Sequence UnicodeChar )").unwrap();
-            let dst_type = ctx.type_term_from_str("( Sequence ( Bits 32 ) )").unwrap();
-            ctx.add_morphism(
-                MorphismType {
-                    mode: MorphismMode::Mono,
-                    src_type: src_type.clone(),
-                    dst_type: dst_type.clone()
-                },
-                Box::new({
-                    move |src| {
-                        assert!(src.type_tag == src_type);
-                        Object {
-                            type_tag: dst_type.clone(),
-                            repr: ReprTree::new_leaf(
-                                src.get_port::<dyn SequenceView<Item = char>>().unwrap()
-                                    .map(
-                                        |c| *c as u32
-                                    )
-                                    .into()
-                            )
-                        }
-                    }
-                })
-            );
-
-/*
-            let src_type = vec![
-                ctx.type_term_from_str("( PositionalInteger  )").unwrap(),
-            ];
-            let dst_type = ctx.type_term_from_str("( Sequence MachineInt )").unwrap();
-            ctx.add_morphism(
-                MorphismType {
-                    mode: MorphismMode::Epi,
-                    src_type: src_type.clone(),
-                    dst_type: dst_type.clone()
-                },
-                Box::new({
-                    move |src| {
-                        assert!(src.type_tag == src_type);
-                        Object {
-                            type_tag: dst_type.clone(),
-                            repr: ReprTree::new_leaf(
-                                vec![ dst_type.clone() ].into_iter(),
-                                src.get_port::<RwLock<Vec<usize>>>().unwrap().to_sequence().into()                                
-                            )
-                        }
-                    }
-                })
-            );
-             */
- 
-            let arg1_vec_port = ed.get_data_port();
-
-            ctx.add_obj("$1".into(), "( Vec UnicodeChar )");
-            ctx.insert_repr(
-                "$1",
-                vec![].into_iter(),
-                arg1_vec_port.clone().into()
-            );
-
-            ctx.epi_cast("$1", "( Sequence UnicodeChar )");
-            ctx.epi_cast("$1", "( Sequence ( Digit 10 ) )");
-            ctx.epi_cast("$1", "( PositionalInt 10 LittleEndian )");
-            ctx.epi_cast("$1", "( ℕ )");
-
-            let arg1_dec_unic_port: OuterViewPort<dyn SequenceView<Item = char>> =
-                ctx.mono_view(
-                    "$1",
-                    vec![
-                        "( PositionalInt 10 LittleEndian )",
-                        "( Sequence ( Digit 10 ) )",
-                        "( Sequence UnicodeChar )"
-                    ].into_iter()
-                ).unwrap();
-
-            let arg1_dec_mint_port: OuterViewPort<dyn SequenceView<Item = usize>> =
-                arg1_dec_unic_port
-                .map(|c| c.to_digit(10).map(|x| x as usize))
-                .filter(|d| d.is_some())
-                .map(|d| d.unwrap());
-
-            ctx.insert_repr(
-                "$1",
-                vec![
-                    "( PositionalInt 10 LittleEndian )",
-                    "( Sequence ( Digit 10 ) )",
-                    "( Sequence MachineInt )"
-                ].into_iter(),
-                arg1_dec_mint_port.clone().into()
-            );
-
-            let arg1_hex_mint_port: ViewPort<RwLock<Vec<usize>>>
-                = ViewPort::new();
-            let _radix_proj = RadixProjection::new(
-                10,
-                16,
-                arg1_dec_mint_port.clone(),
-                arg1_hex_mint_port.inner()
-            );
-
-            ctx.insert_repr(
-                "$1",
-                vec![
-                    "( PositionalInt 16 LittleEndian )",
-                    "( Sequence ( Digit 16 ) )",
-                    "( Sequence MachineInt )"
-                ].into_iter(),
-                arg1_hex_mint_port.outer().to_sequence().into()
-            );
-
-            let arg1_hex_unic_port: OuterViewPort<dyn SequenceView<Item = char>> =
-                arg1_hex_mint_port.outer().to_sequence()
-                .map(
-                    |d| char::from_digit(*d as u32, 16).unwrap()
-                );
-
-            ctx.insert_repr(
-                "$1",
-                vec![
-                    "( PositionalInt 16 LittleEndian )",
-                    "( Sequence ( Digit 16 ) )",
-                    "( Sequence UnicodeChar )"
-                ].into_iter(),
-                arg1_hex_unic_port.clone().into()
-            );
 
                 let magic = make_label("<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>")
                     .map_item(
@@ -302,19 +119,33 @@ write::
 
             // TypeEditor
 
-            let make_sub_editor = || {
-                std::sync::Arc::new(std::sync::RwLock::new(StringEditor::new()))
+            let make_char_editor = || {
+                std::sync::Arc::new(std::sync::RwLock::new(DigitEditor::new(16)))
             };
 
-            let mut te = ListEditor::new(make_sub_editor.clone());
+            let make_sub_editor = move || {
+                std::sync::Arc::new(std::sync::RwLock::new(ListEditor::new(make_char_editor.clone(), ListEditorStyle::Hex)))
+            };
+
+            let mut te = ListEditor::new(make_sub_editor.clone(), ListEditorStyle::Clist);
 
             compositor.write().unwrap().push(
-                te.path_view()
+                te.get_term_view()
                     .offset(cgmath::Vector2::new(40,y))
             );
             y += 1;
 
-            let mut p = te.get_data_port().map(|string_editor| string_editor.read().unwrap().get_data_port());
+            let mut p = te.get_data_port().map(|sub_editor| sub_editor.read().unwrap().get_data_port());
+
+            let status_chars_port = ViewPort::new();
+            let mut status_chars = VecBuffer::new(status_chars_port.inner());
+
+            compositor.write().unwrap().push(
+                status_chars_port.outer()
+                    .to_sequence()
+                    .to_grid_horizontal()
+                    .offset(cgmath::Vector2::new(40, 2))
+            );
 
             loop {
                 term_port.update();
@@ -343,10 +174,19 @@ write::
                     }
                     TerminalEvent::Input(Event::Key(Key::Up)) => { te.up(); }
                     TerminalEvent::Input(Event::Key(Key::Down)) => { te.dn(); }
-                    TerminalEvent::Input(Event::Key(Key::Home)) => { te.goto_home(); }
-                    TerminalEvent::Input(Event::Key(Key::End)) => { te.goto_end(); }
+                    TerminalEvent::Input(Event::Key(Key::Home)) => {
+                        if te.goto_home() == TreeNavResult::Exit {
+                            te.goto_home();
+                        }
+                    }
+                    TerminalEvent::Input(Event::Key(Key::End)) => {
+                        if te.goto_end() == TreeNavResult::Exit {
+                            te.goto_end();
+                        }
+                    }
 
                     TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {
+                        /*
                         let mut strings = Vec::new();
 
                         let v = p.get_view().unwrap();
@@ -412,11 +252,26 @@ write::
                         y += 1;
 
                         p = te.get_data_port().map(|string_editor| string_editor.read().unwrap().get_data_port());
+*/
                     },
                     ev => {
                         te.handle_terminal_event(&ev);
                     }
                     _ => {}
+                }
+
+                status_chars.clear();
+                match te.get_cursor() {
+                    Some(addr) => {
+                        status_chars.push(TerminalAtom::new('@', TerminalStyle::fg_color((120, 80, 80)).add(TerminalStyle::bold(true))));
+                        for x in addr {
+                            for c in format!("{}", x).chars() {
+                                status_chars.push(TerminalAtom::new(c, TerminalStyle::fg_color((0, 100, 20))));
+                            }
+                            status_chars.push(TerminalAtom::new('.', TerminalStyle::fg_color((120, 80, 80))));
+                        }
+                    }
+                    None => {}
                 }
             }
 
