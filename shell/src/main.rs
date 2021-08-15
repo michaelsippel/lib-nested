@@ -294,94 +294,8 @@ write::
 
             }
 
-/*
-
-            // list views
-            {
-                let items_port = ViewPort::new();
-                let items = VecBuffer::with_data(
-                    vec![
-                        arg1_hex_unic_port.clone()
-                            .map(|c| TerminalAtom::from(c))
-                            .to_index()
-                            .map_key(
-                                |idx| Point2::new(*idx as i16, 0 as i16),
-                                |pt| if pt.y == 0 { Some(pt.x as usize) } else { None }
-                            ),
-                        ed.insert_view()
-                            .map_item(
-                                |_pos, atom|
-                                TerminalAtom::new(
-                                    atom.c.unwrap_or(' '),
-                                    TerminalStyle::fg_color(
-                                        if let Some(c) = atom.c {
-                                            if c == '|' {
-                                                (200, 200, 90)
-                                            } else if c.is_digit(10) {
-                                                (0, 200, 0)
-                                            } else {
-                                                (255, 0, 0)
-                                            }
-                                        } else {
-                                            (0, 0, 0)
-                                        }
-                                    ).add(
-                                        TerminalStyle::bg_color((0,0,0))
-                                    )
-                                )
-                            ),
-                        arg1_hex_unic_port.clone()
-                            .map(|c| TerminalAtom::from(c))
-                            .to_index()
-                            .map_key(
-                                |idx| Point2::new(*idx as i16, 0 as i16),
-                                |pt| if pt.y == 0 { Some(pt.x as usize) } else { None }
-                            ),
-                    ],
-                    items_port.inner()
-                );
-
-                let par_items_port = ViewPort::new();
-                let par_items = VecBuffer::with_data(
-                    vec![
-                        items_port.outer().to_sequence().sexpr_view(1),
-                        arg1_hex_unic_port.clone()
-                            .map(|c| TerminalAtom::from(c))
-                            .to_index()
-                            .map_key(
-                                |idx| Point2::new(*idx as i16, 0 as i16),
-                                |pt| if pt.y == 0 { Some(pt.x as usize) } else { None }
-                            ),
-                    ],
-                    par_items_port.inner()
-                );
-
-                compositor.write().unwrap().push(
-                    par_items_port.outer()
-                        .to_sequence()
-                        .sexpr_view(0)
-                        .offset(Vector2::new(45, 5))
-                );
-            }
-
-            for c in _arg1_vec {
-                ed.insert(c);
-            }
-*/
-
             let cur_size_port = ViewPort::new();
             let mut cur_size = nested::singleton::SingletonBuffer::new(Vector2::new(10, 10), cur_size_port.inner());
-
-//            compositor.write().unwrap()
-//                .push(
-                    let label_port = cur_size_port.outer()
-                        .map(
-                            |size| make_label(format!("Current Size: {:?}", size).as_str())
-                        );
-//                );
-
-            //term_port.update();
-            //eprintln!("start loop:");
 
             {
 //                let history_port = ViewPort::new();
@@ -411,11 +325,12 @@ write::
             let mut te = ListEditor::new(make_sub_editor.clone());
 
             compositor.write().unwrap().push(
-                te.segment_seq.horizontal_sexpr_view(0).offset(cgmath::Vector2::new(40,y))
+                te.path_view()
+                    .offset(cgmath::Vector2::new(40,y))
             );
             y += 1;
 
-            let mut p = te.get_data_port().map(|string_editor| string_editor.read().unwrap().get_data_port());            
+            let mut p = te.get_data_port().map(|string_editor| string_editor.read().unwrap().get_data_port());
 
             loop {
                 term_port.update();
@@ -494,7 +409,9 @@ write::
                         compositor.write().unwrap().push(magic.offset(Vector2::new(40, y)));
                         y += 1;
                         compositor.write().unwrap().push(
-                            te.segment_seq.horizontal_sexpr_view(0).offset(cgmath::Vector2::new(40,y))
+                            te
+                                .horizontal_sexpr_view()
+                                .offset(Vector2::new(40, y))
                         );
                         y += 1;
 

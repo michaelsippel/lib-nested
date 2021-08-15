@@ -32,7 +32,7 @@ use {
         },
         string_editor::StringEditor,
         leveled_term_view::LeveledTermView,
-        list::SExprView
+        list::{SExprView, ListDecoration}
     }
 };
 
@@ -59,7 +59,7 @@ where SubEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
     data_sequence_port: OuterViewPort<dyn SequenceView<Item = Arc<RwLock<SubEditor>>>>,
     make_item_editor: FnMakeItemEditor,
     level: usize,
-    pub segment_seq: OuterViewPort<dyn SequenceView<Item = OuterViewPort<dyn TerminalView>>>,
+    segment_seq: OuterViewPort<dyn SequenceView<Item = ListEditorViewSegment>>,
 }
 
 impl<SubEditor, FnMakeItemEditor> TerminalEditor for ListEditor<SubEditor, FnMakeItemEditor>
@@ -67,7 +67,7 @@ where SubEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
       FnMakeItemEditor: Fn() -> Arc<RwLock<SubEditor>>
 {
     fn get_term_view(&self) -> OuterViewPort<dyn TerminalView> {
-        self.segment_seq.horizontal_sexpr_view(0)
+        self.horizontal_sexpr_view()
     }
 
     fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
@@ -369,6 +369,49 @@ impl<SubEditor, FnMakeItemEditor> ListEditor<SubEditor, FnMakeItemEditor>
 where SubEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
       FnMakeItemEditor: Fn() -> Arc<RwLock<SubEditor>>
 {
+
+    pub fn get_seg_seq_view(&self) -> OuterViewPort<dyn SequenceView<Item = OuterViewPort<dyn TerminalView>>> {
+        self.segment_seq
+            .map(
+                |segment| match segment {
+                    ListEditorViewSegment::InsertCursor =>
+                        make_label("|")
+                        .map_item(
+                            |_pt, atom|
+                            atom.add_style_back(TerminalStyle::fg_color((90,60,200)))
+                                .add_style_back(TerminalStyle::bold(true))
+                        ),
+                    ListEditorViewSegment::Select(sub_view) =>
+                        sub_view.map_item(
+                            |_pt, atom|
+                            atom.add_style_back(TerminalStyle::bg_color((90,60,200)))
+                        ),
+                    ListEditorViewSegment::Edit(sub_view) =>
+                        sub_view.map_item(
+                            |_pt, atom|
+                            atom.add_style_back(TerminalStyle::bg_color((0,0,0)))
+                                .add_style_back(TerminalStyle::bold(true))
+                        ),
+                    ListEditorViewSegment::View(sub_view) =>
+                        sub_view.clone()
+                }
+            )
+    }
+    
+    pub fn horizontal_sexpr_view(&self) -> OuterViewPort<dyn TerminalView> {
+        self.get_seg_seq_view().horizontal_sexpr_view(0)
+    }
+    pub fn vertical_sexpr_view(&self) -> OuterViewPort<dyn TerminalView> {
+        self.get_seg_seq_view().vertical_sexpr_view(0)
+    }
+
+    pub fn path_view(&self) -> OuterViewPort<dyn TerminalView> {
+        self.get_seg_seq_view()
+            .decorate("<", ">", "/", 1)
+            .to_grid_horizontal()
+            .flatten()
+    }
+
     pub fn new(make_item_editor: FnMakeItemEditor) -> Self {
         let cursor_port = ViewPort::new();
         let data_port = ViewPort::new();
@@ -391,32 +434,7 @@ where SubEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
             cursor,
             make_item_editor,
             level: 0,
-            segment_seq: segment_view_port
-                .outer()
-                .map(
-                    |segment| match segment {
-                        ListEditorViewSegment::InsertCursor =>
-                            make_label("|")
-                            .map_item(
-                                |_pt, atom|
-                                atom.add_style_back(TerminalStyle::fg_color((90,60,200)))
-                                    .add_style_back(TerminalStyle::bold(true))
-                            ),
-                        ListEditorViewSegment::Select(sub_view) =>
-                            sub_view.map_item(
-                                |_pt, atom|
-                                atom.add_style_back(TerminalStyle::bg_color((90,60,200)))
-                            ),
-                        ListEditorViewSegment::Edit(sub_view) =>
-                            sub_view.map_item(
-                                |_pt, atom|
-                                atom.add_style_back(TerminalStyle::bg_color((0,0,0)))
-                                    .add_style_back(TerminalStyle::bold(true))
-                            ),
-                        ListEditorViewSegment::View(sub_view) =>
-                            sub_view.clone()
-                    }
-                )
+            segment_seq: segment_view_port.outer()
         }
     }
 
