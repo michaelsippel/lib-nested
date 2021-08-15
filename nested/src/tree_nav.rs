@@ -29,9 +29,13 @@ pub trait TreeNav {
     fn goto_end(&mut self) -> TreeNavResult {
         TreeNavResult::Exit        
     }
-    
+
     fn goto(&mut self, tree_addr: Vec<usize>)  -> TreeNavResult {
         TreeNavResult::Exit
+    }
+
+    fn get_cursor(&self) -> Option<Vec<usize>> {
+        None
     }
 }
 

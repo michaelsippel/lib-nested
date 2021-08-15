@@ -61,13 +61,29 @@ where SubEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
     make_item_editor: FnMakeItemEditor,
     level: usize,
     segment_seq: OuterViewPort<dyn SequenceView<Item = ListEditorViewSegment>>,
-}
 
+    terminal_view: OuterViewPort<dyn TerminalView>
+}
 
 impl<SubEditor, FnMakeItemEditor> TreeNav for ListEditor<SubEditor, FnMakeItemEditor>
 where SubEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
       FnMakeItemEditor: Fn() -> Arc<RwLock<SubEditor>>
 {
+    fn get_cursor(&self) -> Option<Vec<usize>> {
+        match self.cursor.get() {
+            ListEditorCursor::None => None,
+            ListEditorCursor::Insert(idx) => Some(vec![ idx ]),
+            ListEditorCursor::Select(idx) => Some(vec![ idx ]),
+            ListEditorCursor::Edit(idx) => match self.data.get(idx).read().unwrap().get_cursor() {
+                Some(mut addr) => {
+                    addr.insert(0, idx);
+                    Some(addr)
+                }
+                None => Some(vec![ idx ])
+            },
+        }
+    }
+
     fn up(&mut self) -> TreeNavResult {
         match self.cursor.get() {
             ListEditorCursor::Edit(idx) => {
