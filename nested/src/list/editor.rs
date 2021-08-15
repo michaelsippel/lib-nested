@@ -18,6 +18,7 @@ use {
                 Context
             }
         },
+        tree_nav::{TreeNav, TreeNavResult, TerminalTreeEditor},
         projection::ProjectionHelper,
         singleton::{SingletonView, SingletonBuffer},
         sequence::{SequenceView},
@@ -62,8 +63,221 @@ where SubEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
     segment_seq: OuterViewPort<dyn SequenceView<Item = ListEditorViewSegment>>,
 }
 
+
+impl<SubEditor, FnMakeItemEditor> TreeNav for ListEditor<SubEditor, FnMakeItemEditor>
+where SubEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
+      FnMakeItemEditor: Fn() -> Arc<RwLock<SubEditor>>
+{
+    fn up(&mut self) -> TreeNavResult {
+        match self.cursor.get() {
+            ListEditorCursor::Edit(idx) => {
+                let ce = self.data.get_mut(idx);
+                let mut cur_edit = ce.write().unwrap();
+
+                match cur_edit.up() {
+                    TreeNavResult::Exit => {
+                        self.cursor.set(ListEditorCursor::Select(idx));
+                    }
+                    TreeNavResult::Continue => {}
+                }
+                TreeNavResult::Continue
+            }
+            _ => {
+                self.cursor.set(ListEditorCursor::None);
+                TreeNavResult::Exit
+            }
+        }
+    }
+
+    fn goto(&mut self, tree_addr: Vec<usize>) -> TreeNavResult {
+        if tree_addr.len() == 1 {
+            if tree_addr[0] < self.data.len() {
+                match self.cursor.get() {
+                    ListEditorCursor::None |
+                    ListEditorCursor::Select(_) => {
+                        self.cursor.set(ListEditorCursor::Select(tree_addr[0]));
+                    }
+                    ListEditorCursor::Insert(_) => {
+                        self.cursor.set(ListEditorCursor::Insert(tree_addr[0]));
+                    }
+                    ListEditorCursor::Edit(_) => {
+                        self.cursor.set(ListEditorCursor::Edit(tree_addr[0]));
+                    }
+                }
+                TreeNavResult::Continue
+            } else {
+                TreeNavResult::Exit
+            }                    
+        } else if tree_addr.len() > 0 {
+            if tree_addr[0] < self.data.len() {
+                self.cursor.set(ListEditorCursor::Edit(tree_addr[0]));
+
+                let ce = self.data.get_mut(tree_addr[0]);
+                let mut cur_edit = ce.write().unwrap();
+
+                cur_edit.goto(tree_addr[1..].iter().cloned().collect());
+
+                TreeNavResult::Continue
+            } else {
+                TreeNavResult::Exit
+            }
+        } else {
+            self.cursor.set(ListEditorCursor::None);
+            TreeNavResult::Exit
+        }
+    }
+
+    fn goto_end(&mut self) -> TreeNavResult {
+        match self.cursor.get() {
+            ListEditorCursor::None |
+            ListEditorCursor::Insert(_) | 
+            ListEditorCursor::Select(_) =>
+                self.goto(vec![ self.data.len()-1 ]),
+            ListEditorCursor::Edit(idx) => {
+                let ce = self.data.get_mut(idx);
+                let mut cur_edit = ce.write().unwrap();
+
+                match cur_edit.goto_end() {
+                    TreeNavResult::Continue => TreeNavResult::Continue,
+                    TreeNavResult::Exit => {
+                        if idx+1 < self.data.len() {
+                            self.cursor.set(ListEditorCursor::Edit(idx+1));
+                            self.data.get_mut(idx+1).write().unwrap().goto_end();
+                            TreeNavResult::Continue
+                        } else {
+                            self.cursor.set(ListEditorCursor::None);
+                            TreeNavResult::Exit
+                        }
+                    }
+                }                
+            }
+        }
+    }
+
+    fn goto_home(&mut self) -> TreeNavResult {
+        match self.cursor.get() {
+            ListEditorCursor::None |
+            ListEditorCursor::Insert(_) | 
+            ListEditorCursor::Select(_) => self.goto(vec![ 0 ]),
+            ListEditorCursor::Edit(idx) => {
+                let ce = self.data.get_mut(idx);
+                let mut cur_edit = ce.write().unwrap();
+
+                match cur_edit.goto_home() {
+                    TreeNavResult::Continue => TreeNavResult::Continue,
+                    TreeNavResult::Exit => {
+                        if idx > 0 {
+                            self.cursor.set(ListEditorCursor::Edit(idx-1));
+                            self.data.get_mut(idx-1).write().unwrap().goto_home();
+                            TreeNavResult::Continue
+                        } else {
+                            self.cursor.set(ListEditorCursor::None);
+                            TreeNavResult::Exit
+                        }
+                    }
+                }
+            }
+            _ => {
+                self.up();
+                TreeNavResult::Exit
+            }
+        }
+    }
+
+    fn dn(&mut self) -> TreeNavResult {
+        match self.cursor.get() {
+            ListEditorCursor::Select(idx) => {
+                self.data.get_mut(idx).write().unwrap().goto_home();
+                self.cursor.set(ListEditorCursor::Edit(idx));
+            }
+            _ => {}
+        }
+        TreeNavResult::Continue
+    }
+
+    fn pxev(&mut self) -> TreeNavResult {
+        match self.cursor.get() {
+            ListEditorCursor::None => TreeNavResult::Exit,
+            ListEditorCursor::Insert(idx) => {
+                if idx > 0 {
+                    self.cursor.set(ListEditorCursor::Insert(idx-1));
+                    TreeNavResult::Continue
+                } else {
+                    self.cursor.set(ListEditorCursor::None);
+                    TreeNavResult::Exit
+                }
+            }
+            ListEditorCursor::Select(idx) => {
+                if idx > 0 {
+                    self.cursor.set(ListEditorCursor::Select(idx-1));
+                    TreeNavResult::Continue
+                } else {
+                    self.cursor.set(ListEditorCursor::None);
+                    TreeNavResult::Exit
+                }
+            }
+            ListEditorCursor::Edit(idx) => {
+                let ce = self.data.get_mut(idx);
+                let mut cur_edit = ce.write().unwrap();
+
+                match cur_edit.pxev() {
+                    TreeNavResult::Exit => {
+                        if idx > 0 {
+                            self.cursor.set(ListEditorCursor::Edit(idx-1));
+                            self.data.get_mut(idx-1).write().unwrap().goto_end();
+                            TreeNavResult::Continue
+                        } else {
+                            TreeNavResult::Exit
+                        }
+                    }
+                    TreeNavResult::Continue => TreeNavResult::Continue
+                }
+            }
+        }
+    }
+
+    fn nexd(&mut self) -> TreeNavResult {
+        match self.cursor.get() {
+            ListEditorCursor::None => TreeNavResult::Exit,
+            ListEditorCursor::Insert(idx) => {
+                if idx < self.data.len() {
+                    self.cursor.set(ListEditorCursor::Insert(idx+1));
+                    TreeNavResult::Continue
+                } else {
+                    TreeNavResult::Exit
+                }
+            }
+            ListEditorCursor::Select(idx) => {
+                if idx+1 < self.data.len() {
+                    self.cursor.set(ListEditorCursor::Select(idx + 1));
+                    TreeNavResult::Continue
+                } else {
+                    TreeNavResult::Exit
+                }
+            }
+            ListEditorCursor::Edit(idx) => {
+                let ce = self.data.get_mut(idx);
+                let mut cur_edit = ce.write().unwrap();
+
+                match cur_edit.nexd() {
+                    TreeNavResult::Exit => {
+                        if idx+1 < self.data.len() {
+                            self.cursor.set(ListEditorCursor::Edit(idx+1));
+                            self.data.get_mut(idx+1).write().unwrap().goto_home();
+                            TreeNavResult::Continue
+                        } else {//if idx+1 == self.data.len() {
+                            TreeNavResult::Exit
+                        }
+                    }
+                    TreeNavResult::Continue => TreeNavResult::Continue
+                }
+            }
+        }
+    }
+}
+
 impl<SubEditor, FnMakeItemEditor> TerminalEditor for ListEditor<SubEditor, FnMakeItemEditor>
-where SubEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
+where SubEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
       FnMakeItemEditor: Fn() -> Arc<RwLock<SubEditor>>
 {
     fn get_term_view(&self) -> OuterViewPort<dyn TerminalView> {
@@ -72,144 +286,51 @@ where SubEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
 
     fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
         match self.cursor.get() {
-            ListEditorCursor::None => {
-                
-            }
             ListEditorCursor::Insert(idx) => {
+                self.data.insert(idx, (self.make_item_editor)());
+
+                let mut ce = self.data.get_mut(idx);
+                let mut cur_edit = ce.write().unwrap();
+
+                cur_edit.goto_home();
+                self.cursor.set(ListEditorCursor::Edit(idx));
+                cur_edit.handle_terminal_event(event);
+            }
+            ListEditorCursor::Edit(idx) => {
                 match event {
-                    TerminalEvent::Input(Event::Key(Key::Insert)) => {
-                        self.cursor.set(ListEditorCursor::Select(idx));
-                    }
-                    TerminalEvent::Input(Event::Key(Key::Left)) => {
-                        if idx > 0 {
-                            self.cursor.set(ListEditorCursor::Insert(idx-1));
-                        }
-                    }
-                    TerminalEvent::Input(Event::Key(Key::Right)) => {
-                        if idx < self.data.len() {
-                            self.cursor.set(ListEditorCursor::Insert(idx+1));
-                        }
+                    TerminalEvent::Input(Event::Key(Key::Char(' '))) => {
+                        // split..
+                        self.data.insert(idx+1, (self.make_item_editor)());
+                        self.data.get_mut(idx).write().unwrap().goto_end();
+                        self.data.get_mut(idx+1).write().unwrap().goto_home();
+                        self.cursor.set(ListEditorCursor::Edit(idx+1));
                     }
                     event => {
-                        self.data.insert(idx, (self.make_item_editor)());
-                        self.cursor.set(ListEditorCursor::Edit(idx));
-                        self.data.get_mut(idx).write().unwrap().handle_terminal_event(event);
+                        let mut ce = self.data.get_mut(idx);
+                        let mut cur_edit = ce.write().unwrap();
+
+                        cur_edit.handle_terminal_event(event);
                     }
                 }
             }
             ListEditorCursor::Select(idx) => {
                 match event {
                     TerminalEvent::Input(Event::Key(Key::Insert)) => {
-                        self.cursor.set(ListEditorCursor::Insert(idx));
+                        
                     }
                     TerminalEvent::Input(Event::Key(Key::Delete)) => {
                         self.data.remove(idx);
+
                         if self.data.len() == 0 {
                             self.cursor.set(ListEditorCursor::Insert(0));
-                        } else if idx == self.data.len() && idx > 0 {
-                            self.cursor.set(ListEditorCursor::Select(idx-1))
+                        } else if idx == self.data.len() {
+                            self.cursor.set(ListEditorCursor::Select(idx-1));
                         }
                     }
-                    TerminalEvent::Input(Event::Key(Key::Home)) => {
-                        if self.data.len() > 0 {
-                            self.cursor.set(ListEditorCursor::Select(0))
-                        } else {
-                            self.cursor.set(ListEditorCursor::Insert(0))
-                        }
-                    }
-                    TerminalEvent::Input(Event::Key(Key::End)) => {
-                        if self.data.len() > 0 {
-                            self.cursor.set(ListEditorCursor::Select(self.data.len() - 1))
-                        } else {
-                            self.cursor.set(ListEditorCursor::Insert(0))
-                        }
-                    }
-                    TerminalEvent::Input(Event::Key(Key::Left)) => {
-                        if idx > 0 {
-                            self.cursor.set(ListEditorCursor::Select(idx - 1));
-                        }
-                    }
-                    TerminalEvent::Input(Event::Key(Key::Right)) => {
-                        if idx+1 < self.data.len() {
-                            self.cursor.set(ListEditorCursor::Select(idx + 1));
-                        }
-                    }
-                    event => {
-                        self.cursor.set(ListEditorCursor::Edit(idx));
-                        self.data.get_mut(idx).write().unwrap().handle_terminal_event(event);
-                    }
+                    _=>{}
                 }
             }
-            ListEditorCursor::Edit(idx) => {
-                match event {
-                    TerminalEvent::Input(Event::Key(Key::Char('\t'))) => {
-                        if idx > 0 {
-                            self.cursor.set(ListEditorCursor::Edit(idx-1));
-                        }
-                    }
-                    TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {
-                        if idx+1 < self.data.len() {
-                            self.cursor.set(ListEditorCursor::Edit(idx+1));
-                        }
-                    }
-                    TerminalEvent::Input(Event::Key(Key::Char(' '))) => {
-                        // split..
-                        self.data.insert(idx+1, (self.make_item_editor)());
-                        self.data.get_mut(idx).write().unwrap().handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::End)));
-                        self.data.get_mut(idx+1).write().unwrap().handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Home)));
-                        self.cursor.set(ListEditorCursor::Edit(idx+1));
-                    }
-                    event => {
-                        let ce = self.data.get_mut(idx);
-                        let mut cur_edit = ce.write().unwrap();
-                        match cur_edit.handle_terminal_event(event) {
-                            TerminalEditorResult::Exit => {
-                                match event {
-                                    TerminalEvent::Input(Event::Key(Key::Up)) => {
-                                        self.cursor.set(ListEditorCursor::Select(idx));
-                                    }
-                                    TerminalEvent::Input(Event::Key(Key::Home)) => {
-                                        if idx > 0 {
-                                            self.cursor.set(ListEditorCursor::Edit(idx-1));
-                                            self.data.get_mut(idx-1).write().unwrap().handle_terminal_event(event);
-                                        } else {
-                                            cur_edit.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Home)));
-                                        }
-                                    }
-                                    TerminalEvent::Input(Event::Key(Key::Backspace)) | // -> join
-                                    TerminalEvent::Input(Event::Key(Key::Left)) => {
-                                        if idx > 0 {
-                                            self.cursor.set(ListEditorCursor::Edit(idx-1));
-                                            self.data.get_mut(idx-1).write().unwrap().handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::End)));
-                                        } else {
-                                            cur_edit.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Home)));
-                                        }
-                                    }
-                                    TerminalEvent::Input(Event::Key(Key::End)) => {
-                                        if idx+1 < self.data.len() {
-                                            self.cursor.set(ListEditorCursor::Edit(idx+1));
-                                            self.data.get_mut(idx+1).write().unwrap().handle_terminal_event(event);
-                                        } else if idx+1 == self.data.len() {
-                                            cur_edit.handle_terminal_event(event);
-                                        }
-                                    }
-                                    TerminalEvent::Input(Event::Key(Key::Delete)) |
-                                    TerminalEvent::Input(Event::Key(Key::Right)) => {
-                                        if idx+1 < self.data.len() {
-                                            self.cursor.set(ListEditorCursor::Edit(idx+1));
-                                            self.data.get_mut(idx+1).write().unwrap().handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Home)));
-                                        } else if idx+1 == self.data.len() {
-                                            cur_edit.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::End)));
-                                        }
-                                    }
-                                    _ => {}
-                                }
-                            }
-                            TerminalEditorResult::Continue => {}
-                        }
-                    }
-                }
-            }
+            _ => {}
         }
 
         TerminalEditorResult::Continue
@@ -404,10 +525,15 @@ where SubEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
     pub fn vertical_sexpr_view(&self) -> OuterViewPort<dyn TerminalView> {
         self.get_seg_seq_view().vertical_sexpr_view(0)
     }
-
     pub fn path_view(&self) -> OuterViewPort<dyn TerminalView> {
         self.get_seg_seq_view()
-            .decorate("<", ">", "/", 1)
+            .decorate("<", ">", "/", 0)
+            .to_grid_horizontal()
+            .flatten()
+    }
+    pub fn string_view(&self) -> OuterViewPort<dyn TerminalView> {
+        self.get_seg_seq_view()
+            .decorate("\"", "\"", "", 1)
             .to_grid_horizontal()
             .flatten()
     }

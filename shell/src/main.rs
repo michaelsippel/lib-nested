@@ -28,6 +28,7 @@ use{
             TerminalView,
             TerminalEditor},
         string_editor::StringEditor,
+        tree_nav::{TreeNav, TreeNavResult, TerminalTreeEditor},
         list::{SExprView, ListEditor}
     }
 };
@@ -297,24 +298,7 @@ write::
             let cur_size_port = ViewPort::new();
             let mut cur_size = nested::singleton::SingletonBuffer::new(Vector2::new(10, 10), cur_size_port.inner());
 
-            {
-//                let history_port = ViewPort::new();
-//                let mut history = VecBuffer::new(history_port.inner());
-/*
-                compositor.write().unwrap().push(
-                    history_port.into_outer()
-                        .to_sequence()
-                        .map(
-                            |
-                        )
-                        .to_grid_vertical()
-                        .flatten()
-                        .offset(Vector2::new(45, 5))
-                );
-*/
-            };
             let mut y = 5;
-
 
             // TypeEditor
 
@@ -346,6 +330,22 @@ write::
                     TerminalEvent::Input(Event::Key(Key::Ctrl('c'))) |
                     TerminalEvent::Input(Event::Key(Key::Ctrl('g'))) |
                     TerminalEvent::Input(Event::Key(Key::Ctrl('d'))) => break,
+
+                    TerminalEvent::Input(Event::Key(Key::Left)) => {
+                        if te.pxev() == TreeNavResult::Exit {
+                            te.goto_home();
+                        }
+                    }
+                    TerminalEvent::Input(Event::Key(Key::Right)) => {
+                        if te.nexd() == TreeNavResult::Exit {
+                            te.goto_end();
+                        }
+                    }
+                    TerminalEvent::Input(Event::Key(Key::Up)) => { te.up(); }
+                    TerminalEvent::Input(Event::Key(Key::Down)) => { te.dn(); }
+                    TerminalEvent::Input(Event::Key(Key::Home)) => { te.goto_home(); }
+                    TerminalEvent::Input(Event::Key(Key::End)) => { te.goto_end(); }
+
                     TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {
                         let mut strings = Vec::new();
 
@@ -398,12 +398,8 @@ write::
                             y+=1;
                         }
 
-                        te.handle_terminal_event(
-                            &TerminalEvent::Input(Event::Key(Key::Up))
-                        );
-                        te.handle_terminal_event(
-                            &TerminalEvent::Input(Event::Key(Key::Home))
-                        );
+                        te.up();
+                        te.goto_home();
                         te = ListEditor::new(make_sub_editor.clone());
 
                         compositor.write().unwrap().push(magic.offset(Vector2::new(40, y)));

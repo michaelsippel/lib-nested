@@ -5,7 +5,8 @@ use {
         core::{ViewPort, OuterViewPort},
         singleton::{SingletonView, SingletonBuffer},
         vec::VecBuffer,
-        terminal::{TerminalView, TerminalEvent, TerminalEditor, TerminalEditorResult}
+        terminal::{TerminalView, TerminalEvent, TerminalEditor, TerminalEditorResult},
+        tree_nav::{TreeNav, TreeNavResult}
     }
 };
 
@@ -53,56 +54,89 @@ impl StringEditor {
         self.cursor_port.outer()
     }
 
-    pub fn goto(&mut self, new_pos: usize) -> TerminalEditorResult {
-        if new_pos <= self.data.len() {
-            self.cursor.set(Some(new_pos));
-            TerminalEditorResult::Continue
-        } else {
-            self.cursor.set(None);
-            TerminalEditorResult::Exit
-        }
-    }
-
-    pub fn goto_end(&mut self) -> TerminalEditorResult {
-        self.goto(self.data.len())
-    }
-
-    pub fn prev(&mut self) -> TerminalEditorResult {
-        let cur = self.cursor.get().unwrap_or(usize::MAX);
-        if cur > 0 {
-            self.cursor.set(Some(cur - 1));
-            TerminalEditorResult::Continue
-        } else {
-            self.cursor.set(None);
-            TerminalEditorResult::Exit
-        }
-    }
-
-    pub fn next(&mut self) -> TerminalEditorResult {
-        self.goto(self.cursor.get().unwrap_or(0) + 1)
-    }
-
-    pub fn insert(&mut self, c: char) -> TerminalEditorResult {
+    pub fn insert(&mut self, c: char) -> TreeNavResult {
         self.data.insert(self.cursor.get().unwrap_or(0), c);
-        self.next()
+        self.nexd()
     }
 
-    pub fn delete_prev(&mut self) -> TerminalEditorResult {
+    pub fn delete_prev(&mut self) -> TreeNavResult {
         let cur = self.cursor.get().unwrap_or(0);
         if cur <= self.data.len() && cur > 0 {
             self.data.remove(cur-1);
         }
-        self.prev()
+        self.pxev()
     }
 
-    pub fn delete(&mut self) -> TerminalEditorResult {
+    pub fn delete(&mut self) -> TreeNavResult {
         let cur = self.cursor.get().unwrap_or(0);
         if cur < self.data.len() {
             self.data.remove(cur);
-            TerminalEditorResult::Continue
+            TreeNavResult::Continue
         } else {
             self.cursor.set(None);
-            TerminalEditorResult::Exit
+            TreeNavResult::Exit
+        }
+    }
+}
+
+impl TreeNav for  StringEditor {
+    fn goto(&mut self, tree_pos: Vec<usize>) -> TreeNavResult {
+        if tree_pos.len() == 1 {
+            let new_pos = tree_pos[0];
+            if new_pos <= self.data.len() {
+                self.cursor.set(Some(new_pos));
+                TreeNavResult::Continue
+            } else {
+                self.cursor.set(None);
+                TreeNavResult::Exit
+            }
+        } else {
+            self.cursor.set(None);            
+            TreeNavResult::Exit
+        }
+    }
+
+    fn pxev(&mut self) -> TreeNavResult {
+        let cur = self.cursor.get().unwrap_or(usize::MAX);
+        if cur > 0 {
+            self.cursor.set(Some(cur - 1));
+            TreeNavResult::Continue
+        } else {
+            self.cursor.set(None);
+            TreeNavResult::Exit
+        }        
+    }
+
+    fn nexd(&mut self) -> TreeNavResult {
+        self.goto(vec![ self.cursor.get().unwrap_or(0) + 1 ])
+    }
+
+    fn goto_end(&mut self) -> TreeNavResult {
+        if self.cursor.get() == Some(self.data.len()) {
+            self.up()
+        } else {
+            self.goto(vec![ self.data.len() ])
+        }
+    }
+
+    fn goto_home(&mut self) -> TreeNavResult {
+        if self.cursor.get() == Some(0) {
+            self.up()
+        } else {
+            self.goto(vec![ 0 ])
+        }
+    }
+
+    fn up(&mut self) -> TreeNavResult {
+        self.cursor.set(None);
+        TreeNavResult::Exit
+    }
+
+    fn dn(&mut self) -> TreeNavResult {
+        if self.cursor.get() == Some(0) {
+            self.up()
+        } else {
+            self.goto(vec![0])
         }
     }
 }
@@ -114,33 +148,19 @@ impl TerminalEditor for StringEditor {
 
     fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
         match event {
-            TerminalEvent::Input(Event::Key(Key::Left)) => self.prev(),
-            TerminalEvent::Input(Event::Key(Key::Right)) => self.next(),
-
-            TerminalEvent::Input(Event::Key(Key::Up)) => {
-                self.cursor.set(None);
-                TerminalEditorResult::Exit
-            }
-            
-            TerminalEvent::Input(Event::Key(Key::Down)) |
-            TerminalEvent::Input(Event::Key(Key::Home)) =>
-                if self.cursor.get() == Some(0) {
-                    self.cursor.set(None);
-                    TerminalEditorResult::Exit
-                } else {
-                    self.goto(0)
-                },
-            TerminalEvent::Input(Event::Key(Key::End)) =>
-                if self.cursor.get() == Some(self.data.len()) {
-                    self.cursor.set(None);
-                    TerminalEditorResult::Exit
-                } else {
-                    self.goto_end()
-                },
             TerminalEvent::Input(Event::Key(Key::Char('\n'))) => TerminalEditorResult::Continue,
-            TerminalEvent::Input(Event::Key(Key::Char(c))) => self.insert(*c),
-            TerminalEvent::Input(Event::Key(Key::Delete)) => self.delete(),
-            TerminalEvent::Input(Event::Key(Key::Backspace)) => self.delete_prev(),
+            TerminalEvent::Input(Event::Key(Key::Char(c))) => match self.insert(*c) {
+                TreeNavResult::Exit => TerminalEditorResult::Exit,
+                TreeNavResult::Continue => TerminalEditorResult::Continue
+            }
+            TerminalEvent::Input(Event::Key(Key::Delete)) => match self.delete()  {
+                TreeNavResult::Exit => TerminalEditorResult::Exit,
+                TreeNavResult::Continue => TerminalEditorResult::Continue
+            }
+            TerminalEvent::Input(Event::Key(Key::Backspace)) => match self.delete_prev() {
+                TreeNavResult::Exit => TerminalEditorResult::Exit,
+                TreeNavResult::Continue => TerminalEditorResult::Continue
+            }
             _ => TerminalEditorResult::Continue
         }
     }
