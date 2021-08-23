@@ -29,7 +29,7 @@ use{
             TerminalEditor},
         string_editor::{CharEditor},
         tree_nav::{TreeNav, TreeNavResult, TerminalTreeEditor},
-        list::{SExprView, ListEditor, ListEditorStyle}
+        list::{SExprView, ListCursorMode, ListEditor, ListEditorStyle}
     }
 };
 
@@ -261,17 +261,26 @@ write::
                 }
 
                 status_chars.clear();
-                match te.get_cursor() {
-                    Some(addr) => {
-                        status_chars.push(TerminalAtom::new('@', TerminalStyle::fg_color((120, 80, 80)).add(TerminalStyle::bold(true))));
-                        for x in addr {
-                            for c in format!("{}", x).chars() {
-                                status_chars.push(TerminalAtom::new(c, TerminalStyle::fg_color((0, 100, 20))));
-                            }
-                            status_chars.push(TerminalAtom::new('.', TerminalStyle::fg_color((120, 80, 80))));
+                if let Some(cur) = te.get_cursor() {
+                    status_chars.push(TerminalAtom::new('@', TerminalStyle::fg_color((120, 80, 80)).add(TerminalStyle::bold(true))));
+                    for x in cur.tree_addr {
+                        for c in format!("{}", x).chars() {
+                            status_chars.push(TerminalAtom::new(c, TerminalStyle::fg_color((0, 100, 20))));
                         }
+                        status_chars.push(TerminalAtom::new('.', TerminalStyle::fg_color((120, 80, 80))));
                     }
-                    None => {}
+
+                    status_chars.push(TerminalAtom::new(':', TerminalStyle::fg_color((120, 80, 80)).add(TerminalStyle::bold(true))));
+                    for c in
+                        match cur.leaf_mode {
+                            ListCursorMode::Insert => "INSERT",
+                            ListCursorMode::Select => "SELECT",
+                            ListCursorMode::Modify => "MODIFY"
+                        }.chars()
+                    {
+                        status_chars.push(TerminalAtom::new(c, TerminalStyle::fg_color((200, 200, 20))));
+                    }
+                    status_chars.push(TerminalAtom::new(':', TerminalStyle::fg_color((120, 80, 80)).add(TerminalStyle::bold(true))));
                 }
             }
 

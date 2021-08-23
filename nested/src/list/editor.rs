@@ -18,7 +18,6 @@ use {
                 Context
             }
         },
-        tree_nav::{TreeNav, TreeNavResult, TerminalTreeEditor},
         projection::ProjectionHelper,
         singleton::{SingletonView, SingletonBuffer},
         sequence::{SequenceView},
@@ -32,31 +31,18 @@ use {
             make_label
         },
         leveled_term_view::LeveledTermView,
-        list::{SExprView, ListDecoration}
+        list::{SExprView, ListDecoration, ListCursor, ListCursorMode},
+        tree_nav::{TreeCursor, TreeNav, TreeNavResult, TerminalTreeEditor}
     }
 };
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum ListEditorCursor {
-    None,
-    Insert(usize),
-    Select(usize),
-    Edit(usize)
-}
-
-impl Default for ListEditorCursor {
-    fn default() -> Self {
-        ListEditorCursor::None
-    }
-}
-
-pub struct ListEditor<SubEditor, FnMakeItemEditor>
-where SubEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
-      FnMakeItemEditor: Fn() -> Arc<RwLock<SubEditor>>
+pub struct ListEditor<ItemEditor, FnMakeItemEditor>
+where ItemEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
+      FnMakeItemEditor: Fn() -> Arc<RwLock<ItemEditor>>
 {
-    cursor: SingletonBuffer<ListEditorCursor>,
-    data: VecBuffer<Arc<RwLock<SubEditor>>>,
-    data_sequence_port: OuterViewPort<dyn SequenceView<Item = Arc<RwLock<SubEditor>>>>,
+    cursor: SingletonBuffer<Option<ListCursor>>,
+    data: VecBuffer<Arc<RwLock<ItemEditor>>>,
+    data_sequence_port: OuterViewPort<dyn SequenceView<Item = Arc<RwLock<ItemEditor>>>>,
     make_item_editor: FnMakeItemEditor,
     level: usize,
     segment_seq: OuterViewPort<dyn SequenceView<Item = ListEditorViewSegment>>,
@@ -64,358 +50,501 @@ where SubEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
     terminal_view: OuterViewPort<dyn TerminalView>
 }
 
-impl<SubEditor, FnMakeItemEditor> TreeNav for ListEditor<SubEditor, FnMakeItemEditor>
-where SubEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
-      FnMakeItemEditor: Fn() -> Arc<RwLock<SubEditor>>
+impl<ItemEditor, FnMakeItemEditor> TreeNav for ListEditor<ItemEditor, FnMakeItemEditor>
+where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
+      FnMakeItemEditor: Fn() -> Arc<RwLock<ItemEditor>>
 {
-    fn get_cursor(&self) -> Option<Vec<usize>> {
-        match self.cursor.get() {
-            ListEditorCursor::None => None,
-            ListEditorCursor::Insert(idx) => Some(vec![ idx ]),
-            ListEditorCursor::Select(idx) => Some(vec![ idx ]),
-            ListEditorCursor::Edit(idx) => match self.data.get(idx).read().unwrap().get_cursor() {
-                Some(mut addr) => {
-                    addr.insert(0, idx);
-                    Some(addr)
+    fn get_cursor(&self) -> Option<TreeCursor> {
+        if let Some(cur) = self.cursor.get() {
+            match cur.mode {
+                ListCursorMode::Insert |
+                ListCursorMode::Select => {
+                    Some(TreeCursor {
+                        leaf_mode: cur.mode,
+                        tree_addr: vec![ cur.idx ]
+                    })
+                },
+                ListCursorMode::Modify => {
+                    if cur.idx < self.data.len() {
+                        if let Some(mut sub_cur) = self.data.get(cur.idx).read().unwrap().get_cursor() {
+                            sub_cur.tree_addr.insert(0, cur.idx);
+                            Some(sub_cur)
+                        } else {
+                            Some(TreeCursor {
+                                leaf_mode: cur.mode,
+                                tree_addr: vec![ cur.idx ]
+                            })
+                        }
+                    } else {
+                        None
+                    }
                 }
-                None => Some(vec![ idx ])
-            },
+            }
+        } else {
+            None
         }
     }
 
-    fn up(&mut self) -> TreeNavResult {
-        match self.cursor.get() {
-            ListEditorCursor::Edit(idx) => {
-                let ce = self.data.get_mut(idx);
+    fn goto(&mut self, cursor: Option<TreeCursor>) -> TreeNavResult {
+        if let Some(old_cur) = self.cursor.get() {
+            if old_cur.mode == ListCursorMode::Modify {
+                let ce = self.data.get_mut(old_cur.idx);
                 let mut cur_edit = ce.write().unwrap();
-
-                match cur_edit.up() {
-                    TreeNavResult::Exit => {
-                        self.cursor.set(ListEditorCursor::Select(idx));
-                    }
-                    TreeNavResult::Continue => {}
-                }
-                TreeNavResult::Continue
-            }
-            _ => {
-                self.cursor.set(ListEditorCursor::None);
-                TreeNavResult::Exit
+                cur_edit.goto(None);
             }
         }
-    }
 
-    fn goto(&mut self, tree_addr: Vec<usize>) -> TreeNavResult {
-        if tree_addr.len() == 1 {
-            if tree_addr[0] < self.data.len() {
-                match self.cursor.get() {
-                    ListEditorCursor::None |
-                    ListEditorCursor::Select(_) => {
-                        self.cursor.set(ListEditorCursor::Select(tree_addr[0]));
-                    }
-                    ListEditorCursor::Insert(_) => {
-                        self.cursor.set(ListEditorCursor::Insert(tree_addr[0]));
-                    }
-                    ListEditorCursor::Edit(_) => {
-                        self.cursor.set(ListEditorCursor::Edit(tree_addr[0]));
-                    }
-                }
+        if let Some(new_cur) = cursor {
+            if new_cur.tree_addr.len() == 1 {
+                self.cursor.set(Some(ListCursor{
+                    mode: new_cur.leaf_mode,
+                    idx: new_cur.tree_addr[0]
+                }));
                 TreeNavResult::Continue
-            } else {
-                TreeNavResult::Exit
-            }                    
-        } else if tree_addr.len() > 0 {
-            if tree_addr[0] < self.data.len() {
-                self.cursor.set(ListEditorCursor::Edit(tree_addr[0]));
+            } else if new_cur.tree_addr[0] < self.data.len() {
+                self.cursor.set(Some(ListCursor {
+                    mode: ListCursorMode::Modify,
+                    idx: new_cur.tree_addr[0]
+                }));
 
-                let ce = self.data.get_mut(tree_addr[0]);
-                let mut cur_edit = ce.write().unwrap();
+                let ne = self.data.get_mut(new_cur.tree_addr[0]);
+                let mut nxt_edit = ne.write().unwrap();
 
-                cur_edit.goto(tree_addr[1..].iter().cloned().collect());
+                nxt_edit.goto(
+                    Some(TreeCursor {
+                        leaf_mode: new_cur.leaf_mode,
+                        tree_addr: new_cur.tree_addr[1..].iter().cloned().collect()
+                    }));
 
                 TreeNavResult::Continue
             } else {
+                self.cursor.set(None);
                 TreeNavResult::Exit
             }
         } else {
-            self.cursor.set(ListEditorCursor::None);
+            self.cursor.set(None);
             TreeNavResult::Exit
         }
     }
 
     fn goto_end(&mut self) -> TreeNavResult {
-        match self.cursor.get() {
-            ListEditorCursor::None => { self.goto(vec![ self.data.len() - 1 ])}
-            ListEditorCursor::Insert(idx) => {
-                if idx < self.data.len() {
-                    self.goto(vec![ self.data.len() ])
-                } else {
-                    self.up();
-                    self.nexd();
-                    self.dn();
-                    self.goto_end();
-                    TreeNavResult::Continue                    
-                }
-            }
-            ListEditorCursor::Select(idx) => {
-                if idx < self.data.len()-1 {
-                    self.goto(vec![ self.data.len()-1 ])
-                } else {
-                    self.up();
-                    self.nexd();
-                    self.dn();
-                    self.goto_end();
-                    TreeNavResult::Continue
-                }
-            }
-            ListEditorCursor::Edit(idx) => {
-                let ce = self.data.get_mut(idx);
-                let mut cur_edit = ce.write().unwrap();
-
-                match cur_edit.goto_end() {
-                    TreeNavResult::Continue => TreeNavResult::Continue,
-                    TreeNavResult::Exit => {
-                        if idx+1 < self.data.len() {
-                            drop(cur_edit);
-                            self.up();
-                            self.nexd();
-                            self.dn();
-                            self.goto_end();
+        if let Some(cur) = self.cursor.get() {
+            if cur.idx < self.data.len() {
+                match cur.mode {
+                    ListCursorMode::Insert => {
+                        if cur.idx < self.data.len() {
+                            self.cursor.set(Some(
+                                ListCursor {
+                                    mode: ListCursorMode::Insert,
+                                    idx: self.data.len()
+                                }
+                            ));
                             TreeNavResult::Continue
                         } else {
-                            self.cursor.set(ListEditorCursor::None);
+                            self.cursor.set(None);
                             TreeNavResult::Exit
                         }
                     }
+                    ListCursorMode::Select => {
+                        if cur.idx+1 < self.data.len() {
+                            self.cursor.set(Some(
+                                ListCursor {
+                                    mode: ListCursorMode::Select,
+                                    idx: self.data.len()-1
+                                }
+                            ));
+                            TreeNavResult::Continue
+                        } else {
+                            self.cursor.set(None);
+                            TreeNavResult::Exit                            
+                        }
+                    }
+                    ListCursorMode::Modify => {
+                        let ce = self.data.get_mut(cur.idx);
+                        let mut cur_edit = ce.write().unwrap();
+                        let cur_mode = if let Some(c) = cur_edit.get_cursor() { c.leaf_mode } else { ListCursorMode::Select };
+
+                        match cur_edit.goto_end() {
+                            TreeNavResult::Continue => {
+                                TreeNavResult::Continue
+                            }
+                            TreeNavResult::Exit => {
+                                if cur.idx+1 < self.data.len() {
+                                    cur_edit.up();
+                                    drop(cur_edit);
+
+                                    self.set_mode(cur_mode);
+                                    self.nexd();
+                                    self.dn();
+                                    self.goto_end();
+                                    TreeNavResult::Continue
+                                } else {
+                                    self.cursor.set(None);
+                                    TreeNavResult::Exit
+                                }
+                            }
+                        }
+                    }
                 }
+            } else {
+                // goto right neighbours end
+                TreeNavResult::Exit
             }
+        } else {
+            TreeNavResult::Exit
         }
     }
 
     fn goto_home(&mut self) -> TreeNavResult {
-        match self.cursor.get() {
-            ListEditorCursor::None |
-            ListEditorCursor::Insert(_) | 
-            ListEditorCursor::Select(_) => self.goto(vec![ 0 ]),
-            ListEditorCursor::Edit(idx) => {
-                let ce = self.data.get_mut(idx);
-                let mut cur_edit = ce.write().unwrap();
+        if let Some(cur) = self.cursor.get() {
+            match cur.mode {
+                ListCursorMode::Insert |
+                ListCursorMode::Select => {
+                    if cur.idx > 0 {
+                        self.cursor.set(Some(
+                            ListCursor {
+                                mode: cur.mode,
+                                idx: 0
+                            }
+                        ));
+                        TreeNavResult::Continue
+                    } else {
+                        self.cursor.set(None);
+                        TreeNavResult::Exit
+                    }
+                }
+                ListCursorMode::Modify => {
+                    let ce = self.get_item().unwrap();
+                    let mut cur_edit = ce.write().unwrap();
+                    let cur_mode = if let Some(c) = cur_edit.get_cursor() { c.leaf_mode } else { ListCursorMode::Select };
 
-                match cur_edit.goto_home() {
-                    TreeNavResult::Continue => TreeNavResult::Continue,
-                    TreeNavResult::Exit => {
-                        if idx > 0 {
-                            drop(cur_edit);
-                            self.up();
-                            self.pxev();
-                            self.dn();
-                            self.goto_home();
-                            TreeNavResult::Continue
-                        } else {
-                            self.cursor.set(ListEditorCursor::None);
-                            TreeNavResult::Exit
+                    match cur_edit.goto_home() {
+                        TreeNavResult::Exit => {
+                            if cur.idx > 0 {
+                                cur_edit.up();
+                                drop(cur_edit);
+
+                                self.set_mode(cur_mode);
+                                self.pxev();
+                                self.dn();
+                                TreeNavResult::Continue
+                            } else {
+                                self.cursor.set(None);
+                                TreeNavResult::Exit
+                            }
                         }
+                        TreeNavResult::Continue => TreeNavResult::Continue
                     }
                 }
             }
-            _ => {
-                self.up();
+        } else {
+            TreeNavResult::Exit
+        }
+    }
+
+    fn up(&mut self) -> TreeNavResult {
+        if let Some(cur) = self.cursor.get() {
+            if cur.mode == ListCursorMode::Modify {
+                let ce = self.data.get_mut(cur.idx);
+                let mut cur_edit = ce.write().unwrap();
+
+                let mode =
+                    if let Some(c) = cur_edit.get_cursor() {
+                        c.leaf_mode
+                    } else {
+                        ListCursorMode::Select
+                    };
+
+                match cur_edit.up() {
+                    TreeNavResult::Exit => {
+                        self.set_mode(mode);
+                    }
+                    TreeNavResult::Continue => {}
+                }
+
+                TreeNavResult::Continue
+            } else {
+                self.cursor.set(None);
                 TreeNavResult::Exit
             }
+        } else {
+            TreeNavResult::Exit
         }
     }
 
     fn dn(&mut self) -> TreeNavResult {
-        match self.cursor.get() {
-            ListEditorCursor::Select(idx) => {
-                self.data.get_mut(idx).write().unwrap().goto_home();
-                self.cursor.set(ListEditorCursor::Edit(idx));
-            }
-            ListEditorCursor::Edit(idx) => {
-                let ce = self.data.get_mut(idx);
-                let mut cur_edit = ce.write().unwrap();
+        if let Some(cur) = self.cursor.get() {
+            match cur.mode {
+                ListCursorMode::Insert |
+                ListCursorMode::Select => {
+                    if cur.idx < self.data.len() {
+                        self.cursor.set(Some(ListCursor {
+                            mode: ListCursorMode::Modify,
+                            idx: cur.idx
+                        }));
 
-                cur_edit.dn();
+                        self.data.get_mut(cur.idx).write().unwrap().goto(
+                            Some(TreeCursor {
+                                leaf_mode: cur.mode,
+                                tree_addr: vec![ 0 ]
+                            })
+                        );
+                    }
+                }
+                ListCursorMode::Modify => {
+                    let ce = self.data.get_mut(cur.idx);
+                    let mut cur_edit = ce.write().unwrap();
+
+                    cur_edit.dn();
+                }
             }
-            _ => {}
+            TreeNavResult::Continue
+        } else {
+            self.cursor.set(Some(ListCursor {
+                mode: ListCursorMode::Insert,
+                idx: 0 // todo: smart prediction
+            }));
+            TreeNavResult::Continue
         }
-        TreeNavResult::Continue
     }
 
     fn pxev(&mut self) -> TreeNavResult {
-        match self.cursor.get() {
-            ListEditorCursor::None => TreeNavResult::Exit,
-            ListEditorCursor::Insert(idx) => {
-                if idx > 0 {
-                    self.cursor.set(ListEditorCursor::Insert(idx-1));
-                    TreeNavResult::Continue
-                } else {
-                    self.cursor.set(ListEditorCursor::None);
-                    TreeNavResult::Exit
-                }
-            }
-            ListEditorCursor::Select(idx) => {
-                if idx > 0 {
-                    self.cursor.set(ListEditorCursor::Select(idx-1));
-                    TreeNavResult::Continue
-                } else {
-                    self.cursor.set(ListEditorCursor::None);
-                    TreeNavResult::Exit
-                }
-            }
-            ListEditorCursor::Edit(idx) => {
-                let ce = self.data.get_mut(idx);
-                let mut cur_edit = ce.write().unwrap();
-
-                match cur_edit.pxev() {
-                    TreeNavResult::Exit => {
-                        if idx > 0 {
-                            drop(cur_edit);
-                            self.up();
-                            self.pxev();
-                            self.dn();
-                            self.goto_end();
-                            TreeNavResult::Continue
-                        } else {
-                            TreeNavResult::Exit
-                        }
+        if let Some(cur) = self.cursor.get() {
+            match cur.mode {
+                ListCursorMode::Insert => {
+                    if cur.idx > 0 {
+                        self.cursor.set(Some(ListCursor {
+                            mode: ListCursorMode::Insert,
+                            idx: cur.idx - 1
+                        }));
+                        TreeNavResult::Continue
+                    } else {
+                        self.cursor.set(None);
+                        TreeNavResult::Exit
                     }
-                    TreeNavResult::Continue => TreeNavResult::Continue
+                }
+                ListCursorMode::Select => {
+                    if cur.idx > 0 {
+                        self.cursor.set(Some(ListCursor {
+                            mode: ListCursorMode::Select,
+                            idx: cur.idx - 1
+                        }));
+                        TreeNavResult::Continue
+                    } else {
+                        self.cursor.set(None);
+                        TreeNavResult::Exit
+                    }
+                }
+                ListCursorMode::Modify => {
+                    let ce = self.get_item().unwrap();
+                    let mut cur_edit = ce.write().unwrap();
+                    let cur_mode = if let Some(c) = cur_edit.get_cursor() { c.leaf_mode } else { ListCursorMode::Select };
+
+                    match cur_edit.pxev() {
+                        TreeNavResult::Exit => {
+                            if cur.idx > 0 {
+                                cur_edit.up();
+                                drop(cur_edit);
+
+                                self.set_mode(cur_mode);
+                                self.pxev();
+                                self.dn();
+                                self.goto_end();
+                                TreeNavResult::Continue
+                            } else {
+                                self.cursor.set(None);
+                                TreeNavResult::Exit
+                            }
+                        }
+                        TreeNavResult::Continue => TreeNavResult::Continue
+                    }
                 }
             }
+        } else {
+            TreeNavResult::Exit
         }
     }
 
     fn nexd(&mut self) -> TreeNavResult {
-        match self.cursor.get() {
-            ListEditorCursor::None => TreeNavResult::Exit,
-            ListEditorCursor::Insert(idx) => {
-                if idx < self.data.len() {
-                    self.cursor.set(ListEditorCursor::Insert(idx+1));
-                    TreeNavResult::Continue
-                } else {
-                    TreeNavResult::Exit
-                }
-            }
-            ListEditorCursor::Select(idx) => {
-                if idx+1 < self.data.len() {
-                    self.cursor.set(ListEditorCursor::Select(idx + 1));
-                    TreeNavResult::Continue
-                } else {
-                    self.cursor.set(ListEditorCursor::None);
-                    TreeNavResult::Exit
-                }
-            }
-            ListEditorCursor::Edit(idx) => {
-                let ce = self.data.get_mut(idx);
-                let mut cur_edit = ce.write().unwrap();
-
-                match cur_edit.nexd() {
-                    TreeNavResult::Exit => {
-                        if idx+1 < self.data.len() {
-                            drop(cur_edit);
-                            self.up();
-                            self.nexd();
-                            self.dn();
-                            TreeNavResult::Continue
-                        } else {//if idx+1 == self.data.len() {
-                            TreeNavResult::Exit
-                        }
+        if let Some(cur) = self.cursor.get() {
+            match cur.mode {
+                ListCursorMode::Insert => {
+                    if cur.idx < self.data.len() {
+                        self.cursor.set(Some(ListCursor {
+                            mode: ListCursorMode::Insert,
+                            idx: cur.idx + 1
+                        }));
+                        TreeNavResult::Continue
+                    } else {
+                        self.cursor.set(None);
+                        TreeNavResult::Exit
                     }
-                    TreeNavResult::Continue => TreeNavResult::Continue
+                }
+                ListCursorMode::Select => {
+                    if cur.idx+1 < self.data.len() {
+                        self.cursor.set(Some(ListCursor {
+                            mode: ListCursorMode::Select,
+                            idx: cur.idx + 1
+                        }));
+                        TreeNavResult::Continue
+                    } else {
+                        self.cursor.set(None);
+                        TreeNavResult::Exit
+                    }
+                }
+                ListCursorMode::Modify => {
+                    let ce = self.data.get(cur.idx);
+                    let mut cur_edit = ce.write().unwrap();
+                    let cur_mode = if let Some(c) = cur_edit.get_cursor() { c.leaf_mode } else { ListCursorMode::Select };
+
+                    match cur_edit.nexd() {
+                        TreeNavResult::Exit => {
+                            if cur.idx+1 < self.data.len() {
+                                cur_edit.up();
+                                drop(cur_edit);
+                                drop(ce);
+
+                                self.set_mode(cur_mode);
+                                self.nexd();
+                                self.dn();
+                                TreeNavResult::Continue
+                            } else {
+                                self.cursor.set(None);
+                                TreeNavResult::Exit
+                            }
+                        }
+                        TreeNavResult::Continue => TreeNavResult::Continue
+                    }
                 }
             }
+        } else {
+            TreeNavResult::Exit
         }
     }
 }
 
-impl<SubEditor, FnMakeItemEditor> TerminalEditor for ListEditor<SubEditor, FnMakeItemEditor>
-where SubEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
-      FnMakeItemEditor: Fn() -> Arc<RwLock<SubEditor>>
+impl<ItemEditor, FnMakeItemEditor> TerminalEditor for ListEditor<ItemEditor, FnMakeItemEditor>
+where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
+      FnMakeItemEditor: Fn() -> Arc<RwLock<ItemEditor>>
 {
     fn get_term_view(&self) -> OuterViewPort<dyn TerminalView> {
         self.terminal_view.clone()
     }
 
     fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
-        match self.cursor.get() {
-            ListEditorCursor::Insert(idx) => {
-                match event {
-                    TerminalEvent::Input(Event::Key(Key::Backspace)) => {
-                        if idx > 0 {
-                            self.data.remove(idx-1);
-                            self.cursor.set(ListEditorCursor::Insert(idx-1));
-                            TerminalEditorResult::Continue
-                        } else {
-                            TerminalEditorResult::Exit
-                        }
-                    }
-                    TerminalEvent::Input(Event::Key(Key::Delete)) => {
-                        if idx < self.data.len() {
-                            self.data.remove(idx);
-                            self.cursor.set(ListEditorCursor::Insert(idx));
-                            TerminalEditorResult::Continue
-                        } else {
-                            TerminalEditorResult::Exit
-                        }
-                    }
-                    TerminalEvent::Input(Event::Key(Key::Insert)) => {
-                        let l = self.data.len();
-                        if idx < l {
-                            self.cursor.set(ListEditorCursor::Select(idx));
-                        } else {
-                            self.cursor.set(ListEditorCursor::Select(l-1))
-                        }
-                        TerminalEditorResult::Continue
-                    }
-                    _ => {
-                        
-                        let new_edit = (self.make_item_editor)();
-                        self.data.insert(idx, new_edit.clone());
-
-                        new_edit.write().unwrap().goto_home();
-                        self.cursor.set(ListEditorCursor::Edit(idx));
-                        match new_edit.write().unwrap().handle_terminal_event(event) {
-                            TerminalEditorResult::Exit => {
-                                self.cursor.set(ListEditorCursor::Insert(idx+1));
+        if let Some(cur) = self.cursor.get() {
+            match cur.mode {
+                ListCursorMode::Insert => {
+                    match event {
+                        TerminalEvent::Input(Event::Key(Key::Backspace)) => {
+                            if cur.idx > 0 {
+                                self.data.remove(cur.idx-1);
+                                self.cursor.set(Some(ListCursor {
+                                    mode: ListCursorMode::Insert,
+                                    idx: cur.idx-1
+                                }));
+                                TerminalEditorResult::Continue
+                            } else {
+                                TerminalEditorResult::Exit
                             }
-                            _ => {}
                         }
-                        TerminalEditorResult::Continue
-                    }
-                }
-            }
-            ListEditorCursor::Edit(idx) => {
-                let mut ce = self.data.get_mut(idx);
-                let mut cur_edit = ce.write().unwrap();
-                match event {
-                    TerminalEvent::Input(Event::Key(Key::Char(' '))) => {
-                        // split..
-                        cur_edit.up();
-                        self.cursor.set(ListEditorCursor::Insert(idx+1));
-                        TerminalEditorResult::Continue
-                    }
-                    _ => cur_edit.handle_terminal_event(event)
-                }
-            }
-            ListEditorCursor::Select(idx) => {
-                match event {
-                    TerminalEvent::Input(Event::Key(Key::Insert)) => {
-                        self.cursor.set(ListEditorCursor::Insert(idx));
-                    }
-                    TerminalEvent::Input(Event::Key(Key::Delete)) => {
-                        self.data.remove(idx);
+                        TerminalEvent::Input(Event::Key(Key::Delete)) => {
+                            if cur.idx < self.data.len() {
+                                self.data.remove(cur.idx);
+                                TerminalEditorResult::Continue
+                            } else {
+                                TerminalEditorResult::Exit
+                            }
+                        }
+                        TerminalEvent::Input(Event::Key(Key::Char('\t'))) |
+                        TerminalEvent::Input(Event::Key(Key::Insert)) => {
+                            let l = self.data.len();
+                            self.set_mode(ListCursorMode::Select);
+                            TerminalEditorResult::Continue
+                        }
+                        _ => {
+                            let new_edit = (self.make_item_editor)();
+                            self.data.insert(cur.idx, new_edit.clone());
+                            self.cursor.set(Some(ListCursor {
+                                mode: ListCursorMode::Modify,
+                                idx: cur.idx
+                            }));
 
-                        if self.data.len() == 0 {
-                            self.cursor.set(ListEditorCursor::Insert(0));
-                        } else if idx == self.data.len() {
-                            self.cursor.set(ListEditorCursor::Select(idx-1));
+                            match new_edit.write().unwrap().handle_terminal_event(event) {
+                                TerminalEditorResult::Exit => {
+                                    self.cursor.set(Some(ListCursor {
+                                        mode: ListCursorMode::Insert,
+                                        idx: cur.idx+1
+                                    }));
+                                }
+                                _ => {}
+                            }
+                            TerminalEditorResult::Continue
                         }
                     }
-                    _=>{}
                 }
-                TerminalEditorResult::Continue
+                ListCursorMode::Select => {
+                    match event {
+                        TerminalEvent::Input(Event::Key(Key::Char('\t'))) |
+                        TerminalEvent::Input(Event::Key(Key::Insert)) => {
+                            self.cursor.set(Some(ListCursor {
+                                mode: ListCursorMode::Insert,
+                                idx: cur.idx
+                            }));
+                        }
+                        TerminalEvent::Input(Event::Key(Key::Delete)) => {
+                            self.data.remove(cur.idx);
+
+                            if self.data.len() == 0 {
+                                self.cursor.set(Some(ListCursor::default()));
+                            } else if cur.idx == self.data.len() {
+                                self.cursor.set(Some(ListCursor {
+                                    mode: ListCursorMode::Select,
+                                    idx: cur.idx-1
+                                }));
+                            }
+                        }
+                        _ => {}
+                    }
+
+                    TerminalEditorResult::Continue
+                }
+                ListCursorMode::Modify => {
+                    let mut ce = self.data.get_mut(cur.idx);
+                    let mut cur_edit = ce.write().unwrap();
+                    match event {
+                        TerminalEvent::Input(Event::Key(Key::Char(' '))) => {
+                            // split..
+                            cur_edit.up();
+                            drop(cur_edit);
+                            self.cursor.set(Some(ListCursor {
+                                mode: ListCursorMode::Insert,
+                                idx: cur.idx+1
+                            }));
+                            TerminalEditorResult::Continue
+                        }
+                        TerminalEvent::Input(Event::Key(Key::Backspace)) => {
+                            match cur_edit.handle_terminal_event(event) {
+                                TerminalEditorResult::Exit => {
+                                    drop(cur_edit);
+                                    drop(ce);
+                                    self.cursor.set(Some(ListCursor {
+                                        mode: ListCursorMode::Insert,
+                                        idx: cur.idx
+                                    }));
+                                    self.data.remove(cur.idx); // todo: join instead of remove
+                                }
+                                TerminalEditorResult::Continue => {
+                                }
+                            }
+                            TerminalEditorResult::Continue
+                        }
+                        _ => cur_edit.handle_terminal_event(event)
+                    }
+                }
             }
-            _ => TerminalEditorResult::Continue
+        } else {
+            TerminalEditorResult::Continue            
         }
     }
 }
@@ -424,13 +553,13 @@ enum ListEditorViewSegment {
     InsertCursor,
     View(OuterViewPort<dyn TerminalView>),
     Select(OuterViewPort<dyn TerminalView>),
-    Edit(OuterViewPort<dyn TerminalView>)
+    Modify(OuterViewPort<dyn TerminalView>)
 }
 
 struct ListEditorView {
-    cursor: Arc<dyn SingletonView<Item = ListEditorCursor>>,
+    cursor: Arc<dyn SingletonView<Item = Option<ListCursor>>>,
     data: Arc<dyn SequenceView<Item = OuterViewPort<dyn TerminalView>>>,
-    cur_cursor: ListEditorCursor,
+    cur_cursor: Option<ListCursor>,
 
     cast: Arc<RwLock<ObserverBroadcast<dyn SequenceView<Item = ListEditorViewSegment>>>>,
     proj_helper: ProjectionHelper<Self>
@@ -444,39 +573,46 @@ impl SequenceView for ListEditorView {
     type Item = ListEditorViewSegment;
 
     fn len(&self) -> Option<usize> {
-        match self.cur_cursor {
-            ListEditorCursor::None => self.data.len(),
-            ListEditorCursor::Select(_) => self.data.len(),
-            ListEditorCursor::Edit(_) => self.data.len(),
-            ListEditorCursor::Insert(_) => Some(self.data.len()? + 1)
+        if let Some(cur) = self.cur_cursor {
+            match cur.mode {
+                ListCursorMode::Insert => Some(self.data.len()? + 1),
+                _ => self.data.len()
+            }
+        } else {
+            self.data.len()
         }
     }
 
     fn get(&self, idx: &usize) -> Option<Self::Item> {
         Some(
-            match self.cur_cursor {
-                ListEditorCursor::None =>
-                    ListEditorViewSegment::View(self.data.get(idx)?),
-                ListEditorCursor::Select(c) =>
-                    if *idx == c {
-                        ListEditorViewSegment::Select(self.data.get(idx)?)
-                    } else {
-                        ListEditorViewSegment::View(self.data.get(idx)?)
-                    },
-                ListEditorCursor::Edit(c) =>
-                    if *idx == c {
-                        ListEditorViewSegment::Edit(self.data.get(idx)?)
-                    } else {
-                        ListEditorViewSegment::View(self.data.get(idx)?)
-                    },
-                ListEditorCursor::Insert(c) =>
-                    if *idx < c {
-                        ListEditorViewSegment::View(self.data.get(idx)?)
-                    } else if *idx == c {
-                        ListEditorViewSegment::InsertCursor
-                    } else {
-                        ListEditorViewSegment::View(self.data.get(&(idx-1))?)
-                    },
+            if let Some(cur) = self.cur_cursor {
+                match cur.mode {
+                    ListCursorMode::Select => {
+                        if *idx == cur.idx {
+                            ListEditorViewSegment::Select(self.data.get(idx)?)
+                        } else {
+                            ListEditorViewSegment::View(self.data.get(idx)?)
+                        }
+                    }
+                    ListCursorMode::Insert => {
+                        if *idx < cur.idx {
+                            ListEditorViewSegment::View(self.data.get(idx)?)
+                        } else if *idx == cur.idx {
+                            ListEditorViewSegment::InsertCursor
+                        } else {
+                            ListEditorViewSegment::View(self.data.get(&(idx-1))?)
+                        }                        
+                    }
+                    ListCursorMode::Modify => {
+                        if *idx == cur.idx {
+                            ListEditorViewSegment::Modify(self.data.get(idx)?)
+                        } else {
+                            ListEditorViewSegment::View(self.data.get(idx)?)
+                        }
+                    }
+                }
+            } else {
+                ListEditorViewSegment::View(self.data.get(idx)?)
             }
         )
     }
@@ -484,35 +620,34 @@ impl SequenceView for ListEditorView {
 
 impl ListEditorView {
     fn new(
-        cursor_port: OuterViewPort<dyn SingletonView<Item = ListEditorCursor>>,
+        cursor_port: OuterViewPort<dyn SingletonView<Item = Option<ListCursor>>>,
         data_port: OuterViewPort<dyn SequenceView<Item = OuterViewPort<dyn TerminalView>>>,
         out_port: InnerViewPort<dyn SequenceView<Item = ListEditorViewSegment>>
     ) -> Arc<RwLock<Self>> {
         let mut proj_helper = ProjectionHelper::new(out_port.0.update_hooks.clone());
         let proj = Arc::new(RwLock::new(
                 ListEditorView {
-                    cur_cursor: ListEditorCursor::None,
+                    cur_cursor: None,
                     cursor: proj_helper.new_singleton_arg(
                         cursor_port,
                         |s: &mut Self, _msg| {
                             let old_cursor = s.cur_cursor;
                             let new_cursor = s.cursor.get();
                             s.cur_cursor = new_cursor;
-
+/*
                             let mut begin = std::cmp::min(
-                                match old_cursor {
-                                    ListEditorCursor::None => usize::MAX,
-                                    ListEditorCursor::Select(c) => c,
-                                    ListEditorCursor::Insert(c) => c,
-                                    ListEditorCursor::Edit(c) => c
+                                if let Some(cur) = self.old_cursor {
+                                    cur.idx
+                                } else {
+                                    usize::MAX
                                 },
-                                match new_cursor {
-                                    ListEditorCursor::None => usize::MAX,
-                                    ListEditorCursor::Select(c) => c,
-                                    ListEditorCursor::Insert(c) => c,
-                                    ListEditorCursor::Edit(c) => c
+                                if let Some(cur) = self.new_cursor {
+                                    cur.idx
+                                } else {
+                                    usize::MAX
                                 }
                             );
+
                             let mut end =
                                 /*
                                 match (old_cursor, new_cursor) {
@@ -537,7 +672,7 @@ impl ListEditorView {
                                     ListEditorCursor::Edit(c) => c
                                 }
                             );
-
+*/
                             s.cast.notify_each(
                                 0 ..= s.data.len().unwrap_or(0)+1
                             );
@@ -545,16 +680,21 @@ impl ListEditorView {
                     data: proj_helper.new_sequence_arg(
                         data_port,
                         |s: &mut Self, idx| {
-                            match s.cur_cursor {
-                                ListEditorCursor::None => s.cast.notify(idx),
-                                ListEditorCursor::Select(c) => s.cast.notify(idx),
-                                ListEditorCursor::Edit(c) => s.cast.notify(idx),
-                                ListEditorCursor::Insert(c) =>
-                                    if *idx < c {
-                                        s.cast.notify(idx)
-                                    } else {
-                                        s.cast.notify(&(*idx + 1))
+                            if let Some(cur) = s.cur_cursor {
+                                match cur.mode {
+                                    ListCursorMode::Insert => {
+                                        if *idx < cur.idx {
+                                            s.cast.notify(idx);
+                                        } else {
+                                            s.cast.notify(&(*idx + 1));
+                                        }
+                                    },
+                                    _ => {
+                                        s.cast.notify(idx);
                                     }
+                                }
+                            } else {
+                                s.cast.notify(idx);
                             }
                         }),
                     cast: out_port.get_broadcast(),
@@ -575,12 +715,13 @@ pub enum ListEditorStyle {
     Path,
     String,
     Clist,
-    Hex
+    Hex,
+    Plain
 }
 
-impl<SubEditor, FnMakeItemEditor> ListEditor<SubEditor, FnMakeItemEditor>
-where SubEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
-      FnMakeItemEditor: Fn() -> Arc<RwLock<SubEditor>>
+impl<ItemEditor, FnMakeItemEditor> ListEditor<ItemEditor, FnMakeItemEditor>
+where ItemEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
+      FnMakeItemEditor: Fn() -> Arc<RwLock<ItemEditor>>
 {
     pub fn get_seg_seq_view(&self) -> OuterViewPort<dyn SequenceView<Item = OuterViewPort<dyn TerminalView>>> {
         self.segment_seq
@@ -591,14 +732,15 @@ where SubEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
                         .map_item(
                             |_pt, atom|
                             atom.add_style_back(TerminalStyle::fg_color((90,60,200)))
+                                .add_style_back(TerminalStyle::bg_color((0,0,0)))
                                 .add_style_back(TerminalStyle::bold(true))
                         ),
                     ListEditorViewSegment::Select(sub_view) =>
                         sub_view.map_item(
                             |_pt, atom|
-                            atom.add_style_back(TerminalStyle::bg_color((90,60,200)))
+                            atom.add_style_front(TerminalStyle::bg_color((90,60,200)))
                         ),
-                    ListEditorViewSegment::Edit(sub_view) =>
+                    ListEditorViewSegment::Modify(sub_view) =>
                         sub_view.map_item(
                             |_pt, atom|
                             atom.add_style_back(TerminalStyle::bg_color((0,0,0)))
@@ -609,7 +751,7 @@ where SubEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
                 }
             )
     }
-    
+
     pub fn horizontal_sexpr_view(&self) -> OuterViewPort<dyn TerminalView> {
         self.get_seg_seq_view().horizontal_sexpr_view(0)
     }
@@ -624,12 +766,14 @@ where SubEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
             .to_grid_horizontal()
             .flatten()
     }
+
     pub fn string_view(&self) -> OuterViewPort<dyn TerminalView> {
         self.get_seg_seq_view()
             .decorate("\"", "\"", "", 1)
             .to_grid_horizontal()
             .flatten()
     }
+
     pub fn clist_view(&self) -> OuterViewPort<dyn TerminalView> {
         self.get_seg_seq_view()
             .decorate("{", "}", ", ", 1)
@@ -644,12 +788,18 @@ where SubEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
             .flatten()
     }
 
+    pub fn plain_view(&self) -> OuterViewPort<dyn TerminalView> {
+        self.get_seg_seq_view()
+            .to_grid_horizontal()
+            .flatten()
+    }
+    
     pub fn new(make_item_editor: FnMakeItemEditor, style: ListEditorStyle) -> Self {
         let cursor_port = ViewPort::new();
         let data_port = ViewPort::new();
 
-        let mut cursor = SingletonBuffer::new(ListEditorCursor::Insert(0), cursor_port.inner());
-        let mut data = VecBuffer::<Arc<RwLock<SubEditor>>>::new(data_port.inner());
+        let mut cursor = SingletonBuffer::new(Some(ListCursor::default()), cursor_port.inner());
+        let mut data = VecBuffer::<Arc<RwLock<ItemEditor>>>::new(data_port.inner());
 
         let data_sequence_port = data_port.into_outer().to_sequence();
 
@@ -680,12 +830,63 @@ where SubEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
             ListEditorStyle::Path => self.path_view(),
             ListEditorStyle::String => self.string_view(),
             ListEditorStyle::Clist => self.clist_view(),
-            ListEditorStyle::Hex => self.hex_view()
+            ListEditorStyle::Hex => self.hex_view(),
+            ListEditorStyle::Plain => self.plain_view()
+        }
+    }
+
+    pub fn get_data_port(&self) -> OuterViewPort<dyn SequenceView<Item = Arc<RwLock<ItemEditor>>>> {
+        self.data_sequence_port.clone()
+    }
+
+    fn get_item(&self) -> Option<Arc<RwLock<ItemEditor>>> {
+        if let Some(cur) = self.cursor.get() {
+            if cur.idx < self.data.len() {
+                Some(self.data.get(cur.idx))
+            } else {
+                None
+            }
+        } else {
+            None
         }
     }
     
-    pub fn get_data_port(&self) -> OuterViewPort<dyn SequenceView<Item = Arc<RwLock<SubEditor>>>> {
-        self.data_sequence_port.clone()
+    fn set_idx(&mut self, idx: isize) {
+        let mode =
+            if let Some(c) = self.cursor.get() {
+                c.mode
+            } else {
+                ListCursorMode::Insert
+            };
+
+        if idx < 0 {
+            self.cursor.set(Some(ListCursor {
+                mode,
+                idx: (self.data.len() as isize + idx) as usize
+            }));
+        } else {
+            self.cursor.set(Some(ListCursor {
+                mode,
+                idx: idx as usize
+            }));
+        }
+    }
+
+    fn set_mode(&mut self, mode: ListCursorMode) {
+        if let Some(old_cur) = self.cursor.get() {
+            let l = self.data.len();
+            if old_cur.idx < l {
+                self.cursor.set(Some(ListCursor {
+                    mode,
+                    idx: old_cur.idx
+                }));
+            } else {
+                self.cursor.set(Some(ListCursor {
+                    mode: ListCursorMode::Select,
+                    idx: l-1
+                }));
+            }
+        }
     }
 }
 
