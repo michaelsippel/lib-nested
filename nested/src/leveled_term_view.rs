@@ -19,7 +19,7 @@ pub struct LeveledTermView {
     level: usize,
 
     cast: Arc<RwLock<ObserverBroadcast<dyn TerminalView>>>,
-    proj_helper: ProjectionHelper<Self>
+    proj_helper: ProjectionHelper<(), Self>
 }
 
 impl LeveledTermView {
@@ -40,6 +40,7 @@ impl LeveledTermView {
         let v = Arc::new(RwLock::new(
             LeveledTermView {
                 src: proj_helper.new_index_arg(
+                    (),
                     src_port,
                     |p: &mut Self, pos: &Point2<i16>| {
                         p.cast.notify(pos);

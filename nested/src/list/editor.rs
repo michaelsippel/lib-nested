@@ -562,7 +562,7 @@ struct ListEditorView {
     cur_cursor: Option<ListCursor>,
 
     cast: Arc<RwLock<ObserverBroadcast<dyn SequenceView<Item = ListEditorViewSegment>>>>,
-    proj_helper: ProjectionHelper<Self>
+    proj_helper: ProjectionHelper<usize, Self>
 }
 
 impl View for ListEditorView {
@@ -629,6 +629,7 @@ impl ListEditorView {
                 ListEditorView {
                     cur_cursor: None,
                     cursor: proj_helper.new_singleton_arg(
+                        0,
                         cursor_port,
                         |s: &mut Self, _msg| {
                             let old_cursor = s.cur_cursor;
@@ -678,6 +679,7 @@ impl ListEditorView {
                             );
                         }),
                     data: proj_helper.new_sequence_arg(
+                        1,
                         data_port,
                         |s: &mut Self, idx| {
                             if let Some(cur) = s.cur_cursor {

@@ -42,7 +42,7 @@ where Item: 'static
     top: Arc<dyn GridView<Item = OuterViewPort<dyn GridView<Item = Item>>>>,
     chunks: HashMap<Point2<i16>, Chunk<Item>>,
     cast: Arc<RwLock<ObserverBroadcast<dyn GridView<Item = Item>>>>,
-    proj_helper: ProjectionHelper<Self>
+    proj_helper: ProjectionHelper<Point2<i16>, Self>
 }
 
 impl<Item> View for Flatten<Item>
@@ -81,6 +81,7 @@ where Item: 'static
             Flatten {
                 limit: Point2::new(0, 0),
                 top: proj_helper.new_index_arg(
+                    Point2::new(-1, -1),
                     top_port,
                     |s: &mut Self, chunk_idx| {
                         s.update_chunk(*chunk_idx);
@@ -101,6 +102,7 @@ where Item: 'static
     fn update_chunk(&mut self, chunk_idx: Point2<i16>) {
         if let Some(chunk_port) = self.top.get(&chunk_idx) {
             let view = self.proj_helper.new_index_arg(
+                chunk_idx,
                 chunk_port.clone(),
                 move |s: &mut Self, idx| {
                     if let Some(chunk) = s.chunks.get(&chunk_idx) {
@@ -134,8 +136,7 @@ where Item: 'static
             self.update_all_offsets();
             chunk_port.0.update();
         } else {
-            // todo:
-            //self.proj_helper.remove_arg();
+            self.proj_helper.remove_arg(&chunk_idx);
 
             let mut dirty_idx = Vec::new();
             if let Some(chunk) = self.chunks.get_mut(&chunk_idx) {

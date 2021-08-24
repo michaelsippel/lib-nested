@@ -3,7 +3,8 @@ use {
         cmp::{max},
         any::Any,
         sync::{Arc, Weak},
-        hash::Hash
+        hash::Hash,
+        collections::HashMap
     },
     std::sync::RwLock,
     crate::{
@@ -26,16 +27,22 @@ use {
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-pub struct ProjectionHelper<P: Send + Sync + 'static> {
-    keepalive: Vec<Arc<dyn Any + Send + Sync>>,
+pub struct ProjectionHelper<ArgKey, P>
+where ArgKey: Clone + Hash + Eq,
+      P: Send + Sync + 'static
+{
+    keepalive: HashMap<ArgKey, (usize, Arc<dyn Any + Send + Sync>)>,
     proj: Arc<RwLock<Weak<RwLock<P>>>>,
     update_hooks: Arc<RwLock<Vec<Arc<dyn UpdateTask>>>>
 }
 
-impl<P: Send + Sync + 'static> ProjectionHelper<P> {
+impl<ArgKey, P> ProjectionHelper<ArgKey, P>
+where ArgKey: Clone + Hash + Eq,
+      P: Send + Sync + 'static
+{
     pub fn new(update_hooks: Arc<RwLock<Vec<Arc<dyn UpdateTask>>>>) -> Self {
         ProjectionHelper {
-            keepalive: Vec::new(),
+            keepalive: HashMap::new(),
             proj: Arc::new(RwLock::new(Weak::new())),
             update_hooks
         }
@@ -50,31 +57,31 @@ impl<P: Send + Sync + 'static> ProjectionHelper<P> {
 
     pub fn new_singleton_arg<Item: 'static>(
         &mut self,
+        arg_key: ArgKey,
         port: OuterViewPort<dyn SingletonView<Item = Item>>,
         notify: impl Fn(&mut P, &()) + Send + Sync + 'static
     ) -> Arc<RwLock<Option<Arc<dyn SingletonView<Item = Item>>>>> {
-        self.update_hooks.write().unwrap().push(Arc::new(port.0.clone()));
-        port.add_observer(self.new_arg(notify, set_channel()));
+        port.add_observer(self.new_arg(arg_key, Arc::new(port.0.clone()), notify, set_channel()));
         port.get_view_arc()
     }
 
     pub fn new_sequence_arg<Item: 'static>(
         &mut self,
+        arg_key: ArgKey,
         port: OuterViewPort<dyn SequenceView<Item = Item>>,
         notify: impl Fn(&mut P, &usize) + Send + Sync + 'static
     ) -> Arc<RwLock<Option<Arc<dyn SequenceView<Item = Item>>>>> {
-        self.update_hooks.write().unwrap().push(Arc::new(port.0.clone()));
-        port.add_observer(self.new_arg(notify, set_channel()));
+        port.add_observer(self.new_arg(arg_key, Arc::new(port.0.clone()), notify, set_channel()));
         port.get_view_arc()
     }
 
     pub fn new_index_arg<Key: Hash + Eq + Clone + Send + Sync + std::fmt::Debug + 'static, Item: 'static>(
         &mut self,
+        arg_key: ArgKey,
         port: OuterViewPort<dyn IndexView<Key, Item = Item>>,
         notify: impl Fn(&mut P, &Key) + Send + Sync + 'static
     ) -> Arc<RwLock<Option<Arc<dyn IndexView<Key, Item = Item>>>>> {
-        self.update_hooks.write().unwrap().push(Arc::new(port.0.clone()));
-        port.add_observer(self.new_arg(notify, set_channel()));
+        port.add_observer(self.new_arg(arg_key, Arc::new(port.0.clone()), notify, set_channel()));
         port.get_view_arc()
     }
 
@@ -83,6 +90,8 @@ impl<P: Send + Sync + 'static> ProjectionHelper<P> {
         D: ChannelData<Item = V::Msg> + 'static
     >(
         &mut self,
+        arg_key: ArgKey,
+        src_update: Arc<dyn UpdateTask>,
         notify: impl Fn(&mut P, &V::Msg) + Send + Sync + 'static,
         (tx, rx): (ChannelSender<D>, ChannelReceiver<D>)
     )
@@ -90,6 +99,8 @@ impl<P: Send + Sync + 'static> ProjectionHelper<P> {
     where V::Msg: Send + Sync + std::fmt::Debug,
           D::IntoIter: Send + Sync + 'static
     {
+        self.remove_arg(&arg_key);
+
         let arg = Arc::new(RwLock::new(
             ProjectionArg {
                 src: None,
@@ -98,10 +109,26 @@ impl<P: Send + Sync + 'static> ProjectionHelper<P> {
                 rx, tx
             }));
 
-        self.keepalive.push(arg.clone());
+        let mut hooks = self.update_hooks.write().unwrap();
+        let idx = hooks.len();
+        hooks.push(src_update);
+        hooks.push(arg.clone());
+        self.keepalive.insert(arg_key, (idx, arg.clone()));
 
-        self.update_hooks.write().unwrap().push(arg.clone());
         arg
+    }
+
+    pub fn remove_arg(&mut self, arg_key: &ArgKey) {
+        let mut hooks = self.update_hooks.write().unwrap();
+        if let Some((idx, arg)) = self.keepalive.remove(arg_key) {
+            hooks.remove(idx);
+            hooks.remove(idx);
+            for (_, (j, _)) in self.keepalive.iter_mut() {
+                if *j > idx {
+                    *j -= 2;
+                }
+            }
+        }
     }
 }
 

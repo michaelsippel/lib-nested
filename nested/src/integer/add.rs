@@ -44,7 +44,7 @@ pub struct Add {
     a: Arc<dyn SequenceView<Item = usize>>, // PosInt, Little Endian
     b: Arc<dyn SequenceView<Item = usize>>, // PosInt, Little Endian
     c: VecBuffer<usize>,
-    _proj_helper: ProjectionHelper<Self>
+    _proj_helper: ProjectionHelper<usize, Self>
 }
 
 impl Add {
@@ -58,8 +58,8 @@ impl Add {
         let add = Arc::new(RwLock::new(
             Add {
                 radix,
-                a: proj_helper.new_sequence_arg(a, |s: &mut Self, _digit_idx| s.update()),
-                b: proj_helper.new_sequence_arg(b, |s: &mut Self, _digit_idx| s.update()),
+                a: proj_helper.new_sequence_arg(0, a, |s: &mut Self, _digit_idx| s.update()),
+                b: proj_helper.new_sequence_arg(1, b, |s: &mut Self, _digit_idx| s.update()),
                 c: VecBuffer::new(c),
                 _proj_helper: proj_helper
             }

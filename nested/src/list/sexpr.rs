@@ -22,7 +22,7 @@ pub struct ListDecorator {
     item_style: TerminalStyle,
 
     cast: Arc<RwLock<ObserverBroadcast<dyn SequenceView<Item = OuterViewPort<dyn TerminalView>>>>>,
-    proj_helper: ProjectionHelper<Self>,
+    proj_helper: ProjectionHelper<(), Self>,
 }
 
 impl View for ListDecorator {
@@ -77,7 +77,7 @@ impl ListDecorator {
             opening_port: make_label(opening),
             closing_port: make_label(closing),
             delim_port: make_label(delim),
-            items: proj_helper.new_sequence_arg(items_port, |s: &mut Self, item_idx| {
+            items: proj_helper.new_sequence_arg((), items_port, |s: &mut Self, item_idx| {
                 s.cast.notify(&(*item_idx * 2 + 1));
                 s.cast.notify(&(*item_idx * 2 + 2));
             }),
@@ -137,7 +137,7 @@ pub struct VerticalSexprDecorator {
     item_style: TerminalStyle,
 
     cast: Arc<RwLock<ObserverBroadcast<dyn GridView<Item = OuterViewPort<dyn TerminalView>>>>>,
-    proj_helper: ProjectionHelper<Self>,
+    proj_helper: ProjectionHelper<(), Self>,
 }
 
 impl View for VerticalSexprDecorator {
@@ -214,7 +214,7 @@ impl VerticalSexprDecorator {
         let li = Arc::new(RwLock::new(VerticalSexprDecorator {
             opening_port: make_label(opening),
             closing_port: make_label(closing),
-            items: proj_helper.new_sequence_arg(items_port, |s: &mut Self, item_idx| {
+            items: proj_helper.new_sequence_arg((), items_port, |s: &mut Self, item_idx| {
                 s.cast.notify(&Point2::new(1, *item_idx as i16));
                 s.cast.notify(&Point2::new(2, *item_idx as i16 - 1));
                 s.cast.notify(&Point2::new(2, *item_idx as i16));

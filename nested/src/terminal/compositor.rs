@@ -17,7 +17,7 @@ use {
 pub struct TerminalCompositor {
     layers: Vec<Arc<dyn TerminalView>>,
     cast: Arc<RwLock<ObserverBroadcast<dyn TerminalView>>>,
-    proj_helper: ProjectionHelper<Self>
+    proj_helper: ProjectionHelper<usize, Self>
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
@@ -41,8 +41,10 @@ impl TerminalCompositor {
     }
 
     pub fn push(&mut self, v: OuterViewPort<dyn TerminalView>) {
+        let idx = self.layers.len();
         self.layers.push(
             self.proj_helper.new_index_arg(
+                idx,
                 v,
                 |s: &mut Self, pos| {
                     s.cast.notify(pos);

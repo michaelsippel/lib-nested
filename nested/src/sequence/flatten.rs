@@ -39,7 +39,7 @@ where Item: 'static
     top: Arc<dyn SequenceView<Item = OuterViewPort<dyn SequenceView<Item = Item>>>>,
     chunks: BTreeMap<usize, Chunk<Item>>,
     cast: Arc<RwLock<ObserverBroadcast<dyn SequenceView<Item = Item>>>>,
-    proj_helper: ProjectionHelper<Self>
+    proj_helper: ProjectionHelper<usize, Self>
 }
 
 impl<Item> View for Flatten<Item>
@@ -77,6 +77,7 @@ where Item: 'static
             Flatten {
                 length: 0,
                 top: proj_helper.new_sequence_arg(
+                    usize::MAX,
                     top_port,
                     |s: &mut Self, chunk_idx| {
                         s.update_chunk(*chunk_idx);
@@ -102,6 +103,7 @@ where Item: 'static
                     offset: 0, // will be adjusted by update_offsets() later
                     len: 0,
                     view: self.proj_helper.new_sequence_arg(
+                        chunk_idx,
                         chunk_port.clone(),
                         move |s: &mut Self, idx| {
                             if let Some(chunk) = s.chunks.get(&chunk_idx) {
@@ -127,7 +129,7 @@ where Item: 'static
             self.cast.notify_each(dirty_idx);
         } else {
             // todo:
-            //self.proj_helper.remove_arg();
+            self.proj_helper.remove_arg(&chunk_idx);
 
             self.chunks.remove(&chunk_idx);
 
