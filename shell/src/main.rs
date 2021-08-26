@@ -28,7 +28,7 @@ use{
             TerminalView,
             TerminalEditor},
         string_editor::{CharEditor},
-        tree_nav::{TreeNav, TreeNavResult, TerminalTreeEditor},
+        tree_nav::{TreeNav, TreeNavResult, TreeCursor, TerminalTreeEditor},
         list::{SExprView, ListCursorMode, ListEditor, ListEditorStyle}
     }
 };
@@ -106,9 +106,9 @@ write::
                 compositor.write().unwrap().push(magic.offset(Vector2::new(40, 4)));
                 //compositor.write().unwrap().push(magic.offset(Vector2::new(40, 20)));
 
-                let monstera_port = monstera::make_monstera();
-                compositor.write().unwrap().push(monstera_port.clone());
-                compositor.write().unwrap().push(monstera_port.offset(Vector2::new(83,0)));
+                //let monstera_port = monstera::make_monstera();
+                //compositor.write().unwrap().push(monstera_port.clone());
+                //compositor.write().unwrap().push(monstera_port.offset(Vector2::new(83,0)));
 
             }
 
@@ -128,6 +128,13 @@ write::
             };
 
             let mut te = ListEditor::new(make_sub_editor.clone(), ListEditorStyle::Clist);
+
+            te.goto(
+                TreeCursor {
+                    leaf_mode: ListCursorMode::Insert,
+                    tree_addr: vec![ 0 ]
+                }
+            );
 
             compositor.write().unwrap().push(
                 te.get_term_view()
@@ -255,13 +262,28 @@ write::
 */
                     },
                     ev => {
-                        te.handle_terminal_event(&ev);
+                        if te.get_cursor().leaf_mode == ListCursorMode::Select {
+                            match ev {
+                                TerminalEvent::Input(Event::Key(Key::Char('l'))) => { te.up(); },
+                                TerminalEvent::Input(Event::Key(Key::Char('a'))) => { te.dn(); },
+                                TerminalEvent::Input(Event::Key(Key::Char('i'))) => { te.pxev(); },
+                                TerminalEvent::Input(Event::Key(Key::Char('e'))) => { te.nexd(); },
+                                TerminalEvent::Input(Event::Key(Key::Char('u'))) => { te.goto_home(); },
+                                TerminalEvent::Input(Event::Key(Key::Char('o'))) => { te.goto_end(); },
+                                _ => {
+                                    te.handle_terminal_event(&ev);
+                                }
+                            }
+                        } else {
+                            te.handle_terminal_event(&ev);
+                        }
                     }
-                    _ => {}
                 }
 
                 status_chars.clear();
-                if let Some(cur) = te.get_cursor() {
+                let cur = te.get_cursor();
+
+                if cur.tree_addr.len() > 0 {
                     status_chars.push(TerminalAtom::new('@', TerminalStyle::fg_color((120, 80, 80)).add(TerminalStyle::bold(true))));
                     for x in cur.tree_addr {
                         for c in format!("{}", x).chars() {

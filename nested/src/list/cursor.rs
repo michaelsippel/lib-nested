@@ -9,14 +9,14 @@ pub enum ListCursorMode {
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct ListCursor {
     pub mode: ListCursorMode,
-    pub idx: usize
+    pub idx: Option<usize>
 }
 
 impl Default for ListCursor {
     fn default() -> Self {
         ListCursor {
-            mode: ListCursorMode::Insert,
-            idx: 0
+            mode: ListCursorMode::Select,
+            idx: None
         }
     }
 }
