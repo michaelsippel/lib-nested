@@ -1,6 +1,7 @@
 
 pub mod map_item;
 pub mod map_key;
+pub mod buffer;
 
 use {
     std::{
@@ -46,7 +47,6 @@ impl<Key, V> IndexView<Key> for Arc<V>
 where Key: Send + Sync,
       V: IndexView<Key> + ?Sized
 {
-
     type Item = V::Item;
 
     fn get(&self, key: &Key) -> Option<Self::Item> {
