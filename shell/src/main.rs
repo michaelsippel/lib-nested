@@ -89,45 +89,36 @@ write::
 
     async_std::task::spawn(
         async move {
+            let table_port = ViewPort::<dyn nested::grid::GridView<Item = OuterViewPort<dyn TerminalView>>>::new();
+            let mut table_buf = nested::index::buffer::IndexBuffer::new(table_port.inner());
 
-                let magic = make_label("<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>")
-                    .map_item(
-                        |pos, atom|
-                        atom.add_style_back(
-                            TerminalStyle::fg_color(
-                                (5,
-                                 ((80+(pos.x*30)%100) as u8),
-                                 (55+(pos.x*15)%180) as u8)
-                            )
+            let magic = make_label("<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>")
+                .map_item(
+                    |pos, atom|
+                    atom.add_style_back(
+                        TerminalStyle::fg_color(
+                            (5,
+                             ((80+(pos.x*30)%100) as u8),
+                             (55+(pos.x*15)%180) as u8)
                         )
-                    );
-
-            {
-                compositor.write().unwrap().push(magic.offset(Vector2::new(40, 4)));
-                //compositor.write().unwrap().push(magic.offset(Vector2::new(40, 20)));
-
-                //let monstera_port = monstera::make_monstera();
-                //compositor.write().unwrap().push(monstera_port.clone());
-                //compositor.write().unwrap().push(monstera_port.offset(Vector2::new(83,0)));
-
-            }
+                    )
+                );
 
             let cur_size_port = ViewPort::new();
             let mut cur_size = nested::singleton::SingletonBuffer::new(Vector2::new(10, 10), cur_size_port.inner());
 
-            let mut y = 5;
-
             // TypeEditor
-
             let make_char_editor = || {
-                std::sync::Arc::new(std::sync::RwLock::new(DigitEditor::new(16)))
+                std::sync::Arc::new(std::sync::RwLock::new(CharEditor::new()))
             };
-
+            let make_subsub_editor = move || {
+                std::sync::Arc::new(std::sync::RwLock::new(ListEditor::new(make_char_editor.clone(), ListEditorStyle::String)))
+            };
             let make_sub_editor = move || {
-                std::sync::Arc::new(std::sync::RwLock::new(ListEditor::new(make_char_editor.clone(), ListEditorStyle::Hex)))
+                std::sync::Arc::new(std::sync::RwLock::new(ListEditor::new(make_subsub_editor.clone(), ListEditorStyle::HorizontalSexpr)))
             };
 
-            let mut te = ListEditor::new(make_sub_editor.clone(), ListEditorStyle::Clist);
+            let mut te = ListEditor::new(make_sub_editor.clone(), ListEditorStyle::VerticalSexpr);
 
             te.goto(
                 TreeCursor {
@@ -136,24 +127,63 @@ write::
                 }
             );
 
-            compositor.write().unwrap().push(
-                te.get_term_view()
-                    .offset(cgmath::Vector2::new(40,y))
-            );
-            y += 1;
-
             let mut p = te.get_data_port().map(|sub_editor| sub_editor.read().unwrap().get_data_port());
 
             let status_chars_port = ViewPort::new();
             let mut status_chars = VecBuffer::new(status_chars_port.inner());
 
-            compositor.write().unwrap().push(
-                status_chars_port.outer()
-                    .to_sequence()
-                    .to_grid_horizontal()
-                    .offset(cgmath::Vector2::new(40, 2))
-            );
+            let help_port = ViewPort::<dyn nested::grid::GridView<Item = OuterViewPort<dyn TerminalView>>>::new();
+            let mut help_buf = nested::index::buffer::IndexBuffer::<Point2<i16>, OuterViewPort<dyn TerminalView>>::new(help_port.inner());
 
+            let table_style = TerminalStyle::fg_color((120, 100, 80));
+            let desc_style = TerminalStyle::italic(true);
+            help_buf.insert_iter(vec![
+                (Point2::new(0, 0), make_label("CTRL+{c,d,g}").map_item(|_idx, atom| atom.add_style_back(TerminalStyle::bold(true)))),
+                (Point2::new(1, 0), make_label(" | ").map_item(move |_idx, atom| atom.add_style_back(table_style))),
+                (Point2::new(2, 0), make_label("quit").map_item(move |_idx, atom| atom.add_style_back(desc_style))),
+
+                (Point2::new(0, 1), make_label("↞ ← ↑ ↓ → ↠").map_item(|_idx, atom| atom.add_style_back(TerminalStyle::bold(true)))),
+                (Point2::new(1, 1), make_label(" | ").map_item(move |_idx, atom| atom.add_style_back(table_style))),
+                (Point2::new(2, 1), make_label("move cursor").map_item(move |_idx, atom| atom.add_style_back(desc_style))),
+
+                (Point2::new(0, 3), make_label("<DEL> (Select)").map_item(|_idx, atom| atom.add_style_back(TerminalStyle::bold(true)))),
+                (Point2::new(1, 3), make_label(" | ").map_item(move |_idx, atom| atom.add_style_back(table_style))),
+                (Point2::new(2, 3), make_label("delete item at cursor position").map_item(move |_idx, atom| atom.add_style_back(desc_style))),
+
+                (Point2::new(0, 4), make_label("<DEL> (Insert)").map_item(|_idx, atom| atom.add_style_back(TerminalStyle::bold(true)))),
+                (Point2::new(1, 4), make_label(" | ").map_item(move |_idx, atom| atom.add_style_back(table_style))),
+                (Point2::new(2, 4), make_label("delete item right to cursor").map_item(move |_idx, atom| atom.add_style_back(desc_style))),
+
+                (Point2::new(0, 5), make_label("<BACKSPACE> (Insert)").map_item(|_idx, atom| atom.add_style_back(TerminalStyle::bold(true)))),
+                (Point2::new(1, 5), make_label(" | ").map_item(move |_idx, atom| atom.add_style_back(table_style))),
+                (Point2::new(2, 5), make_label("delete item left to cursor").map_item(move |_idx, atom| atom.add_style_back(desc_style))),
+
+                (Point2::new(0, 6), make_label("<TAB>").map_item(|_idx, atom| atom.add_style_back(TerminalStyle::bold(true)))),
+                (Point2::new(1, 6), make_label(" | ").map_item(move |_idx, atom| atom.add_style_back(table_style))),
+                (Point2::new(2, 6), make_label("toggle cursor mode (insert / select)").map_item(move |_idx, atom| atom.add_style_back(desc_style))),
+            ]);
+
+            let help_head = make_label("─────────────────────┬─────────────────────").map_item(move |_idx, atom| atom.add_style_back(table_style));
+
+            table_buf.insert_iter(vec![
+                (Point2::new(0, 0), magic.clone()),
+                (Point2::new(0, 2), status_chars_port.outer().to_sequence().to_grid_horizontal()),
+                (Point2::new(0, 3), te.get_term_view()),
+                (Point2::new(0, 4), make_label(" ")),
+                (Point2::new(0, 5), help_head),
+                (Point2::new(0, 6), help_port.outer().flatten()),
+                (Point2::new(0, 7), magic.clone()),
+            ]);
+
+            compositor.write().unwrap().push(monstera::make_monstera());
+            compositor.write().unwrap().push(table_port.outer().flatten().offset(Vector2::new(40, 2)));
+
+/*
+            te.get_data_port()
+                .map(
+                    |item_editor| item_editor.read().unwrap().get_data_port()
+                )
+*/
             loop {
                 term_port.update();
                 match term.next_event().await {
@@ -180,9 +210,10 @@ write::
                         }
                     }
                     TerminalEvent::Input(Event::Key(Key::Up)) => { te.up(); }
-                    TerminalEvent::Input(Event::Key(Key::Down)) => { te.dn(); }
+                    TerminalEvent::Input(Event::Key(Key::Down)) => { te.dn(); te.goto_home(); }
                     TerminalEvent::Input(Event::Key(Key::Home)) => {
                         if te.goto_home() == TreeNavResult::Exit {
+
                             te.goto_home();
                         }
                     }

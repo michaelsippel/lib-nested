@@ -5,7 +5,7 @@ use {
         core::{ViewPort, OuterViewPort},
         singleton::{SingletonView, SingletonBuffer},
         vec::VecBuffer,
-        terminal::{TerminalView, TerminalEvent, TerminalEditor, TerminalEditorResult},
+        terminal::{TerminalView, TerminalStyle, TerminalEvent, TerminalEditor, TerminalEditorResult},
         tree_nav::{TreeNav, TreeNavResult}
     }
 };
@@ -40,6 +40,10 @@ impl TerminalEditor for CharEditor {
             } else {
                 "".to_string()
             })
+            .map_item(
+                |_idx, atom|
+                atom.add_style_back(TerminalStyle::fg_color((120, 200, 10)))
+        )
     }
 
     fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
@@ -60,4 +64,30 @@ impl TerminalEditor for CharEditor {
     }
 }
 
+/*
+pub struct ArgListEditor {
+    
+}
 
+impl TreeNav for ArgListEditor {
+    
+}
+
+impl TerminalEditor for ArgListEditor {
+    fn get_term_view(&self) -> OuterViewPort<dyn TerminalView> {
+        
+    }
+
+    fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
+        match event {
+            TerminalEvent::Input(Event::Key(Key::Char(' '))) => {
+                // list.get_arg()
+                // split
+            }
+            _ => {
+                
+            }
+        }
+    }
+}
+*/

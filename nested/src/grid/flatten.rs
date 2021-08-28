@@ -115,11 +115,10 @@ where Item: 'static
                     }
                 }
             );
-/*
+
             if let Some(chunk) = self.chunks.get_mut(&chunk_idx) {
                 chunk.view = view;
             } else {
-*/
                 self.chunks.insert(
                     chunk_idx,
                     Chunk {
@@ -128,9 +127,7 @@ where Item: 'static
                         view
                     }
                 );
-                /*
             }
-             */
 
             chunk_port.0.update();
             self.update_all_offsets();
@@ -164,18 +161,22 @@ where Item: 'static
 
         for chunk_idx in GridWindowIterator::from(self.top.range()) {
             if let Some(chunk) = self.chunks.get_mut(&chunk_idx) {
+                let lim = chunk.view.range().end;
+                col_widths[chunk_idx.x as usize] = std::cmp::max(col_widths[chunk_idx.x as usize], lim.x);
+                row_heights[chunk_idx.y as usize] = std::cmp::max(row_heights[chunk_idx.y as usize], lim.y);
+            }
+        }
+
+        for chunk_idx in GridWindowIterator::from(self.top.range()) {
+            if let Some(chunk) = self.chunks.get_mut(&chunk_idx) {
                 let old_offset = chunk.offset;
                 let old_limit = chunk.limit;
 
+                chunk.limit = chunk.view.range().end;
                 chunk.offset = Vector2::new(
                     (0 .. chunk_idx.x as usize).map(|x| col_widths[x]).sum(),
                     (0 .. chunk_idx.y as usize).map(|y| row_heights[y]).sum()
                 );
-                chunk.limit = chunk.view.range().end;
-
-                col_widths[chunk_idx.x as usize] = std::cmp::max(col_widths[chunk_idx.x as usize], chunk.limit.x);
-                row_heights[chunk_idx.y as usize] = std::cmp::max(row_heights[chunk_idx.y as usize], chunk.limit.y);
-
                 if old_offset != chunk.offset {
                     dirty_idx.extend(
                         GridWindowIterator::from(

@@ -137,6 +137,17 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
     fn goto_end(&mut self) -> TreeNavResult {
         let mut cur = self.cursor.get();
         let i = cur.idx.unwrap_or(0);
+
+        if self.data.len() == 0 && cur.idx.is_none() {
+            self.cursor.set(
+                ListCursor {
+                    mode: ListCursorMode::Insert,
+                    idx: Some(0)
+                }
+            );
+            return TreeNavResult::Continue;
+        }
+        
         if i < self.data.len() {
             match cur.mode {
                 ListCursorMode::Insert => {
@@ -150,6 +161,16 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
                     }
                 }
                 ListCursorMode::Select => {
+                    if self.data.len() == 0 && cur.idx.is_none() {
+                        self.cursor.set(
+                            ListCursor {
+                                mode: ListCursorMode::Insert,
+                                idx: Some(0)
+                            }
+                        );
+                        return TreeNavResult::Continue;
+                    }
+
                     if i+1 < self.data.len() || cur.idx.is_none() {
                         cur.idx = Some(self.data.len()-1);
                         self.cursor.set(cur);
@@ -170,24 +191,25 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
                         }
                         TreeNavResult::Exit => {
                             drop(cur_edit);
+
                             self.up();
 
-                            if let Some(i) = cur.idx {
-                                if i+1 < self.data.len() {
-                                    self.nexd();
-                                    self.set_leaf_mode(cur_mode);
+                            if i+1 < self.data.len() {
+                                self.set_mode(ListCursorMode::Select);
+                                self.nexd();
 
-                                    for x in 1 .. depth {
-                                        self.dn();
-                                        self.goto_home();
-                                    }
-
+                                for x in 1 .. depth {
                                     self.dn();
-                                    self.goto_end();
-
-                                    return TreeNavResult::Continue;
+                                    self.goto_home();
                                 }
+
+                                self.set_leaf_mode(cur_mode);
+                                self.dn();
+                                self.goto_end();
+
+                                return TreeNavResult::Continue;
                             }
+
                             TreeNavResult::Exit
                         }
                     }
@@ -201,13 +223,23 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
 
     fn goto_home(&mut self) -> TreeNavResult {
         let cur = self.cursor.get();
+        if self.data.len() == 0 && cur.idx.is_none() {
+            self.cursor.set(
+                ListCursor {
+                    mode: ListCursorMode::Insert,
+                    idx: Some(0)
+                }
+            );
+            return TreeNavResult::Continue;
+        }
+
         match cur.mode {
             ListCursorMode::Insert |
             ListCursorMode::Select => {
                 if cur.idx != Some(0) {
                     self.cursor.set(
                         ListCursor {
-                            mode: cur.mode,
+                            mode: if self.data.len() == 0 { ListCursorMode::Insert } else { cur.mode },
                             idx: Some(0)
                         }
                     );
@@ -226,9 +258,10 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
                 match cur_edit.goto_home() {
                     TreeNavResult::Exit => {
                         drop(cur_edit);
-                        self.up();
 
                         if let Some(i) = cur.idx {
+                            self.up();
+
                             if i > 0 {
                                 self.set_mode(ListCursorMode::Select);
                                 self.pxev();
@@ -331,6 +364,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
                             self.up();
 
                             if i > 0 {
+                                self.set_mode(ListCursorMode::Select);
                                 self.pxev();
 
                                 for x in 1 .. depth {
@@ -341,7 +375,6 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
                                 self.set_leaf_mode(cur_mode);
                                 self.dn();
                                 self.goto_end();
-
                                 TreeNavResult::Continue
                             } else {
                                 TreeNavResult::Exit
@@ -391,17 +424,21 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
                         TreeNavResult::Exit => {
                             drop(cur_edit);
                             drop(ce);
-                            self.up();
+                                self.up();
 
                             if i+1 < self.data.len() {
+
+                                self.set_mode(ListCursorMode::Select);
                                 self.nexd();
 
-                                for x in 0 .. depth {
+                                for x in 1 .. depth {
                                     self.dn();
                                     self.goto_home();
                                 }
 
                                 self.set_leaf_mode(cur_mode);
+                                self.dn();
+                                self.goto_home();
                                 TreeNavResult::Continue
                             } else {
                                 TreeNavResult::Exit
@@ -565,7 +602,7 @@ where ItemEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
                         .map_item(
                             |_pt, atom|
                             atom.add_style_back(TerminalStyle::fg_color((90,60,200)))
-                                .add_style_back(TerminalStyle::bg_color((0,0,0)))
+                                //.add_style_back(TerminalStyle::bg_color((0,0,0)))
                                 .add_style_back(TerminalStyle::bold(true))
                         ),
                     ListEditorViewSegment::Select(sub_view) =>
@@ -574,11 +611,11 @@ where ItemEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
                             atom.add_style_front(TerminalStyle::bg_color((90,60,200)))
                         ),
                     ListEditorViewSegment::Modify(sub_view) => {
-                        sub_view.map_item(
+                        sub_view.clone()/*.map_item(
                             |_pt, atom|
-                            atom.add_style_back(TerminalStyle::bg_color((0,0,0)))
-                                .add_style_back(TerminalStyle::bold(true))
-                        )
+                            atom//.add_style_back(TerminalStyle::bg_color((0,0,0)))
+                                //.add_style_back(TerminalStyle::bold(true))
+                        )*/
                     },
                     ListEditorViewSegment::View(sub_view) =>
                         sub_view.clone()
@@ -684,7 +721,7 @@ where ItemEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
             });
         }
     }
-    
+
     fn set_mode(&mut self, mode: ListCursorMode) {
         let mut cur = self.cursor.get();
 
@@ -699,6 +736,7 @@ where ItemEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
         }
 
         cur.mode = mode;
+
         self.cursor.set(cur);
     }
 }
