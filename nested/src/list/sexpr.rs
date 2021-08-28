@@ -157,6 +157,9 @@ impl IndexView<Point2<i16>> for VerticalSexprDecorator {
     }
 
     fn get(&self, pt: &Point2<i16>) -> Option<Self::Item> {
+        if pt.y < 0 {
+            return None;
+        }
         let item_idx = pt.y as usize;
         let list_style = self.list_style.clone();
         let item_style = self.item_style.clone();
