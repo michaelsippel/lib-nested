@@ -1,11 +1,11 @@
 
 pub mod radix;
 pub mod add;
-pub mod digit;
+pub mod editor;
 
 pub use {
     radix::RadixProjection,
     add::Add,
-    digit::DigitEditor
+    editor::{DigitEditor, PosIntEditor}
 };
 
