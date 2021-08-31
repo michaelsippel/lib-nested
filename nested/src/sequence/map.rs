@@ -33,6 +33,18 @@ impl<Item: 'static> OuterViewPort<dyn SequenceView<Item = Item>> {
         port.inner().set_view(Some(map));
         port.into_outer()
     }
+
+    pub fn filter_map<
+        DstItem: Clone + 'static,
+        F: Fn(&Item) -> Option<DstItem> + Send + Sync + 'static
+    >(
+        &self,
+        f: F
+    ) -> OuterViewPort<dyn SequenceView<Item = DstItem>> {
+        self.map(f)
+            .filter(|x| x.is_some())
+            .map(|x| x.clone().unwrap())
+    }
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
