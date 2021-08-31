@@ -6,6 +6,7 @@ use {
     crate::{
         core::{ViewPort, OuterViewPort, Observer},
         singleton::{SingletonView, SingletonBuffer},
+        sequence::{SequenceView},
         vec::VecBuffer,
         terminal::{TerminalAtom, TerminalStyle, TerminalView, TerminalEvent, TerminalEditor, TerminalEditorResult},
         tree_nav::{TreeNav, TreeNavResult, TerminalTreeEditor, TreeCursor},
@@ -34,7 +35,7 @@ impl DigitEditor {
     pub fn get_data_port(&self) -> OuterViewPort<dyn SingletonView<Item = Option<u32>>> {
         let radix = self.radix;
         self.data_port.outer().map(
-            move |c| c.unwrap_or('?').to_digit(radix)
+            move |c| c?.to_digit(radix)
         )
     }
 }
@@ -95,6 +96,12 @@ impl PosIntEditor {
             )
         }
     }
+
+    pub fn get_data_port(&self) -> OuterViewPort<dyn SequenceView<Item = u32>> {
+        let radix = self.radix;
+        self.digits_editor.get_data_port()
+            .filter_map(move |digit_editor| digit_editor.read().unwrap().data.get()?.to_digit(radix))
+    }
 }
 
 impl TreeNav for PosIntEditor {
@@ -105,7 +112,7 @@ impl TreeNav for PosIntEditor {
     fn pxev(&mut self) -> TreeNavResult  { self.digits_editor.pxev() }
     fn nexd(&mut self) -> TreeNavResult  { self.digits_editor.nexd() }
     fn up(&mut self) -> TreeNavResult { self.digits_editor.up() }
-    fn dn(&mut self) -> TreeNavResult { TreeNavResult::Exit }
+    fn dn(&mut self) -> TreeNavResult { self.digits_editor.dn() }
 }
 
 impl TerminalEditor for PosIntEditor {
@@ -132,6 +139,7 @@ impl TerminalEditor for PosIntEditor {
         match event {
             TerminalEvent::Input(Event::Key(Key::Char(' '))) |
             TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {
+                self.digits_editor.up();
                 TerminalEditorResult::Exit
             }
 

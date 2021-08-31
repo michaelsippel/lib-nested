@@ -1,12 +1,15 @@
 use {
+    std::sync::Arc,
     std::sync::RwLock,
     termion::event::{Key, Event},
     crate::{
         core::{ViewPort, OuterViewPort},
         singleton::{SingletonView, SingletonBuffer},
+        sequence::{SequenceView},
         vec::VecBuffer,
         terminal::{TerminalView, TerminalStyle, TerminalEvent, TerminalEditor, TerminalEditorResult},
-        tree_nav::{TreeNav, TreeNavResult}
+        list::{ListEditor, sexpr::ListDecoration},
+        tree_nav::{TreeNav, TreeNavResult, TreeCursor}
     }
 };
 
@@ -64,30 +67,63 @@ impl TerminalEditor for CharEditor {
     }
 }
 
-/*
-pub struct ArgListEditor {
-    
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+
+pub struct StringEditor {
+    chars_editor: ListEditor< CharEditor,
+                              Box<dyn Fn() -> Arc<RwLock<CharEditor>> + Send + Sync + 'static> >
 }
 
-impl TreeNav for ArgListEditor {
-    
+impl StringEditor {
+    pub fn new() -> Self {
+        StringEditor {
+            chars_editor: ListEditor::new(
+                Box::new(
+                    move || {
+                        Arc::new(RwLock::new(CharEditor::new()))
+                    }
+                ),
+                crate::list::ListEditorStyle::String
+            )
+        }
+    }
+
+    pub fn get_data_port(&self) -> OuterViewPort<dyn SequenceView<Item = char>> {
+        self.chars_editor.get_data_port()
+            .map(
+                |char_editor| char_editor.read().unwrap().data.get().unwrap()
+            )
+    }
 }
 
-impl TerminalEditor for ArgListEditor {
+impl TreeNav for StringEditor {
+    fn get_cursor(&self) -> TreeCursor { self.chars_editor.get_cursor() }
+    fn goto(&mut self, cur: TreeCursor) -> TreeNavResult  { self.chars_editor.goto(cur) }
+    fn goto_home(&mut self) -> TreeNavResult  { self.chars_editor.goto_home() }
+    fn goto_end(&mut self) -> TreeNavResult  { self.chars_editor.goto_end() }
+    fn pxev(&mut self) -> TreeNavResult  { self.chars_editor.pxev() }
+    fn nexd(&mut self) -> TreeNavResult  { self.chars_editor.nexd() }
+    fn up(&mut self) -> TreeNavResult { self.chars_editor.up() }
+    fn dn(&mut self) -> TreeNavResult { TreeNavResult::Exit }
+}
+
+impl TerminalEditor for StringEditor {
     fn get_term_view(&self) -> OuterViewPort<dyn TerminalView> {
-        
+        self.chars_editor
+            .get_seg_seq_view()
+            .decorate("\"", "\"", "", 1)
+            .to_grid_horizontal()
+            .flatten()
     }
 
     fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
         match event {
-            TerminalEvent::Input(Event::Key(Key::Char(' '))) => {
-                // list.get_arg()
-                // split
+            TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {
+                self.chars_editor.up();
+                TerminalEditorResult::Exit
             }
-            _ => {
-                
-            }
+            event => self.chars_editor.handle_terminal_event(event)
         }
     }
 }
-*/
+
