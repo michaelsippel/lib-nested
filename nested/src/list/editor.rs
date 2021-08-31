@@ -130,7 +130,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
                 mode: new_cur.leaf_mode,
                 idx: None
             });
-            TreeNavResult::Exit
+            TreeNavResult::Continue
         }
     }
 
@@ -328,12 +328,12 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
                         );
                     }
                 }
+                TreeNavResult::Continue
             }
             ListCursorMode::Modify => {
-                self.get_item().unwrap().write().unwrap().dn();
+                self.get_item().unwrap().write().unwrap().dn()
             }
         }
-        TreeNavResult::Continue
     }
 
     fn pxev(&mut self) -> TreeNavResult {

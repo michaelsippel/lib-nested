@@ -210,10 +210,13 @@ write::
                         }
                     }
                     TerminalEvent::Input(Event::Key(Key::Up)) => { te.up(); }
-                    TerminalEvent::Input(Event::Key(Key::Down)) => { te.dn(); te.goto_home(); }
+                    TerminalEvent::Input(Event::Key(Key::Down)) => {
+                        if te.dn() == TreeNavResult::Continue {
+                            te.goto_home();
+                        }
+                    }
                     TerminalEvent::Input(Event::Key(Key::Home)) => {
                         if te.goto_home() == TreeNavResult::Exit {
-
                             te.goto_home();
                         }
                     }
@@ -334,6 +337,10 @@ write::
                         status_chars.push(TerminalAtom::new(c, TerminalStyle::fg_color((200, 200, 20))));
                     }
                     status_chars.push(TerminalAtom::new(':', TerminalStyle::fg_color((120, 80, 80)).add(TerminalStyle::bold(true))));
+                } else {
+                    for c in "Press <DN> to enter".chars() {
+                        status_chars.push(TerminalAtom::new(c, TerminalStyle::fg_color((200, 200, 20))));
+                    }
                 }
             }
 
