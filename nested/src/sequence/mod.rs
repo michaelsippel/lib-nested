@@ -19,6 +19,40 @@ pub trait SequenceView : View<Msg = usize> {
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
+pub trait SequenceViewExt : SequenceView {
+    fn iter<'a>(&'a self) -> SequenceViewIter<'a, Self> {
+        SequenceViewIter {
+            view: self,
+            cur: 0
+        }
+    }
+}
+
+impl<V: SequenceView + ?Sized> SequenceViewExt for V {}
+
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+
+pub struct SequenceViewIter<'a, V>
+where V: SequenceView + ?Sized
+{
+    view: &'a V,
+    cur: usize
+}
+
+impl<'a, V> Iterator for SequenceViewIter<'a, V>
+where V: SequenceView + ?Sized
+{
+    type Item = V::Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let i = self.cur;
+        self.cur += 1;
+        self.view.get(&i)
+    }
+}
+
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+
 use std::{
     sync::Arc,
     ops::{Deref}
