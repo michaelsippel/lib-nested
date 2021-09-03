@@ -43,10 +43,6 @@ impl TerminalEditor for CharEditor {
             } else {
                 "".to_string()
             })
-            .map_item(
-                |_idx, atom|
-                atom.add_style_back(TerminalStyle::fg_color((120, 200, 10)))
-        )
     }
 
     fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
@@ -114,6 +110,10 @@ impl TerminalEditor for StringEditor {
             .decorate("\"", "\"", "", 1)
             .to_grid_horizontal()
             .flatten()
+            .map_item(
+                |_idx, atom|
+                atom.add_style_back(TerminalStyle::fg_color((120, 200, 10)))
+            )
     }
 
     fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {

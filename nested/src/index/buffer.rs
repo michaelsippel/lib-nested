@@ -77,5 +77,10 @@ where Key: Clone + Hash + Eq + Send + Sync + 'static,
             self.insert(key, item);
         }
     }
+
+    pub fn remove(&mut self, key: Key) {
+        self.data.write().unwrap().remove(&key);
+        self.cast.notify(&key);        
+    }
 }
 
