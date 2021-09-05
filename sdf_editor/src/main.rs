@@ -7,6 +7,7 @@ use{
             View,
             ViewPort,
             Observer,
+            ObserverExt,
             OuterViewPort,
             port::UpdateTask
         },
@@ -41,7 +42,7 @@ impl ColorCollector {
             let r = l.get(&0).unwrap_or(0);
             let g = l.get(&1).unwrap_or(0);
             let b = l.get(&2).unwrap_or(0);
-            println!("Set r: {}", r);
+
             self.color.set((r as u8, g as u8, b as u8));
         }
     }
@@ -82,13 +83,15 @@ async fn main() {
     let color_port = ViewPort::new();
     let color_collector = Arc::new(RwLock::new(ColorCollector {
         src_view: None,
-        color: SingletonBuffer::new((0, 0, 0), color_port.inner())
+        color: SingletonBuffer::new((200, 200, 0), color_port.inner())
     }));
 
-    color_editor.get_data_port().map(
+    let col_seq_port = color_editor.get_data_port().map(
         |sub_editor| sub_editor.read().unwrap().get_value()
-    ).add_observer(
-        color_collector
+    );
+    color_port.add_update_hook(Arc::new(col_seq_port.0.clone()));
+    col_seq_port.add_observer(
+        color_collector.clone()
     );
 
     compositor.write().unwrap().push(color_editor.get_term_view().offset(Vector2::new(2, 2)));
@@ -98,9 +101,16 @@ async fn main() {
     async_std::task::spawn(
         async move {
             loop {
-                term_port.update();
                 color_port.update();
+                term_port.update();
                 match term.next_event().await {
+                    TerminalEvent::Resize(new_size) => {
+                        term_port.inner().get_broadcast().notify_each(
+                            nested::grid::GridWindowIterator::from(
+                                Point2::new(0,0) .. Point2::new(new_size.x, new_size.y)
+                            )
+                        );
+                    }
                     TerminalEvent::Input(Event::Key(Key::Ctrl('c'))) |
                     TerminalEvent::Input(Event::Key(Key::Ctrl('g'))) |
                     TerminalEvent::Input(Event::Key(Key::Ctrl('d'))) => break,
