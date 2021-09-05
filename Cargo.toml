@@ -4,6 +4,7 @@ members = [
     "terminal/display_server",
     "terminal/ansi_parser",
     "shell",
+    "sdf_editor",
     "math/str2int",
     "math/int2str",
     "math/radix_transform",

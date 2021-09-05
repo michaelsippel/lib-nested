@@ -1,0 +1,18 @@
+[package]
+name = "sdf_editor"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nako = {git= "https://gitlab.com/tendsinmende/nako.git"}
+nako_std = {git= "https://gitlab.com/tendsinmende/nako.git"}
+nakorender = {git="https://gitlab.com/tendsinmende/nako.git", default-features = false}
+nested = { path = "../nested" }
+cgmath = "*"
+termion = "*"
+
+[dependencies.async-std]
+version = "1.9.0"
+features = ["unstable", "attributes"]

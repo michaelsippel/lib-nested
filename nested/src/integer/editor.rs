@@ -6,7 +6,7 @@ use {
     crate::{
         core::{ViewPort, OuterViewPort, Observer},
         singleton::{SingletonView, SingletonBuffer},
-        sequence::{SequenceView},
+        sequence::{SequenceView, SequenceViewExt},
         vec::VecBuffer,
         terminal::{TerminalAtom, TerminalStyle, TerminalView, TerminalEvent, TerminalEditor, TerminalEditorResult},
         tree_nav::{TreeNav, TreeNavResult, TerminalTreeEditor, TreeCursor},
@@ -101,6 +101,17 @@ impl PosIntEditor {
         let radix = self.radix;
         self.digits_editor.get_data_port()
             .filter_map(move |digit_editor| digit_editor.read().unwrap().data.get()?.to_digit(radix))
+    }
+
+    pub fn get_value(&self) -> u32 {
+        let mut value = 0;
+        let mut weight = 1;
+        for digit_value in self.get_data_port().get_view().unwrap().iter() {
+            value += digit_value * weight;
+            weight *= self.radix;
+        }
+
+        value
     }
 }
 
