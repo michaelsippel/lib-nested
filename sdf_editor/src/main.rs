@@ -14,7 +14,7 @@ use{
         singleton::{SingletonBuffer, SingletonView},
         sequence::{SequenceView},
         integer::{PosIntEditor},
-        terminal::{Terminal, TerminalCompositor, TerminalEvent, TerminalEditor},
+        terminal::{Terminal, TerminalAtom, TerminalStyle, TerminalCompositor, TerminalEvent, TerminalEditor},
         list::{ListEditor},
         tree_nav::{TreeNav}
     },
@@ -26,9 +26,17 @@ use{
             volumetric::{Color, Union, Round},
         },
     },
-    nakorender::{backend::{Backend, LayerInfo}, winit, camera::Camera2d}
+    nakorender::{
+        backend::{Backend, LayerId, LayerId2d, LayerInfo},
+        marp::MarpBackend,
+        winit, camera::Camera2d
+    },
+    nako_std::{
+        text::Character
+    },
+    std::{fs::File, io::Read, mem::needs_drop, path::Path},
+    font_kit::font::Font,
 };
-
 
 // projects a Sequence of ints to a color tuple
 struct ColorCollector {
@@ -56,6 +64,64 @@ impl Observer<dyn SequenceView<Item = u32>> for ColorCollector {
 
     fn notify(&mut self, idx: &usize) {
         self.update();
+    }
+}
+
+
+struct TermAtomSDF {
+    atom: TerminalAtom
+}
+
+impl TermAtomSDF {
+    fn new(atom: TerminalAtom) -> Self {
+        TermAtomSDF {
+            atom
+        }
+    }
+
+    fn update_bg(&self, layer_id: LayerId2d, renderer: &mut MarpBackend) {
+        let (r,g,b) = self.atom.style.bg_color.unwrap_or((0, 0, 0));
+       
+        let stream = PrimaryStream2d::new()
+            .push(
+                SecondaryStream2d::new(
+                    Union,
+                    Box2d {
+                        extent: Vec2::new(0.5, 1.0)
+                    }
+                ).push_mod(
+                    Color(
+                        Vec3::new(
+                            (r as f32 / 255.0).clamp(0.0, 1.0),
+                            (g as f32 / 255.0).clamp(0.0, 1.0),
+                            (b as f32 / 255.0).clamp(0.0, 1.0),
+                        )
+                    )
+                ).build()
+            ).build();
+
+        renderer.update_sdf_2d(layer_id, stream);
+    }
+
+    fn update_ch(&self, layer_id: LayerId2d, renderer: &mut MarpBackend) {
+        if let Some(c) = self.atom.c {
+            let font = Font::from_path(Path::new("/usr/share/fonts/TTF/FiraCode-Light.ttf"),0).unwrap();
+            let mut ch = Character::from_font(&font, c).with_size(1.0).with_tesselation_factor(0.2);
+
+            let (r,g,b) = self.atom.style.fg_color.unwrap_or((0, 0, 0));
+
+            ch.color = Vec3::new(
+                (r as f32 / 255.0).clamp(0.0, 1.0),
+                (g as f32 / 255.0).clamp(0.0, 1.0),
+                (b as f32 / 255.0).clamp(0.0, 1.0),
+            );
+
+            let mut stream = PrimaryStream2d::new();
+            stream = ch.record_character(stream);
+            renderer.update_sdf_2d(layer_id, stream.build());
+        } else {
+            renderer.update_sdf_2d(layer_id, PrimaryStream2d::new().build());
+        }
     }
 }
 
@@ -126,6 +192,7 @@ async fn main() {
                     }
                     TerminalEvent::Input(Event::Key(Key::Down)) => {
                         color_editor.dn();
+                        color_editor.goto_home();
                     }
                     TerminalEvent::Input(Event::Key(Key::Home)) => {
                         color_editor.goto_home();
@@ -144,20 +211,31 @@ async fn main() {
     async_std::task::spawn(async move {
         term_writer.show().await.expect("output error!");
     });
-
-
+    
     let event_loop = nakorender::winit::event_loop::EventLoop::new();
     let window = nakorender::winit::window::Window::new(&event_loop).unwrap();
     let mut renderer = nakorender::marp::MarpBackend::new(&window, &event_loop);
 
-    let id = renderer.new_layer_2d();
-    renderer.set_layer_order(&[id.into()]);
-    renderer.update_camera_2d(id, Camera2d{
-        extent: Vec2::new(2.0, 2.0),
-        location: Vec2::new(-1.0, -1.0),
+    let bg_id = renderer.new_layer_2d();
+    renderer.update_camera_2d(bg_id, Camera2d{
+        extent: Vec2::new(10.0, 10.0),
+        location: Vec2::new(0.0, 0.0),
         rotation: 0.0
     });
-    
+
+    let ch_id = renderer.new_layer_2d();
+    renderer.update_camera_2d(ch_id, Camera2d{
+        extent: Vec2::new(10.0, 10.0),
+        location: Vec2::new(0.0, 0.0),
+        rotation: 0.0
+    });
+
+    renderer.set_layer_order(&[bg_id.into(), ch_id.into()]);
+
+    let asdf = TermAtomSDF::new(TerminalAtom::new('H', TerminalStyle::fg_color((98, 200, 60)).add(TerminalStyle::bg_color((40,40,40)))));
+    asdf.update_bg(bg_id, &mut renderer);
+    asdf.update_ch(ch_id, &mut renderer);
+
     event_loop.run(move |event, _target, control_flow|{
         //Set to polling for now, might be overwritten
         //TODO: Maybe we want to use "WAIT" for the ui thread? However, the renderers don't work that hard
@@ -171,7 +249,12 @@ async fn main() {
         match event{
             winit::event::Event::WindowEvent{window_id: _, event: winit::event::WindowEvent::Resized(newsize)} => {
                 //update layer to cover whole window again.
-                renderer.set_layer_info(id.into(), LayerInfo{
+                renderer.set_layer_info(bg_id.into(), LayerInfo{
+                    extent: (newsize.width as usize, newsize.height as usize),
+                    location: (0,0)
+                });
+
+                renderer.set_layer_info(ch_id.into(), LayerInfo{
                     extent: (newsize.width as usize, newsize.height as usize),
                     location: (0,0)
                 });
@@ -179,10 +262,7 @@ async fn main() {
             winit::event::Event::MainEventsCleared => {
                 window.request_redraw();
             }
-            winit::event::Event::RedrawRequested(_) => {
-                let new_sdf = sdf_from_color(color_view.get());
-                renderer.update_sdf_2d(id, new_sdf);
-
+            winit::event::Event::RedrawRequested(_) => {                
                 renderer.render(&window);
             }
             _ => {},
@@ -191,20 +271,25 @@ async fn main() {
     })
 }
 
-
-
-fn sdf_from_color(c: (u8, u8, u8)) -> PrimaryStream2d{
+fn sdf_from_color(c: (u8, u8, u8)) -> PrimaryStream2d {
     PrimaryStream2d::new()
         .push(
             SecondaryStream2d::new(
                 Union,
-                Box2d{extent: Vec2::new(0.5, 0.5)}
-            ).push_mod(Color(
-                Vec3::new(
-                    (c.0 as f32 / 255.0).clamp(0.0, 1.0),
-                    (c.1 as f32 / 255.0).clamp(0.0, 1.0),
-                    (c.2 as f32 / 255.0).clamp(0.0, 1.0),
+                Box2d {
+                    extent: Vec2::new(0.5, 0.5)
+                }
+            ).push_mod(
+                Color(
+                    Vec3::new(
+                        (c.0 as f32 / 255.0).clamp(0.0, 1.0),
+                        (c.1 as f32 / 255.0).clamp(0.0, 1.0),
+                        (c.2 as f32 / 255.0).clamp(0.0, 1.0),
+                    )
                 )
-            )).push_mod(Round{radius: 0.2}).build()
+            ).push_mod(
+                Round{radius: 0.2}
             ).build()
+        ).build()
 }
+
