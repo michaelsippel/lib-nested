@@ -111,7 +111,7 @@ impl TermAtomSDF {
         let mut stream = PrimaryStream2d::new();
         
         if let Some(c) = self.atom.c {
-            let font = Font::from_path(Path::new("/usr/share/fonts/TTF/FiraCode-Light.ttf"),0).unwrap();
+            let font = Font::from_path(Path::new("/usr/share/fonts/TTF/FiraCode-Medium.ttf"),0).unwrap();
             let mut ch = Character::from_font(&font, c).with_size(1.0).with_tesselation_factor(0.01);
 
             let (r,g,b) = self.atom.style.fg_color.unwrap_or((0, 0, 0));
@@ -131,42 +131,29 @@ impl TermAtomSDF {
 
 struct SdfTerm {
     src_view: Arc<dyn TerminalView>,
-    bg_layers: HashMap<Point2<i16>, LayerId2d>,
-    ch_layers: HashMap<Point2<i16>, LayerId2d>,
+    bg_layers: HashMap<Point2<i16>, (bool, LayerId2d)>,
+    ch_layers: HashMap<Point2<i16>, (bool, LayerId2d)>,
     renderer: Arc<Mutex<MarpBackend>>
 }
 
 impl SdfTerm {
-    fn update_order(&mut self) {
-        self.renderer.lock().unwrap().set_layer_order(
-                vec![
-                    self.bg_layers.iter().filter(
-                        |(pt, _)|
-                        if let Some(a) = self.src_view.get(pt) {
-                            a.style.bg_color.is_some()
-                        } else {
-                            false
-                        }
-                    )
-                        .collect::<Vec<_>>()
-                        .into_iter(),
-                    self.ch_layers.iter().filter(
-                        |(pt, _)|
-                        if let Some(a) = self.src_view.get(pt) {
-                            a.c.is_some()
-                        } else {
-                            false
-                        }
-                    )
-                        .collect::<Vec<_>>()
-                        .into_iter()
-                ]
-                .into_iter()
-                .flatten()
-                .map(|(_,id)| (*id).into())
+    fn get_order(&mut self) -> Vec<LayerId> {
+        vec![
+            self.bg_layers.iter().filter(
+                |(_pt, (active, _id))| *active
+            )
                 .collect::<Vec<_>>()
-                .as_slice()
-        );
+                .into_iter(),
+            self.ch_layers.iter().filter(
+                |(_pt, (active, _id))| *active
+            )
+                .collect::<Vec<_>>()
+                .into_iter()
+        ]
+            .into_iter()
+            .flatten()
+            .map(|(_,(_,id))| (*id).into())
+            .collect::<Vec<_>>()
     }
 
     fn update(&mut self, pt: &Point2<i16>) {
@@ -187,7 +174,7 @@ impl SdfTerm {
                     location: (pt.x as usize * 60, pt.y as usize * 100)
                 });
 
-            self.bg_layers.insert(*pt, id);
+            self.bg_layers.insert(*pt, (false, id));
         }
         if self.ch_layers.get(pt).is_none() {
             let id = self.renderer.lock().unwrap().new_layer_2d();
@@ -206,13 +193,22 @@ impl SdfTerm {
                     location: (pt.x as usize * 60, pt.y as usize * 100)
                 });
 
-            self.ch_layers.insert(*pt, id);
+            self.ch_layers.insert(*pt, (false, id));
         }
 
         if let Some(atom) = self.src_view.get(pt) {
             let atom_stream_builder = TermAtomSDF::new(atom);
-            atom_stream_builder.update_bg(*self.bg_layers.get(pt).unwrap(), &mut *self.renderer.lock().unwrap());
-            atom_stream_builder.update_ch(*self.ch_layers.get(pt).unwrap(), &mut *self.renderer.lock().unwrap());
+            atom_stream_builder.update_bg(self.bg_layers.get(pt).unwrap().1, &mut *self.renderer.lock().unwrap());
+            atom_stream_builder.update_ch(self.ch_layers.get(pt).unwrap().1, &mut *self.renderer.lock().unwrap());
+
+            let has_bg = atom.style.bg_color.is_some();
+            let has_fg = atom.c.unwrap_or(' ') != ' ';
+
+            self.bg_layers.get_mut(pt).unwrap().0 = has_bg;
+            self.ch_layers.get_mut(pt).unwrap().0 = has_fg;
+        } else {
+            self.bg_layers.get_mut(pt).unwrap().0 = false;
+            self.ch_layers.get_mut(pt).unwrap().0 = false;
         }
     }
 }
@@ -236,7 +232,7 @@ async fn main() {
         || {
             Arc::new(RwLock::new(PosIntEditor::new(16)))
         },
-        nested::list::ListEditorStyle::Clist
+        nested::list::ListEditorStyle::Path
     );
 
     color_editor.goto(nested::tree_nav::TreeCursor {
@@ -258,7 +254,7 @@ async fn main() {
         color_collector.clone()
     );
 
-    compositor.write().unwrap().push(color_editor.get_term_view().offset(Vector2::new(2, 2)));
+    compositor.write().unwrap().push(color_editor.get_term_view().offset(Vector2::new(0, 0)));
 
     let color_view = color_port.outer().get_view();
 
@@ -328,6 +324,19 @@ async fn main() {
         term_writer.show().await.expect("output error!");
     });
 
+
+    
+    let color_layer_id = renderer.lock().unwrap().new_layer_2d();
+    renderer.lock().unwrap().update_camera_2d(color_layer_id, Camera2d{
+        extent: Vec2::new(4.0, 4.0),
+        location: Vec2::new(-2.0, -2.0),
+        rotation: 0.0
+    });
+    renderer.lock().unwrap().set_layer_info(color_layer_id.into(), LayerInfo{
+        extent: (600, 600),
+        location: (200,100)
+    });
+    
     event_loop.run(move |event, _target, control_flow|{
         //Set to polling for now, might be overwritten
         //TODO: Maybe we want to use "WAIT" for the ui thread? However, the renderer.lock().unwrap()s don't work that hard
@@ -344,11 +353,43 @@ async fn main() {
             }
             winit::event::Event::RedrawRequested(_) => {
                 for pt in nested::grid::GridWindowIterator::from(
-                    Point2::new(0, 0) .. Point2::new(10, 4)
+                    Point2::new(0, 0) .. Point2::new(30, 1)
                 ) {
                     sdf_term.write().unwrap().update(&pt);
                 }
-                sdf_term.write().unwrap().update_order();
+
+                let c = color_view.get();
+                let color_stream = PrimaryStream2d::new()
+                    .push(
+                        SecondaryStream2d::new(
+                            Union,
+                            Box2d {
+                                extent: Vec2::new(0.5, 0.5)
+                            }
+                        ).push_mod(
+                            Color(
+                                Vec3::new(
+                                    (c.0 as f32 / 255.0).clamp(0.0, 1.0),
+                                    (c.1 as f32 / 255.0).clamp(0.0, 1.0),
+                                    (c.2 as f32 / 255.0).clamp(0.0, 1.0),
+                                )
+                            )
+                        ).push_mod(
+                            Round{radius: 0.2}
+                        ).build()
+                    ).build();
+
+                renderer.lock().unwrap().update_sdf_2d(color_layer_id, color_stream);
+                renderer.lock().unwrap().set_layer_order(
+                    vec![
+                        sdf_term.write().unwrap().get_order().into_iter(),
+                        vec![ color_layer_id.into() ].into_iter()
+                    ]
+                        .into_iter()
+                        .flatten()
+                        .collect::<Vec<_>>()
+                        .as_slice()
+                );
 
                 renderer.lock().unwrap().render(&window);
             }
