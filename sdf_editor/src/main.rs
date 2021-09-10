@@ -177,7 +177,7 @@ impl SdfTerm {
 
             // foreground layer
             if let Some(c) = atom.c {
-                let font = Font::from_path(Path::new("/usr/share/fonts/TTF/FiraCode-Medium.ttf"),0).unwrap();
+                let font = Font::from_path(Path::new("/usr/share/fonts/TTF/FiraCode-Light.ttf"),0).unwrap();
                 let mut ch = Character::from_font(&font, c).with_size(1.0).with_tesselation_factor(0.01);
 
                 let (r,g,b) = atom.style.fg_color.unwrap_or((0, 0, 0));
@@ -223,14 +223,11 @@ async fn main() {
     let term_port = ViewPort::new();
     let compositor = TerminalCompositor::new(term_port.inner());
 
-    let mut term = Terminal::new(term_port.outer());
-    let term_writer = term.get_writer();
-
     let mut color_editor = ListEditor::new(
         || {
             Arc::new(RwLock::new(PosIntEditor::new(16)))
         },
-        nested::list::ListEditorStyle::Path
+        nested::list::ListEditorStyle::HorizontalSexpr
     );
 
     color_editor.goto(nested::tree_nav::TreeCursor {
@@ -253,56 +250,6 @@ async fn main() {
     );
 
     compositor.write().unwrap().push(color_editor.get_term_view().offset(Vector2::new(0, 0)));
-
-    let tp = term_port.clone();
-    async_std::task::spawn(
-        async move {
-            loop {
-                match term.next_event().await {
-                    TerminalEvent::Resize(mut new_size) => {
-                        new_size.x = 10;
-                        new_size.y = 5;
-                        tp.inner().get_broadcast().notify_each(
-                            nested::grid::GridWindowIterator::from(
-                                Point2::new(0,0) .. Point2::new(new_size.x, new_size.y)
-                            )
-                        );
-                    }
-
-                    TerminalEvent::Input(Event::Key(Key::Ctrl('c'))) |
-                    TerminalEvent::Input(Event::Key(Key::Ctrl('g'))) |
-                    TerminalEvent::Input(Event::Key(Key::Ctrl('d'))) => break,
-
-                    TerminalEvent::Input(Event::Key(Key::Left)) => {
-                        color_editor.pxev();
-                    }
-                    TerminalEvent::Input(Event::Key(Key::Right)) => {
-                        color_editor.nexd();
-                    }
-                    TerminalEvent::Input(Event::Key(Key::Up)) => {
-                        color_editor.up();
-                    }
-                    TerminalEvent::Input(Event::Key(Key::Down)) => {
-                        color_editor.dn();
-                        color_editor.goto_home();
-                    }
-                    TerminalEvent::Input(Event::Key(Key::Home)) => {
-                        color_editor.goto_home();
-                    }
-                    TerminalEvent::Input(Event::Key(Key::End)) => {
-                        color_editor.goto_end();
-                    }
-                    event => {
-                        color_editor.handle_terminal_event(&event);
-                    }
-                }
-            }
-        }
-    );
-
-    async_std::task::spawn(async move {
-        term_writer.show().await.expect("output error!");
-    });
 
     let event_loop = nakorender::winit::event_loop::EventLoop::new();
     let window = nakorender::winit::window::Window::new(&event_loop).unwrap();
@@ -330,11 +277,112 @@ async fn main() {
         //TODO: Maybe we want to use "WAIT" for the ui thread? However, the renderer.lock().unwrap()s don't work that hard
         //if nothing changes. So should be okay for a alpha style programm.
         *control_flow = winit::event_loop::ControlFlow::Poll;
-        
+
         //now check if a rerender was requested, or if we worked on all
         //events on that batch
         match event{
             winit::event::Event::WindowEvent{window_id: _, event: winit::event::WindowEvent::Resized(newsize)} => {
+                
+            }
+            winit::event::Event::WindowEvent{window_id: _, event: winit::event::WindowEvent::KeyboardInput{ device_id, input, is_synthetic }} => {
+                if input.state == winit::event::ElementState::Pressed {
+                    if let Some(kc) = input.virtual_keycode {
+                        match kc {
+                            winit::event::VirtualKeyCode::Space |
+                            winit::event::VirtualKeyCode::Return => {
+                                color_editor.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Char(' '))));
+                            }
+                            winit::event::VirtualKeyCode::Key0 |
+                            winit::event::VirtualKeyCode::Numpad0 => {
+                                color_editor.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Char('0'))));
+                            }
+                            winit::event::VirtualKeyCode::Key1 |
+                            winit::event::VirtualKeyCode::Numpad1 => {
+                                color_editor.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Char('1'))));
+                            }
+                            winit::event::VirtualKeyCode::Key2 |
+                            winit::event::VirtualKeyCode::Numpad2 => {
+                                color_editor.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Char('2'))));
+                            }
+                            winit::event::VirtualKeyCode::Key3 |
+                            winit::event::VirtualKeyCode::Numpad3 => {
+                                color_editor.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Char('3'))));
+                            }
+                            winit::event::VirtualKeyCode::Key4 |
+                            winit::event::VirtualKeyCode::Numpad4 => {
+                                color_editor.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Char('4'))));
+                            }
+                            winit::event::VirtualKeyCode::Key5 |
+                            winit::event::VirtualKeyCode::Numpad5 => {
+                                color_editor.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Char('5'))));
+                            }
+                            winit::event::VirtualKeyCode::Key6 |
+                            winit::event::VirtualKeyCode::Numpad6 => {
+                                color_editor.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Char('6'))));
+                            }
+                            winit::event::VirtualKeyCode::Key7 |
+                            winit::event::VirtualKeyCode::Numpad7 => {
+                                color_editor.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Char('7'))));
+                            }
+                            winit::event::VirtualKeyCode::Key8 |
+                            winit::event::VirtualKeyCode::Numpad8 => {
+                                color_editor.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Char('8'))));
+                            }
+                            winit::event::VirtualKeyCode::Key9 |
+                            winit::event::VirtualKeyCode::Numpad9 => {
+                                color_editor.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Char('9'))));
+                            }
+                            winit::event::VirtualKeyCode::A => {
+                                color_editor.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Char('a'))));
+                            }
+                            winit::event::VirtualKeyCode::B => {
+                                color_editor.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Char('b'))));
+                            }
+                            winit::event::VirtualKeyCode::C => {
+                                color_editor.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Char('c'))));
+                            }
+                            winit::event::VirtualKeyCode::D => {
+                                color_editor.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Char('d'))));
+                            }
+                            winit::event::VirtualKeyCode::E => {
+                                color_editor.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Char('e'))));
+                            }
+                            winit::event::VirtualKeyCode::F => {
+                                color_editor.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Char('f'))));
+                            }
+                            winit::event::VirtualKeyCode::Tab => {
+                                color_editor.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Insert)));
+                            }
+                            winit::event::VirtualKeyCode::Delete => {
+                                color_editor.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Delete)));
+                            }
+                            winit::event::VirtualKeyCode::Back => {
+                                color_editor.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Backspace)));
+                            }
+                            winit::event::VirtualKeyCode::Left => {
+                                color_editor.pxev();
+                            }
+                            winit::event::VirtualKeyCode::Right => {
+                                color_editor.nexd();
+                            }
+                            winit::event::VirtualKeyCode::Up => {
+                                color_editor.up();
+                            }
+                            winit::event::VirtualKeyCode::Down => {
+                                color_editor.dn();
+                                color_editor.goto_home();
+                            }
+                            winit::event::VirtualKeyCode::Home => {
+                                color_editor.goto_home();
+                            }
+                            winit::event::VirtualKeyCode::End => {
+                                color_editor.goto_end();
+                            }
+                            _ => {
+                            }
+                        }
+                    }
+                }
             }
             winit::event::Event::MainEventsCleared => {
                 window.request_redraw();
@@ -367,8 +415,8 @@ async fn main() {
                 renderer.lock().unwrap().update_sdf_2d(color_layer_id, color_stream);
                 renderer.lock().unwrap().set_layer_order(
                     vec![
-                        sdf_term.read().unwrap().get_order().into_iter(),
-                        vec![ color_layer_id.into() ].into_iter()
+                        vec![ color_layer_id.into() ].into_iter(),
+                        sdf_term.read().unwrap().get_order().into_iter()
                     ]
                         .into_iter()
                         .flatten()
