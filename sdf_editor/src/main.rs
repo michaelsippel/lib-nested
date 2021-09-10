@@ -92,20 +92,18 @@ impl SdfTerm {
 
     pub fn get_order(&mut self) -> Vec<LayerId> {
         vec![
-            self.bg_layers.iter().filter(
-                |(_pt, (active, _id))| *active
-            )
-                .collect::<Vec<_>>()
-                .into_iter(),
-            self.fg_layers.iter().filter(
-                |(_pt, (active, _id))| *active
-            )
-                .collect::<Vec<_>>()
-                .into_iter()
+            self.bg_layers.iter(),
+            self.fg_layers.iter()
         ]
             .into_iter()
             .flatten()
-            .map(|(_,(_,id))| (*id).into())
+            .filter_map(
+                |(_pt,(active,id))|
+                if *active {
+                    Some((*id).into())
+                } else {
+                    None
+                })
             .collect::<Vec<_>>()
     }
 
@@ -274,8 +272,6 @@ async fn main() {
                                 Point2::new(0,0) .. Point2::new(new_size.x, new_size.y)
                             )
                         );
-
-                        
                     }
                     TerminalEvent::Input(Event::Key(Key::Ctrl('c'))) |
                     TerminalEvent::Input(Event::Key(Key::Ctrl('g'))) |
