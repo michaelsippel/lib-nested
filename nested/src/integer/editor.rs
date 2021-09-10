@@ -106,7 +106,7 @@ impl PosIntEditor {
     pub fn get_value(&self) -> u32 {
         let mut value = 0;
         let mut weight = 1;
-        for digit_value in self.get_data_port().get_view().unwrap().iter() {
+        for digit_value in self.get_data_port().get_view().unwrap().iter().collect::<Vec<_>>().into_iter().rev() {
             value += digit_value * weight;
             weight *= self.radix;
         }
