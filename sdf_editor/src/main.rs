@@ -1,3 +1,4 @@
+
 use{
     std::{
         sync::{Arc, RwLock, Mutex},
@@ -70,81 +71,33 @@ impl Observer<dyn SequenceView<Item = u32>> for ColorCollector {
     }
 }
 
-
-struct TermAtomSDF {
-    atom: TerminalAtom
-}
-
-impl TermAtomSDF {
-    fn new(atom: TerminalAtom) -> Self {
-        TermAtomSDF {
-            atom
-        }
-    }
-
-    fn update_bg(&self, layer_id: LayerId2d, renderer: &mut MarpBackend) {
-        let mut stream = PrimaryStream2d::new();
-
-        let (r,g,b) = self.atom.style.bg_color.unwrap_or((0,0,0));
-
-            stream = stream.push(
-                SecondaryStream2d::new(
-                    Union,
-                    Box2d {
-                        extent: Vec2::new(0.6, 1.0)
-                    }
-                ).push_mod(
-                    Color(
-                        Vec3::new(
-                            (r as f32 / 255.0).clamp(0.0, 1.0),
-                            (g as f32 / 255.0).clamp(0.0, 1.0),
-                            (b as f32 / 255.0).clamp(0.0, 1.0),
-                        )
-                    )
-                ).build()
-            );
-
-        renderer.update_sdf_2d(layer_id, stream.build());
-    }
-
-    fn update_ch(&self, layer_id: LayerId2d, renderer: &mut MarpBackend) {
-        let mut stream = PrimaryStream2d::new();
-        
-        if let Some(c) = self.atom.c {
-            let font = Font::from_path(Path::new("/usr/share/fonts/TTF/FiraCode-Medium.ttf"),0).unwrap();
-            let mut ch = Character::from_font(&font, c).with_size(1.0).with_tesselation_factor(0.01);
-
-            let (r,g,b) = self.atom.style.fg_color.unwrap_or((0, 0, 0));
-
-            ch.color = Vec3::new(
-                (r as f32 / 255.0).clamp(0.0, 1.0),
-                (g as f32 / 255.0).clamp(0.0, 1.0),
-                (b as f32 / 255.0).clamp(0.0, 1.0),
-            );
-
-            stream = ch.record_character(stream);
-        }
-
-        renderer.update_sdf_2d(layer_id, stream.build());
-    }
-}
-
 struct SdfTerm {
-    src_view: Arc<dyn TerminalView>,
+    pub src_view: Option<Arc<dyn TerminalView>>,
     bg_layers: HashMap<Point2<i16>, (bool, LayerId2d)>,
-    ch_layers: HashMap<Point2<i16>, (bool, LayerId2d)>,
+    fg_layers: HashMap<Point2<i16>, (bool, LayerId2d)>,
+    font: Font,
     renderer: Arc<Mutex<MarpBackend>>
 }
 
 impl SdfTerm {
-    fn get_order(&mut self) -> Vec<LayerId> {
+    pub fn new(renderer: Arc<Mutex<MarpBackend>>) -> Self {
+        SdfTerm {
+            src_view: None,
+            bg_layers: HashMap::new(),
+            fg_layers: HashMap::new(),
+            font: Font::from_path(Path::new("/usr/share/fonts/TTF/FiraCode-Medium.ttf"),0).unwrap(),
+            renderer
+        }
+    }
+
+    pub fn get_order(&mut self) -> Vec<LayerId> {
         vec![
             self.bg_layers.iter().filter(
                 |(_pt, (active, _id))| *active
             )
                 .collect::<Vec<_>>()
                 .into_iter(),
-            self.ch_layers.iter().filter(
+            self.fg_layers.iter().filter(
                 |(_pt, (active, _id))| *active
             )
                 .collect::<Vec<_>>()
@@ -156,7 +109,7 @@ impl SdfTerm {
             .collect::<Vec<_>>()
     }
 
-    fn update(&mut self, pt: &Point2<i16>) {
+    pub fn update(&mut self, pt: &Point2<i16>) {
         if self.bg_layers.get(pt).is_none() {
             let id = self.renderer.lock().unwrap().new_layer_2d();
 
@@ -176,7 +129,7 @@ impl SdfTerm {
 
             self.bg_layers.insert(*pt, (false, id));
         }
-        if self.ch_layers.get(pt).is_none() {
+        if self.fg_layers.get(pt).is_none() {
             let id = self.renderer.lock().unwrap().new_layer_2d();
 
             self.renderer.lock().unwrap().update_camera_2d(
@@ -193,22 +146,68 @@ impl SdfTerm {
                     location: (pt.x as usize * 60, pt.y as usize * 100)
                 });
 
-            self.ch_layers.insert(*pt, (false, id));
+            self.fg_layers.insert(*pt, (false, id));
         }
 
         if let Some(atom) = self.src_view.get(pt) {
-            let atom_stream_builder = TermAtomSDF::new(atom);
-            atom_stream_builder.update_bg(self.bg_layers.get(pt).unwrap().1, &mut *self.renderer.lock().unwrap());
-            atom_stream_builder.update_ch(self.ch_layers.get(pt).unwrap().1, &mut *self.renderer.lock().unwrap());
 
+            // background layer
+            if let Some((r,g,b)) = atom.style.bg_color {
+                let mut stream = PrimaryStream2d::new()
+                    .push(
+                        SecondaryStream2d::new(
+                            Union,
+                            Box2d {
+                                extent: Vec2::new(0.6, 1.0)
+                            }
+                        ).push_mod(
+                            Color(
+                                Vec3::new(
+                                    (r as f32 / 255.0).clamp(0.0, 1.0),
+                                    (g as f32 / 255.0).clamp(0.0, 1.0),
+                                    (b as f32 / 255.0).clamp(0.0, 1.0),
+                                )
+                            )
+                        ).build()
+                    );
+
+                self.renderer.lock().unwrap().update_sdf_2d(self.bg_layers.get(pt).unwrap().1, stream.build());
+                self.bg_layers.get_mut(pt).unwrap().0 = true;
+            } else {
+                self.bg_layers.get_mut(pt).unwrap().0 = false;                
+            }
+
+            // foreground layer
+            if let Some(c) = atom.c {
+                let mut ch = Character::from_font(&self.font, c).with_size(1.0).with_tesselation_factor(0.01);
+
+                let (r,g,b) = atom.style.fg_color.unwrap_or((0, 0, 0));
+
+                ch.color = Vec3::new(
+                    (r as f32 / 255.0).clamp(0.0, 1.0),
+                    (g as f32 / 255.0).clamp(0.0, 1.0),
+                    (b as f32 / 255.0).clamp(0.0, 1.0),
+                );
+
+                let mut stream = PrimaryStream2d::new();
+                stream = ch.record_character(stream);
+
+                self.renderer.lock().unwrap().update_sdf_2d(self.fg_layers.get(pt).unwrap().1, stream.build());
+                self.fg_layers.get_mut(pt).unwrap().0 = true;
+            } else {
+                self.fg_layers.get_mut(pt).unwrap().0 = false;                
+            }
+            
+            
+            
             let has_bg = atom.style.bg_color.is_some();
             let has_fg = atom.c.unwrap_or(' ') != ' ';
 
             self.bg_layers.get_mut(pt).unwrap().0 = has_bg;
-            self.ch_layers.get_mut(pt).unwrap().0 = has_fg;
+            self.fg_layers.get_mut(pt).unwrap().0 = has_fg;
         } else {
             self.bg_layers.get_mut(pt).unwrap().0 = false;
-            self.ch_layers.get_mut(pt).unwrap().0 = false;
+            self.fg_layers.get_mut(pt).unwrap().0 = false;
         }
     }
 }
@@ -265,12 +264,8 @@ async fn main() {
     let window = nakorender::winit::window::Window::new(&event_loop).unwrap();
     let mut renderer = Arc::new(Mutex::new(nakorender::marp::MarpBackend::new(&window, &event_loop)));
 
-    let mut sdf_term = Arc::new(RwLock::new(SdfTerm {
-        src_view: term_port.outer().get_view().unwrap(),
-        bg_layers: HashMap::new(),
-        ch_layers: HashMap::new(),
-        renderer: renderer.clone()
-    }));
+    let mut sdf_term = Arc::new(RwLock::new(SdfTerm::new(renderer.clone())));
+    sdf_term.write().unwrap().src_view = term_port.outer().get_view();
     //term_port.outer().add_observer(sdf_term.clone());
 
     async_std::task::spawn(
@@ -324,7 +319,6 @@ async fn main() {
         term_writer.show().await.expect("output error!");
     });
 
-
     
     let color_layer_id = renderer.lock().unwrap().new_layer_2d();
     renderer.lock().unwrap().update_camera_2d(color_layer_id, Camera2d{
@@ -336,7 +330,7 @@ async fn main() {
         extent: (600, 600),
         location: (200,100)
     });
-    
+
     event_loop.run(move |event, _target, control_flow|{
         //Set to polling for now, might be overwritten
         //TODO: Maybe we want to use "WAIT" for the ui thread? However, the renderer.lock().unwrap()s don't work that hard

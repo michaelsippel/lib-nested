@@ -6,9 +6,9 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-nako = {git= "https://gitlab.com/senvas/nako.git"}
-nako_std = {git= "https://gitlab.com/senvas/nako.git"}
-nakorender = {git="https://gitlab.com/senvas/nako.git", default-features = false}
+nako = {git= "https://git.exobiont.de/senvas/nako.git"}
+nako_std = {git= "https://git.exobiont.de/senvas/nako.git"}
+nakorender = {git="https://git.exobiont.de/senvas/nako.git", default-features = false}
 nested = { path = "../nested" }
 cgmath = "*"
 termion = "*"
