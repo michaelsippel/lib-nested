@@ -197,14 +197,7 @@ impl SdfTerm {
             } else {
                 self.fg_layers.get_mut(pt).unwrap().0 = false;                
             }
-            
-            
-            
-            let has_bg = atom.style.bg_color.is_some();
-            let has_fg = atom.c.unwrap_or(' ') != ' ';
 
-            self.bg_layers.get_mut(pt).unwrap().0 = has_bg;
-            self.fg_layers.get_mut(pt).unwrap().0 = has_fg;
         } else {
             self.bg_layers.get_mut(pt).unwrap().0 = false;
             self.fg_layers.get_mut(pt).unwrap().0 = false;
