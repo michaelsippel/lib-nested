@@ -169,7 +169,7 @@ impl TermOutWriter {
             if let Some(view) = self.view.read().unwrap().as_ref() {
                 let mut out = self.out.write().unwrap();
 
-                for pos in dirty_pos.into_iter() {
+                for pos in dirty_pos.into_iter().filter(|p| p.x >= 0 && p.y >= 0) {
                     if pos != cur_pos {
                         write!(out, "{}", termion::cursor::Goto(pos.x as u16 + 1, pos.y as u16 + 1))?;
                     }
