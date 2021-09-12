@@ -72,10 +72,13 @@ impl Observer<dyn SequenceView<Item = u32>> for ColorCollector {
 }
 
 struct SdfTerm {
-    pub src_view: Option<Arc<dyn TerminalView>>,
+    src_view: Option<Arc<dyn TerminalView>>,
     bg_layers: HashMap<Point2<i16>, (bool, LayerId2d)>,
     fg_layers: HashMap<Point2<i16>, (bool, LayerId2d)>,
-    //font: Arc<RwLock<Font>>,
+
+    font_height: usize,
+    //font: Mutex<Font>,
+
     renderer: Arc<Mutex<MarpBackend>>
 }
 
@@ -85,7 +88,8 @@ impl SdfTerm {
             src_view: None,
             bg_layers: HashMap::new(),
             fg_layers: HashMap::new(),
-            //font: Arc::new(RwLock::new(Font::from_path(Path::new("/usr/share/fonts/TTF/FiraCode-Medium.ttf"),0).unwrap())),
+            font_height: 60,
+            //font: Mutex::new(Font::from_path(Path::new("/usr/share/fonts/TTF/FiraCode-Medium.ttf"),0).unwrap()),
             renderer
         }
     }
@@ -121,8 +125,8 @@ impl SdfTerm {
             self.renderer.lock().unwrap().set_layer_info(
                 id.into(),
                 LayerInfo {
-                    extent: (60, 100),
-                    location: (pt.x as usize * 60, pt.y as usize * 100)
+                    extent: (1 + self.font_height / 2, self.font_height),
+                    location: (pt.x as usize * self.font_height / 2, pt.y as usize * self.font_height)
                 });
 
             self.bg_layers.insert(*pt, (false, id));
@@ -140,8 +144,8 @@ impl SdfTerm {
             self.renderer.lock().unwrap().set_layer_info(
                 id.into(),
                 LayerInfo {
-                    extent: (60, 100),
-                    location: (pt.x as usize * 60, pt.y as usize * 100)
+                    extent: (1 + self.font_height / 2, self.font_height),
+                    location: (pt.x as usize * self.font_height / 2, pt.y as usize * self.font_height)
                 });
 
             self.fg_layers.insert(*pt, (false, id));
