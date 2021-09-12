@@ -24,7 +24,7 @@ use{
     },
     nako::{
         stream::{SecondaryStream2d, PrimaryStream2d},
-        glam::{Vec2, Vec3},
+        glam::{Vec2, Vec3, UVec2},
         operations::{
             planar::primitives2d::Box2d,
             volumetric::{Color, Union, Round},
@@ -76,7 +76,7 @@ struct SdfTerm {
     bg_layers: HashMap<Point2<i16>, (bool, LayerId2d)>,
     fg_layers: HashMap<Point2<i16>, (bool, LayerId2d)>,
 
-    font_height: usize,
+    font_height: u32,
     //font: Mutex<Font>,
 
     renderer: Arc<Mutex<MarpBackend>>
@@ -125,8 +125,8 @@ impl SdfTerm {
             self.renderer.lock().unwrap().set_layer_info(
                 id.into(),
                 LayerInfo {
-                    extent: (1 + self.font_height / 2, self.font_height),
-                    location: (pt.x as usize * self.font_height / 2, pt.y as usize * self.font_height)
+                    extent: UVec2::new(1 + self.font_height / 2, self.font_height),
+                    location: UVec2::new(pt.x as u32 * self.font_height / 2, pt.y as u32 * self.font_height)
                 });
 
             self.bg_layers.insert(*pt, (false, id));
@@ -144,8 +144,8 @@ impl SdfTerm {
             self.renderer.lock().unwrap().set_layer_info(
                 id.into(),
                 LayerInfo {
-                    extent: (1 + self.font_height / 2, self.font_height),
-                    location: (pt.x as usize * self.font_height / 2, pt.y as usize * self.font_height)
+                    extent: UVec2::new(1 + self.font_height / 2, self.font_height),
+                    location: UVec2::new(pt.x as u32 * self.font_height / 2, pt.y as u32 * self.font_height)
                 });
 
             self.fg_layers.insert(*pt, (false, id));
@@ -272,8 +272,8 @@ async fn main() {
         rotation: 0.0
     });
     renderer.lock().unwrap().set_layer_info(color_layer_id.into(), LayerInfo{
-        extent: (600, 600),
-        location: (200,100)
+        extent: UVec2::new(600, 600),
+        location: UVec2::new(200,100)
     });
 
     event_loop.run(move |event, _target, control_flow|{
