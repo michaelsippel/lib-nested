@@ -18,6 +18,7 @@ use{
             context::{ReprTree, Object, MorphismType, MorphismMode, Context},
             port::{UpdateTask}},
         index::{IndexView},
+        grid::{GridWindowIterator},
         sequence::{SequenceView, SequenceViewExt},
         vec::{VecBuffer},
         integer::{RadixProjection, DigitEditor, PosIntEditor},
@@ -38,6 +39,59 @@ use{
         process::ProcessLauncher
     }
 };
+
+
+struct AsciiBox {
+    content: Option<Arc<dyn TerminalView>>,
+    extent: Vector2<i16>
+}
+
+impl View for AsciiBox {
+    type Msg = Point2<i16>;
+}
+
+impl IndexView<Point2<i16>> for AsciiBox {
+    type Item = TerminalAtom;
+
+    fn get(&self, pt: &Point2<i16>) -> Option<TerminalAtom> {
+        if pt.x == 0 || pt.x == self.extent.x {
+            // vertical line
+            if pt.y == 0 && pt.x == 0 {
+                Some(TerminalAtom::from('╭'))
+            } else if pt.y == 0 && pt.x == self.extent.x {
+                Some(TerminalAtom::from('╮'))
+            } else if pt.y > 0 && pt.y < self.extent.y {
+                Some(TerminalAtom::from('│'))
+            } else if pt.y == self.extent.y && pt.x == 0 {
+                Some(TerminalAtom::from('╰'))
+            } else if pt.y == self.extent.y && pt.x == self.extent.x {
+                Some(TerminalAtom::from('╯'))
+            } else {                
+                None
+            }
+        } else if pt.y == 0 || pt.y == self.extent.y {
+            // horizontal line
+            if pt.x > 0 && pt.x < self.extent.x {
+                Some(TerminalAtom::from('─'))
+            } else {
+                None
+            }
+        } else if
+            pt.x < self.extent.x &&
+            pt.y < self.extent.y
+        {
+            self.content.get(&(pt - Vector2::new(1, 1)))
+        } else {
+            None
+        }
+    }
+
+    fn area(&self) -> Option<Vec<Point2<i16>>> {
+        Some(GridWindowIterator::from(
+            Point2::new(0, 0) ..= Point2::new(self.extent.x, self.extent.y)
+        ).collect())
+    }
+}
 
 #[async_std::main]
 async fn main() {
@@ -73,12 +127,13 @@ async fn main() {
             table_buf.insert_iter(vec![
                 (Point2::new(0, 0), magic.clone()),
                 (Point2::new(0, 1), status_chars_port.outer().to_sequence().to_grid_horizontal()),
+                (Point2::new(0, 2), magic.clone()),
             ]);
 
-            compositor.write().unwrap().push(monstera::make_monstera());
-            compositor.write().unwrap().push(table_port.outer().flatten().offset(Vector2::new(40, 2)));
+            //compositor.write().unwrap().push(monstera::make_monstera());
+            compositor.write().unwrap().push(table_port.outer().flatten());//.offset(Vector2::new(40, 2)));
 
-            let mut y = 2;
+            let mut y = 4;
 
             let mut process_launcher = ProcessLauncher::new();
             table_buf.insert(Point2::new(0, y), process_launcher.get_term_view());
@@ -87,7 +142,11 @@ async fn main() {
                 leaf_mode: ListCursorMode::Insert,
                 tree_addr: vec![ 0 ]
             });
-
+/*
+            let mut last_box = Arc::new(RwLock::new(AsciiBox{
+                
+            }));
+*/
             loop {
                 term_port.update();
                 match term.next_event().await {
@@ -124,8 +183,21 @@ async fn main() {
                     TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {
                         let output_view = process_launcher.launch();
 
+                        let range = output_view.get_view().unwrap().range();
+
+                        let box_port = ViewPort::new();
+                        let test_box = Arc::new(RwLock::new(AsciiBox {
+                            content: Some(output_view.map_item(|_,a| a.add_style_back(TerminalStyle::fg_color((230, 230, 230)))).get_view().unwrap()),
+                            extent: range.end - range.start + Vector2::new(1,1)
+                        }));
+
+                        box_port.inner().set_view(Some(test_box.clone() as Arc<dyn TerminalView>));
+
+                        table_buf.insert(Point2::new(0, y-1), ViewPort::new().outer());
                         y += 1;
-                        table_buf.insert(Point2::new(0, y), output_view);
+                        table_buf.insert(Point2::new(0, y), box_port.outer()
+                                                         .map_item(|_idx, x| x.add_style_back(TerminalStyle::fg_color((90, 120, 100))))
+                                                         .offset(Vector2::new(0, -1)));
 
                         process_launcher = ProcessLauncher::new();
                         process_launcher.goto(TreeCursor {
