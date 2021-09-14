@@ -147,7 +147,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
             );
             return TreeNavResult::Continue;
         }
-        
+
         if i < self.data.len() {
             match cur.mode {
                 ListCursorMode::Insert => {
@@ -327,6 +327,8 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
                             }
                         );
                     }
+                } else {
+                    self.goto_home();
                 }
                 TreeNavResult::Continue
             }
@@ -424,7 +426,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
                         TreeNavResult::Exit => {
                             drop(cur_edit);
                             drop(ce);
-                                self.up();
+                            self.up();
 
                             if i+1 < self.data.len() {
 
@@ -477,10 +479,10 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
                 ListCursorMode::Insert => {
                     match event {
                         TerminalEvent::Input(Event::Key(Key::Backspace)) => {
-                            if idx > 0 {
-                                self.data.remove(idx-1);
+                            if idx > 0 && idx <= self.data.len() {
                                 cur.idx = Some(idx-1);
                                 self.cursor.set(cur);
+                                self.data.remove(idx-1);
                                 TerminalEditorResult::Continue
                             } else {
                                 TerminalEditorResult::Exit
@@ -551,24 +553,26 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
                         TerminalEditorResult::Exit => {
                             cur_edit.up();
                             drop(cur_edit);
+                            drop(ce);
 
                             match event {
-                                TerminalEvent::Input(Event::Key(Key::Char(' '))) => {
-                                    // split..
-                                    self.cursor.set(ListCursor {
-                                        mode: ListCursorMode::Insert,
-                                        idx: Some(idx+1)
-                                    });
-                                }
                                 TerminalEvent::Input(Event::Key(Key::Backspace)) => {
+                                    // todo: join instead of remove
                                     self.cursor.set(ListCursor {
                                         mode: ListCursorMode::Insert,
                                         idx: Some(idx)
                                     });
 
-                                    self.data.remove(idx); // todo: join instead of remove
+                                    self.data.remove(idx);
                                 }
-                                _ => {}
+                                _ => {
+                                    // todo: split
+
+                                    self.cursor.set(ListCursor {
+                                        mode: ListCursorMode::Insert,
+                                        idx: Some(idx+1)
+                                    });
+                                }
                             }
                         },
                         TerminalEditorResult::Continue => {}
@@ -611,11 +615,11 @@ where ItemEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
                             atom.add_style_front(TerminalStyle::bg_color((90,60,200)))
                         ),
                     ListEditorViewSegment::Modify(sub_view) => {
-                        sub_view.clone()/*.map_item(
+                        sub_view.clone().map_item(
                             |_pt, atom|
-                            atom//.add_style_back(TerminalStyle::bg_color((0,0,0)))
+                            atom.add_style_back(TerminalStyle::bg_color((22,15,50)))
                                 //.add_style_back(TerminalStyle::bold(true))
-                        )*/
+                        )
                     },
                     ListEditorViewSegment::View(sub_view) =>
                         sub_view.clone()
@@ -624,7 +628,7 @@ where ItemEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
     }
 
     pub fn horizontal_sexpr_view(&self) -> OuterViewPort<dyn TerminalView> {
-        self.get_seg_seq_view().horizontal_sexpr_view(0)
+        self.get_seg_seq_view().horizontal_sexpr_view(1)
     }
 
     pub fn vertical_sexpr_view(&self) -> OuterViewPort<dyn TerminalView> {
@@ -664,7 +668,7 @@ where ItemEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
             .to_grid_horizontal()
             .flatten()
     }
-    
+
     pub fn new(make_item_editor: FnMakeItemEditor, style: ListEditorStyle) -> Self {
         let cursor_port = ViewPort::new();
         let data_port = ViewPort::new();
