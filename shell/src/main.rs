@@ -3,6 +3,7 @@ extern crate portable_pty;
 
 mod monstera;
 mod process;
+mod pty;
 
 use{
     std::sync::{Arc, RwLock},
@@ -12,9 +13,11 @@ use{
         core::{
             View,
             ViewPort,
+            InnerViewPort,
             OuterViewPort,
             Observer,
             ObserverExt,
+            ObserverBroadcast,
             context::{ReprTree, Object, MorphismType, MorphismMode, Context},
             port::{UpdateTask}},
         index::{IndexView},
@@ -43,7 +46,40 @@ use{
 
 struct AsciiBox {
     content: Option<Arc<dyn TerminalView>>,
-    extent: Vector2<i16>
+    extent: Vector2<i16>,
+
+    cast: Arc<RwLock<ObserverBroadcast<dyn TerminalView>>>
+}
+
+impl AsciiBox {
+    pub fn new(
+        extent: Vector2<i16>,
+        content_port: OuterViewPort<dyn TerminalView>,
+        output_port: InnerViewPort<dyn TerminalView>
+    ) -> Arc<RwLock<Self>> {
+        let ascii_box = Arc::new(RwLock::new(AsciiBox {
+            content: None,
+            extent,
+            cast: output_port.get_broadcast()
+        }));
+
+        output_port.0.update_hooks.write().unwrap().push(Arc::new(content_port.0.clone()));
+        output_port.set_view(Some(ascii_box.clone()));
+        content_port.add_observer(ascii_box.clone());
+
+        ascii_box
+    }
+}
+
+impl Observer<dyn TerminalView> for AsciiBox {
+    fn reset(&mut self, new_content: Option<Arc<dyn TerminalView>>) {
+        self.content = new_content;
+        self.notify_each(GridWindowIterator::from(Point2::new(0, 0) ..= Point2::new(self.extent.x, self.extent.y)));
+    }
+
+    fn notify(&mut self, pt: &Point2<i16>) {
+        self.cast.notify(&(pt + Vector2::new(1, 1)));
+    }
 }
 
 impl View for AsciiBox {
@@ -130,8 +166,8 @@ async fn main() {
                 (Point2::new(0, 2), magic.clone()),
             ]);
 
-            //compositor.write().unwrap().push(monstera::make_monstera());
-            compositor.write().unwrap().push(table_port.outer().flatten());//.offset(Vector2::new(40, 2)));
+            compositor.write().unwrap().push(monstera::make_monstera());
+            compositor.write().unwrap().push(table_port.outer().flatten().offset(Vector2::new(40, 2)));
 
             let mut y = 4;
 
@@ -142,14 +178,34 @@ async fn main() {
                 leaf_mode: ListCursorMode::Insert,
                 tree_addr: vec![ 0 ]
             });
-/*
-            let mut last_box = Arc::new(RwLock::new(AsciiBox{
-                
-            }));
-*/
+
+            let mut pty : Option<pty::PTY> = None;
+
             loop {
                 term_port.update();
-                match term.next_event().await {
+                if let Some(p) = pty.as_mut() {
+                    if p.get_status() {
+                        pty = None;
+                       
+                        process_launcher = ProcessLauncher::new();
+                        process_launcher.goto(TreeCursor {
+                            leaf_mode: ListCursorMode::Insert,
+                            tree_addr: vec![ 0 ]
+                        });
+
+                        y += 1;
+                        table_buf.insert(Point2::new(0, y), process_launcher.get_term_view());
+                    }
+                }
+                term_port.update();
+
+                let ev = term.next_event().await;
+
+                if let Some(pty) = pty.as_mut() {
+                    pty.handle_terminal_event(&ev);
+                } else {
+
+                match ev {
                     TerminalEvent::Resize(new_size) => {
                         cur_size.set(new_size);
                         term_port.inner().get_broadcast().notify_each(
@@ -168,9 +224,13 @@ async fn main() {
                     TerminalEvent::Input(Event::Key(Key::Right)) => {
                         process_launcher.nexd();
                     }
-                    TerminalEvent::Input(Event::Key(Key::Up)) => { process_launcher.up(); }
+                    TerminalEvent::Input(Event::Key(Key::Up)) => {
+                        if process_launcher.up() == TreeNavResult::Exit {
+                            //process_launcher.dn();
+                            //process_launcher.goto_home();
+                        }
+                    }
                     TerminalEvent::Input(Event::Key(Key::Down)) => {
-                        //process_launcher.dn();
                         if process_launcher.dn() == TreeNavResult::Continue {
                             process_launcher.goto_home();
                         }
@@ -182,30 +242,25 @@ async fn main() {
                         process_launcher.goto_end();
                     }
                     TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {
-                        let output_view = process_launcher.launch();
+                        let mut output_port = ViewPort::new();
+                        pty = process_launcher.launch_pty(output_port.inner());
 
-                        let box_port = ViewPort::new();
-                        let test_box = Arc::new(RwLock::new(AsciiBox {
-                            content: Some(output_view.map_item(|_,a| a.add_style_back(TerminalStyle::fg_color((230, 230, 230)))).get_view().unwrap()),
-                            extent: Vector2::new(120,30)
-                        }));
+                        let box_port = ViewPort::new();                        
+                        let test_box = AsciiBox::new(
+                            Vector2::new(81, 26),
+                            output_port.outer()
+                                .map_item(|_,a| a.add_style_back(TerminalStyle::fg_color((230, 230, 230)))),
+                            box_port.inner()
+                        );
 
-                        box_port.inner().set_view(Some(test_box.clone() as Arc<dyn TerminalView>));
+                        table_buf.remove(Point2::new(0, y-1));
 
-                        table_buf.insert(Point2::new(0, y-1), ViewPort::new().outer());
-                        y += 1;
-                        table_buf.insert(Point2::new(0, y), box_port.outer()
-                                                         .map_item(|_idx, x| x.add_style_back(TerminalStyle::fg_color((90, 120, 100))))
-                                                         .offset(Vector2::new(0, -1)));
-
-                        process_launcher = ProcessLauncher::new();
-                        process_launcher.goto(TreeCursor {
-                            leaf_mode: ListCursorMode::Insert,
-                            tree_addr: vec![ 0 ]
-                        });
+                        let mut p = box_port.outer().map_item(|_idx, x| x.add_style_back(TerminalStyle::fg_color((90, 120, 100))))
+                            .offset(Vector2::new(0, -1));
+                        table_port.update_hooks.write().unwrap().push(Arc::new(p.clone().0));
 
                         y += 1;
-                        table_buf.insert(Point2::new(0, y), process_launcher.get_term_view());
+                        table_buf.insert(Point2::new(0, y), p.clone());
                     }
 
                     ev => {
@@ -225,6 +280,7 @@ async fn main() {
                             process_launcher.handle_terminal_event(&ev);
                         }
                     }
+                }
                 }
 
                 status_chars.clear();

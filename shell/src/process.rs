@@ -8,7 +8,7 @@ use {
     termion::event::{Key, Event},
     cgmath::Point2,
     nested::{
-        core::{ViewPort, OuterViewPort, Observer},
+        core::{OuterViewPort, InnerViewPort, Observer},
         singleton::{SingletonView, SingletonBuffer},
         sequence::{SequenceView, SequenceViewExt},
         index::buffer::IndexBuffer,
@@ -19,7 +19,6 @@ use {
         string_editor::CharEditor,
     }
 };
-use portable_pty::{CommandBuilder, PtySize, native_pty_system, PtySystem};
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
@@ -96,7 +95,7 @@ impl ProcessLauncher {
         }
     }
 
-    pub fn launch(&mut self) -> (OuterViewPort<dyn TerminalView>) {
+    pub fn launch_pty(&mut self, port: InnerViewPort<dyn TerminalView>) -> Option<crate::pty::PTY> {
         self.up();
         self.up();
 
@@ -109,45 +108,13 @@ impl ProcessLauncher {
         }
 
         if strings.len() > 0 {
-            // Create a new pty
-            let mut pair = native_pty_system().openpty(PtySize {
-                rows: 30,
-                cols: 120,
-                // Not all systems support pixel_width, pixel_height,
-                // but it is good practice to set it to something
-                // that matches the size of the selected font.  That
-                // is more complex than can be shown here in this
-                // brief example though!
-                pixel_width: 0,
-                pixel_height: 0,
-            }).unwrap();
-
             // Spawn a shell into the pty
-            let mut cmd = CommandBuilder::new(strings[0].as_str());
+            let mut cmd = crate::pty::CommandBuilder::new(strings[0].as_str());
             cmd.args(&strings[1..]);
 
-            if let Ok(child) = pair.slave.spawn_command(cmd) {
-                // Read and parse output from the pty with reader
-                let mut reader = pair.master.try_clone_reader().unwrap();
-
-                // Send data to the pty by writing to the master
-                //writeln!(pair.master, "ls -l\r\n");
-
-                let port = ViewPort::new();
-                let p = port.inner();
-                async_std::task::spawn_blocking(
-                    move || {
-                        nested::terminal::ansi_parser::read_ansi_from(&mut reader, p);
-                    });
-
-                port.into_outer()
-            } else {
-                make_label("invalid command")
-                    .map_item(|idx, a| a.add_style_back(TerminalStyle::fg_color((200,0,0))))
-            }
+            crate::pty::PTY::new(cmd, port)
         } else {
-            make_label("no command")
-                .map_item(|idx, a| a.add_style_back(TerminalStyle::fg_color((200,0,0))))
+            None
         }
     }
 }
