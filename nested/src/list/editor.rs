@@ -327,8 +327,6 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
                             }
                         );
                     }
-                } else {
-                    self.goto_home();
                 }
                 TreeNavResult::Continue
             }

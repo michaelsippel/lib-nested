@@ -5,7 +5,6 @@ use {
         os::unix::io::{FromRawFd, AsRawFd},
     },
     std::sync::RwLock,
-    tty::{FileDesc, TtyServer},
     termion::event::{Key, Event},
     cgmath::Point2,
     nested::{
@@ -20,6 +19,7 @@ use {
         string_editor::CharEditor,
     }
 };
+use portable_pty::{CommandBuilder, PtySize, native_pty_system, PtySystem};
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
@@ -96,10 +96,10 @@ impl ProcessLauncher {
         }
     }
 
-    pub fn launch(&mut self) -> OuterViewPort<dyn TerminalView> {
+    pub fn launch(&mut self) -> (OuterViewPort<dyn TerminalView>) {
         self.up();
         self.up();
-        
+
         let mut strings = Vec::new();
 
         let v = self.editor.get_data_port().get_view().unwrap();
@@ -109,49 +109,40 @@ impl ProcessLauncher {
         }
 
         if strings.len() > 0 {
-            let stdin = FileDesc::new(libc::STDIN_FILENO, false);
-            let mut server = match TtyServer::new(Some(&stdin)) {
-                Ok(s) => s,
-                Err(e) => { return make_label(&format!("Error TTY server: {}", e)); },
-            };
+            // Create a new pty
+            let mut pair = native_pty_system().openpty(PtySize {
+                rows: 30,
+                cols: 120,
+                // Not all systems support pixel_width, pixel_height,
+                // but it is good practice to set it to something
+                // that matches the size of the selected font.  That
+                // is more complex than can be shown here in this
+                // brief example though!
+                pixel_width: 0,
+                pixel_height: 0,
+            }).unwrap();
 
-            let mut cmd = std::process::Command::new(strings[0].as_str());
-            cmd.args(&strings[1..]).stdin(std::process::Stdio::null());
+            // Spawn a shell into the pty
+            let mut cmd = CommandBuilder::new(strings[0].as_str());
+            cmd.args(&strings[1..]);
 
-            let process = match server.spawn(cmd) {
-                Ok(p) => p,
-                Err(e) => { return make_label(&format!("Failed to execute process: {}", e));},
-            };
+            if let Ok(child) = pair.slave.spawn_command(cmd) {
+                // Read and parse output from the pty with reader
+                let mut reader = pair.master.try_clone_reader().unwrap();
 
-            if let Ok(mut term_view_proc) = std::process::Command::new("./target/release/ansi_parser")
-                .stdin(unsafe{ std::process::Stdio::from_raw_fd(server.get_master().as_raw_fd()) })
-                .stdout(std::process::Stdio::piped())
-                .stderr(std::process::Stdio::null())
-                .spawn()
-            {
-                let mut term_view_bin = term_view_proc.stdout.unwrap();
-                /*
-                //let mut term_view_bin = async_std::io::BufReader::new(unsafe { async_std::fs::File::from_raw_fd( term_view_proc.stdout.unwrap().as_raw_fd() ) } );
-                //let mut tv_stream = async_bincode::AsyncBincodeReader::<_, (Point2<i16>, Option<TerminalAtom>)>::from(term_view_bin);
+                // Send data to the pty by writing to the master
+                //writeln!(pair.master, "ls -l\r\n");
 
-                async_std::task::spawn(
-                    async move {
-                 */
+                let port = ViewPort::new();
+                let p = port.inner();
+                async_std::task::spawn_blocking(
+                    move || {
+                        nested::terminal::ansi_parser::read_ansi_from(&mut reader, p);
+                    });
 
-                let output_view_port = ViewPort::new();
-                let mut output_buf = IndexBuffer::new(output_view_port.inner());
-
-                while let Ok((pos, atom)) = bincode::deserialize_from(&mut term_view_bin) {
-                    if let Some(a) = atom {
-                        output_buf.insert(pos, a);
-                    } else {
-                        output_buf.remove(pos);
-                    }
-                }
-//                    });
-                output_view_port.outer()
+                port.into_outer()
             } else {
-                make_label("Failed to spawn ansi parser process")
+                make_label("invalid command")
                     .map_item(|idx, a| a.add_style_back(TerminalStyle::fg_color((200,0,0))))
             }
         } else {

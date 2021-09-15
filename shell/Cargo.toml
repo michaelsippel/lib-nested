@@ -9,7 +9,7 @@ cgmath = "*"
 termion = "*"
 bincode = "*"
 libc = "0.2.*"
-tty = { git = "https://github.com/stemjail/tty-rs.git" }
+portable-pty = "0.4.0"
 
 [dependencies.async-std]
 version = "1.9.0"

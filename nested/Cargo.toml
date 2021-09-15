@@ -8,6 +8,8 @@ version = "0.1.0"
 no_deadlocks = "*"
 cgmath = { version = "0.18.0", features = ["serde"] }
 termion = "1.5.5"
+vte = "0.10.1"
+ansi_colours = "1.0"
 signal-hook = "0.3.1"
 signal-hook-async-std = "0.2.0"
 serde = { version = "1.0", features = ["derive"] }

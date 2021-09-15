@@ -1,5 +1,5 @@
 
-extern crate tty;
+extern crate portable_pty;
 
 mod monstera;
 mod process;
@@ -170,6 +170,7 @@ async fn main() {
                     }
                     TerminalEvent::Input(Event::Key(Key::Up)) => { process_launcher.up(); }
                     TerminalEvent::Input(Event::Key(Key::Down)) => {
+                        //process_launcher.dn();
                         if process_launcher.dn() == TreeNavResult::Continue {
                             process_launcher.goto_home();
                         }
@@ -183,12 +184,10 @@ async fn main() {
                     TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {
                         let output_view = process_launcher.launch();
 
-                        let range = output_view.get_view().unwrap().range();
-
                         let box_port = ViewPort::new();
                         let test_box = Arc::new(RwLock::new(AsciiBox {
                             content: Some(output_view.map_item(|_,a| a.add_style_back(TerminalStyle::fg_color((230, 230, 230)))).get_view().unwrap()),
-                            extent: range.end - range.start + Vector2::new(1,1)
+                            extent: Vector2::new(120,30)
                         }));
 
                         box_port.inner().set_view(Some(test_box.clone() as Arc<dyn TerminalView>));

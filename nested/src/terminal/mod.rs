@@ -2,6 +2,7 @@ pub mod style;
 pub mod atom;
 pub mod terminal;
 pub mod compositor;
+pub mod ansi_parser;
 
 pub use {
     style::{TerminalStyle},
