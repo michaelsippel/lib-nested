@@ -699,7 +699,7 @@ where ItemEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
         self.cursor_port.outer()
     }
 
-    fn get_item(&self) -> Option<Arc<RwLock<ItemEditor>>> {
+    pub fn get_item(&self) -> Option<Arc<RwLock<ItemEditor>>> {
         if let Some(idx) = self.cursor.get().idx {
             Some(self.data.get(idx))
         } else {

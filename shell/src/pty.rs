@@ -1,6 +1,7 @@
 
 use {
     termion::event::{Key, Event},
+    std::sync::Mutex,
     nested::{
         core::{InnerViewPort},
         terminal::{TerminalView, TerminalEvent}
@@ -12,7 +13,7 @@ pub use portable_pty::CommandBuilder;
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub struct PTY {
-    master: Box<dyn portable_pty::MasterPty + Send>,
+    master: Mutex<Box<dyn portable_pty::MasterPty + Send>>,
     child: Box<dyn portable_pty::Child + Send + Sync>
 }
 
@@ -45,7 +46,7 @@ impl PTY {
                 });
             
             Some(PTY {
-                master: pair.master,
+                master: Mutex::new(pair.master),
                 child
             })
         } else {
@@ -64,7 +65,7 @@ impl PTY {
     pub fn handle_terminal_event(&mut self, event: &TerminalEvent) {
         match event {
             TerminalEvent::Input(Event::Key(Key::Char(c))) => {
-                write!(self.master, "{}", c);
+                write!(self.master.lock().unwrap(), "{}", c);
             }
             _ => {
             }

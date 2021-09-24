@@ -53,7 +53,7 @@ pub fn read_ansi_from<R: Read + Unpin>(ansi_reader: &mut R, port: InnerViewPort<
                 }
             },
             Err(err) => {
-                println!("err: {}", err);
+                //println!("err: {}", err);
                 break;
             },
         }
@@ -138,10 +138,12 @@ impl Perform for PerfAtom {
     }
 
     fn csi_dispatch(&mut self, params: &Params, intermediates: &[u8], ignore: bool, c: char) {
+        /*
         eprintln!(
             "[csi_dispatch] params={:#?}, intermediates={:?}, ignore={:?}, char={:?}",
             params, intermediates, ignore, c
         );
+         */
 
         let mut piter = params.into_iter();
 
@@ -213,7 +215,7 @@ impl Perform for PerfAtom {
                 if let Some(y) = piter.next() { self.cursor.y = y[0] as i16 - 1 };
                 if let Some(x) = piter.next() { self.cursor.x = x[0] as i16 - 1 };
 
-                eprintln!("cursor at {:?}", self.cursor);
+                //eprintln!("cursor at {:?}", self.cursor);
             },
 
             'A' => { self.cursor.y -= piter.next().unwrap()[0] as i16; }
