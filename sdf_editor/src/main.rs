@@ -24,7 +24,7 @@ use{
     },
     nako::{
         stream::{SecondaryStream2d, PrimaryStream2d},
-        glam::{Vec2, Vec3, UVec2},
+        glam::{Vec2, Vec3, UVec2, IVec2},
         operations::{
             planar::primitives2d::Box2d,
             volumetric::{Color, Union, Round},
@@ -126,7 +126,7 @@ impl SdfTerm {
                 id.into(),
                 LayerInfo {
                     extent: UVec2::new(1 + self.font_height / 2, self.font_height),
-                    location: UVec2::new(pt.x as u32 * self.font_height / 2, pt.y as u32 * self.font_height)
+                    location: IVec2::new(pt.x as i32 * self.font_height as i32 / 2, pt.y as i32 * self.font_height as i32)
                 });
 
             self.bg_layers.insert(*pt, (false, id));
@@ -145,7 +145,7 @@ impl SdfTerm {
                 id.into(),
                 LayerInfo {
                     extent: UVec2::new(1 + self.font_height / 2, self.font_height),
-                    location: UVec2::new(pt.x as u32 * self.font_height / 2, pt.y as u32 * self.font_height)
+                    location: IVec2::new(pt.x as i32 * self.font_height as i32 / 2, pt.y as i32 * self.font_height as i32)
                 });
 
             self.fg_layers.insert(*pt, (false, id));
@@ -273,7 +273,7 @@ async fn main() {
     });
     renderer.lock().unwrap().set_layer_info(color_layer_id.into(), LayerInfo{
         extent: UVec2::new(600, 600),
-        location: UVec2::new(200,100)
+        location: IVec2::new(200,100)
     });
 
     event_loop.run(move |event, _target, control_flow|{

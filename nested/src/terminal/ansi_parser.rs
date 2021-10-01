@@ -46,7 +46,7 @@ pub fn read_ansi_from<R: Read + Unpin>(ansi_reader: &mut R, port: InnerViewPort<
 
     loop {
         match ansi_reader.read(&mut buf) {
-            Ok(0) => break,
+            //Ok(0) => break,
             Ok(n) => {
                 for byte in &buf[..n] {
                     statemachine.advance(&mut performer, *byte);
@@ -119,22 +119,24 @@ impl Perform for PerfAtom {
     }
 
     fn hook(&mut self, params: &Params, intermediates: &[u8], ignore: bool, c: char) {
+        /*
         eprintln!(
             "[hook] params={:?}, intermediates={:?}, ignore={:?}, char={:?}",
             params, intermediates, ignore, c
         );
+         */
     }
 
     fn put(&mut self, byte: u8) {
-        eprintln!("[put] {:02x}", byte);
+        //eprintln!("[put] {:02x}", byte);
     }
 
     fn unhook(&mut self) {
-        eprintln!("[unhook]");
+        //eprintln!("[unhook]");
     }
 
     fn osc_dispatch(&mut self, params: &[&[u8]], bell_terminated: bool) {
-        eprintln!("[osc_dispatch] params={:?} bell_terminated={}", params, bell_terminated);
+        //eprintln!("[osc_dispatch] params={:?} bell_terminated={}", params, bell_terminated);
     }
 
     fn csi_dispatch(&mut self, params: &Params, intermediates: &[u8], ignore: bool, c: char) {
@@ -284,10 +286,12 @@ impl Perform for PerfAtom {
     }
 
     fn esc_dispatch(&mut self, intermediates: &[u8], ignore: bool, byte: u8) {
+        /*
         eprintln!(
             "[esc_dispatch] intermediates={:?}, ignore={:?}, byte={:02x}",
-            intermediates, ignore, byte
+        intermediates, ignore, byte
         );
+*/
     }
 }
 
