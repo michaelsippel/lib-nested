@@ -11,6 +11,10 @@ bincode = "*"
 libc = "0.2.*"
 portable-pty = "0.4.0"
 
+nako = {git= "https://git.exobiont.de/senvas/nako.git"}
+nako_std = {git= "https://git.exobiont.de/senvas/nako.git"}
+nakorender = {git="https://git.exobiont.de/senvas/nako.git", default-features = false}
+
 [dependencies.async-std]
 version = "1.9.0"
 features = ["unstable", "attributes"]

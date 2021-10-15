@@ -18,6 +18,8 @@ pub mod string_editor;
 
 pub mod bimap;
 
+pub mod sdf;
+
 pub fn magic_header() {
     eprintln!("<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>");
 }
