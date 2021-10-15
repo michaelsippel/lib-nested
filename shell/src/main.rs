@@ -145,17 +145,6 @@ async fn main() {
 
         //now check if a rerender was requested, or if we worked on all
         //events on that batch
-        term_port.update();
-        renderer.lock().unwrap().set_layer_order(
-            vec![
-                //vec![ color_layer_id.into() ].into_iter(),
-                sdf_term.read().unwrap().get_order().into_iter()
-            ]
-                .into_iter()
-                .flatten()
-                .collect::<Vec<_>>()
-                .as_slice()
-        );
 
         match event{
             winit::event::Event::WindowEvent{window_id: _, event: winit::event::WindowEvent::Resized(newsize)} => {
@@ -163,6 +152,7 @@ async fn main() {
             }
             winit::event::Event::WindowEvent{window_id: _, event: winit::event::WindowEvent::KeyboardInput{ device_id, input, is_synthetic }} => {
                 if input.state == winit::event::ElementState::Pressed {
+                    
                     if let Some(kc) = input.virtual_keycode {
                         match kc {
                             winit::event::VirtualKeyCode::Space => {
@@ -321,45 +311,56 @@ async fn main() {
                             }
                         }
                     }
+
+                    status_chars.clear();
+                    let cur = process_list_editor.get_cursor();
+
+                    if cur.tree_addr.len() > 0 {
+                        status_chars.push(TerminalAtom::new('@', TerminalStyle::fg_color((120, 80, 80)).add(TerminalStyle::bold(true))));
+                        for x in cur.tree_addr {
+                            for c in format!("{}", x).chars() {
+                                status_chars.push(TerminalAtom::new(c, TerminalStyle::fg_color((0, 100, 20))));
+                            }
+                            status_chars.push(TerminalAtom::new('.', TerminalStyle::fg_color((120, 80, 80))));
+                        }
+
+                        status_chars.push(TerminalAtom::new(':', TerminalStyle::fg_color((120, 80, 80)).add(TerminalStyle::bold(true))));
+                        for c in
+                            match cur.leaf_mode {
+                                ListCursorMode::Insert => "INSERT",
+                                ListCursorMode::Select => "SELECT",
+                                ListCursorMode::Modify => "MODIFY"
+                            }.chars()
+                        {
+                            status_chars.push(TerminalAtom::new(c, TerminalStyle::fg_color((200, 200, 20))));
+                        }
+                        status_chars.push(TerminalAtom::new(':', TerminalStyle::fg_color((120, 80, 80)).add(TerminalStyle::bold(true))));
+                    } else {
+                        for c in "Press <DN> to enter".chars() {
+                            status_chars.push(TerminalAtom::new(c, TerminalStyle::fg_color((200, 200, 20))));
+                        }
+                    }
                 }
             }
             winit::event::Event::MainEventsCleared => {
                 window.request_redraw();
             }
             winit::event::Event::RedrawRequested(_) => {
-                //term_port.update();
+                term_port.update();
+                renderer.lock().unwrap().set_layer_order(
+                    vec![
+                        //vec![ color_layer_id.into() ].into_iter(),
+                        sdf_term.read().unwrap().get_order().into_iter()
+                    ]
+                        .into_iter()
+                        .flatten()
+                        .collect::<Vec<_>>()
+                        .as_slice()
+                );
+
                 renderer.lock().unwrap().render(&window);
             }
             _ => {},
-        }
-
-        status_chars.clear();
-        let cur = process_list_editor.get_cursor();
-
-        if cur.tree_addr.len() > 0 {
-            status_chars.push(TerminalAtom::new('@', TerminalStyle::fg_color((120, 80, 80)).add(TerminalStyle::bold(true))));
-            for x in cur.tree_addr {
-                for c in format!("{}", x).chars() {
-                    status_chars.push(TerminalAtom::new(c, TerminalStyle::fg_color((0, 100, 20))));
-                }
-                status_chars.push(TerminalAtom::new('.', TerminalStyle::fg_color((120, 80, 80))));
-            }
-
-            status_chars.push(TerminalAtom::new(':', TerminalStyle::fg_color((120, 80, 80)).add(TerminalStyle::bold(true))));
-            for c in
-                match cur.leaf_mode {
-                    ListCursorMode::Insert => "INSERT",
-                    ListCursorMode::Select => "SELECT",
-                    ListCursorMode::Modify => "MODIFY"
-                }.chars()
-            {
-                status_chars.push(TerminalAtom::new(c, TerminalStyle::fg_color((200, 200, 20))));
-            }
-            status_chars.push(TerminalAtom::new(':', TerminalStyle::fg_color((120, 80, 80)).add(TerminalStyle::bold(true))));
-        } else {
-            for c in "Press <DN> to enter".chars() {
-                status_chars.push(TerminalAtom::new(c, TerminalStyle::fg_color((200, 200, 20))));
-            }
         }
         
     });

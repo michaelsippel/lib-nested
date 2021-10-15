@@ -43,19 +43,25 @@ pub struct SdfTerm {
     fg_layers: HashMap<Point2<i16>, (bool, LayerId2d)>,
 
     font_height: u32,
-    //font: Mutex<Font>,
+    font: Arc<Vec<u8>>,
 
     renderer: Arc<Mutex<MarpBackend>>
 }
 
 impl SdfTerm {
     pub fn new(renderer: Arc<Mutex<MarpBackend>>) -> Self {
+
+        let font_path = Path::new("/usr/share/fonts/TTF/FiraCode-Medium.ttf");
+        let mut font_file = File::open(font_path).unwrap();
+        let mut font_data = Vec::new();
+        font_file.read_to_end(&mut font_data).unwrap();
+
         SdfTerm {
             src_view: None,
             bg_layers: HashMap::new(),
             fg_layers: HashMap::new(),
             font_height: 30,
-            //font: Mutex::new(Font::from_path(Path::new("/usr/share/fonts/TTF/FiraCode-Medium.ttf"),0).unwrap()),
+            font: Arc::new(font_data),
             renderer
         }
     }
@@ -147,8 +153,9 @@ impl SdfTerm {
 
             // foreground layer
             if let Some(c) = atom.c {
-                let font = Font::from_path(Path::new("/usr/share/fonts/TTF/FiraCode-Light.ttf"),0).unwrap();
-                let mut ch = Character::from_font(&font, c).with_size(1.0).with_tesselation_factor(0.01);
+                let font_index = 0;
+                let fontkit = Font::from_bytes(self.font.clone(), font_index).unwrap();
+                let mut ch = Character::from_font(&fontkit, c).with_size(1.0);
 
                 let (r,g,b) = atom.style.fg_color.unwrap_or((0, 0, 0));
 
