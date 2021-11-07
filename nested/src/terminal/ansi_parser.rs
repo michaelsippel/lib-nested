@@ -26,7 +26,8 @@ pub fn read_ansi_from<R: Read + Unpin>(ansi_reader: &mut R, port: InnerViewPort<
     let mut performer = PerfAtom {
         cursor: Point2::new(0, 0),
         style: TerminalStyle::default(),
-        term_width: 180,
+        invert: false,
+        term_width: 80,
 
         cursor_stack: Vec::new(),
 
@@ -62,7 +63,6 @@ pub fn read_ansi_from<R: Read + Unpin>(ansi_reader: &mut R, port: InnerViewPort<
     }
 }
 
-
 struct ColorPalett {
     black: (u8, u8, u8),
     red: (u8, u8, u8),
@@ -80,7 +80,7 @@ struct PerfAtom {
 
     cursor: Point2<i16>,
     style: TerminalStyle,
-
+    invert: bool,
     cursor_stack: Vec<Point2<i16>>,
 
     buf: IndexBuffer<Point2<i16>, TerminalAtom>,
@@ -88,31 +88,41 @@ struct PerfAtom {
 
 impl PerfAtom {
     fn write_atom(&mut self, pos: Point2<i16>, atom: Option<TerminalAtom>) {
-        if let Some(a) = atom {
+        if let Some(mut a) = atom {
             self.buf.insert(pos, a);
         } else {
             self.buf.remove(pos);
         }
     }
+
+    fn get_style(&self) -> TerminalStyle {
+        let mut style = self.style;
+        if self.invert {
+            style.fg_color = Some(self.style.bg_color.unwrap_or(self.colors.black));
+            style.bg_color = Some(self.style.fg_color.unwrap_or(self.colors.white));
+        }
+        style
+    }
+
+    fn cursor_up(&mut self, n: usize) {
+    }
+
+    fn cursor_down(&mut self, n: usize) {        
+    }
 }
 
 impl Perform for PerfAtom {
     fn print(&mut self, c: char) {
-        //eprintln!("[print] {:?}", c);
-        self.write_atom(
-            self.cursor,
-            Some(TerminalAtom::new(c, self.style))
-        );
+        self.write_atom(self.cursor, Some(TerminalAtom::new(c, self.get_style())));
 
         self.cursor.x += 1;
-        if self.cursor.x > self.term_width {
+        if self.cursor.x >= self.term_width {
             self.cursor.x = 0;
             self.cursor.y += 1;
         }
     }
 
     fn execute(&mut self, byte: u8) {
-        //eprintln!("[execute] {:02x}", byte);
         match byte {
             // linefeed
             b'\n' => {
@@ -138,7 +148,10 @@ impl Perform for PerfAtom {
                     self.cursor.x = self.term_width - 1;
                 }
             }
-            _ => {}
+
+            _ => {
+                eprintln!("unhandled execute byte {:02x}", byte);
+            }
         }
     }
 
@@ -148,7 +161,7 @@ impl Perform for PerfAtom {
             "[hook] params={:?}, intermediates={:?}, ignore={:?}, char={:?}",
             params, intermediates, ignore, c
         );
-         */
+        */
     }
 
     fn put(&mut self, byte: u8) {
@@ -177,98 +190,117 @@ impl Perform for PerfAtom {
             // Set SGR
             'm' =>  while let Some(n) = piter.next() {
                 match n[0] {
-                        0 => self.style = TerminalStyle::default(),
-                        1 => self.style = self.style.add(TerminalStyle::bold(true)),
-                        3 => self.style = self.style.add(TerminalStyle::italic(true)),
-                        4 => self.style = self.style.add(TerminalStyle::underline(true)),
+                    0 => {
+                        self.style = TerminalStyle::default();
+                        self.invert = false;
+                    }
+                    1 => self.style = self.style.add(TerminalStyle::bold(true)),
+                    3 => self.style = self.style.add(TerminalStyle::italic(true)),
+                    4 => self.style = self.style.add(TerminalStyle::underline(true)),
+                    7 => self.invert = true,
+                    27 => self.invert = false,
 
-                        30 => self.style = self.style.add(TerminalStyle::fg_color(self.colors.black)),
-                        40 => self.style = self.style.add(TerminalStyle::bg_color(self.colors.black)),
-                        31 => self.style = self.style.add(TerminalStyle::fg_color(self.colors.red)),
-                        41 => self.style = self.style.add(TerminalStyle::bg_color(self.colors.red)),
-                        32 => self.style = self.style.add(TerminalStyle::fg_color(self.colors.green)),
-                        42 => self.style = self.style.add(TerminalStyle::bg_color(self.colors.green)),
-                        33 => self.style = self.style.add(TerminalStyle::fg_color(self.colors.yellow)),
-                        43 => self.style = self.style.add(TerminalStyle::bg_color(self.colors.yellow)),
-                        34 => self.style = self.style.add(TerminalStyle::fg_color(self.colors.blue)),
-                        44 => self.style = self.style.add(TerminalStyle::bg_color(self.colors.blue)),
-                        35 => self.style = self.style.add(TerminalStyle::fg_color(self.colors.magenta)),
-                        45 => self.style = self.style.add(TerminalStyle::bg_color(self.colors.magenta)),
-                        36 => self.style = self.style.add(TerminalStyle::fg_color(self.colors.cyan)),
-                        46 => self.style = self.style.add(TerminalStyle::bg_color(self.colors.cyan)),
-                        37 => self.style = self.style.add(TerminalStyle::fg_color(self.colors.white)),
-                        47 => self.style = self.style.add(TerminalStyle::bg_color(self.colors.white)),
+                    30 => self.style = self.style.add(TerminalStyle::fg_color(self.colors.black)),
+                    40 => self.style = self.style.add(TerminalStyle::bg_color(self.colors.black)),
+                    31 => self.style = self.style.add(TerminalStyle::fg_color(self.colors.red)),
+                    41 => self.style = self.style.add(TerminalStyle::bg_color(self.colors.red)),
+                    32 => self.style = self.style.add(TerminalStyle::fg_color(self.colors.green)),
+                    42 => self.style = self.style.add(TerminalStyle::bg_color(self.colors.green)),
+                    33 => self.style = self.style.add(TerminalStyle::fg_color(self.colors.yellow)),
+                    43 => self.style = self.style.add(TerminalStyle::bg_color(self.colors.yellow)),
+                    34 => self.style = self.style.add(TerminalStyle::fg_color(self.colors.blue)),
+                    44 => self.style = self.style.add(TerminalStyle::bg_color(self.colors.blue)),
+                    35 => self.style = self.style.add(TerminalStyle::fg_color(self.colors.magenta)),
+                    45 => self.style = self.style.add(TerminalStyle::bg_color(self.colors.magenta)),
+                    36 => self.style = self.style.add(TerminalStyle::fg_color(self.colors.cyan)),
+                    46 => self.style = self.style.add(TerminalStyle::bg_color(self.colors.cyan)),
+                    37 => self.style = self.style.add(TerminalStyle::fg_color(self.colors.white)),
+                    47 => self.style = self.style.add(TerminalStyle::bg_color(self.colors.white)),
 
-                        38 => {
-                            let x = piter.next().unwrap();
-                            match x[0] {
-                                2 => {
-                                    let r = piter.next().unwrap();
-                                    let g = piter.next().unwrap();
-                                    let b = piter.next().unwrap();
-                                    self.style = self.style.add(TerminalStyle::fg_color((r[0] as u8, g[0] as u8, b[30] as u8)))
-                                },
-                                5 => {
-                                    let v = piter.next().unwrap();
-                                    self.style = self.style.add(TerminalStyle::fg_color(ansi_colours::rgb_from_ansi256(v[0] as u8)))
-                                },
-                                _ => {}
-                            }
-                        },
-
-                        48 => {
-                            let x = piter.next().unwrap();
-                            match x[0] {
-                                2 => {
-                                    let r = piter.next().unwrap();
-                                    let g = piter.next().unwrap();
-                                    let b = piter.next().unwrap();
-                                    self.style = self.style.add(TerminalStyle::bg_color((r[0] as u8, g[0] as u8, b[30] as u8)))
-                                },
-                                5 => {
-                                    let v = piter.next().unwrap();
-                                    self.style = self.style.add(TerminalStyle::bg_color(ansi_colours::rgb_from_ansi256(v[0] as u8)))
-                                },
-                                _ => {}
-                            }
-                        },
+                    38 => {
+                        let x = piter.next().unwrap();
+                        match x[0] {
+                            2 => {
+                                let r = piter.next().unwrap();
+                                let g = piter.next().unwrap();
+                                let b = piter.next().unwrap();
+                                self.style = self.style.add(TerminalStyle::fg_color((r[0] as u8, g[0] as u8, b[30] as u8)))
+                            },
+                            5 => {
+                                let v = piter.next().unwrap();
+                                self.style = self.style.add(TerminalStyle::fg_color(ansi_colours::rgb_from_ansi256(v[0] as u8)))
+                            },
+                            _ => {}
+                        }
+                    },
+                    48 => {
+                        let x = piter.next().unwrap();
+                        match x[0] {
+                            2 => {
+                                let r = piter.next().unwrap();
+                                let g = piter.next().unwrap();
+                                let b = piter.next().unwrap();
+                                self.style = self.style.add(TerminalStyle::bg_color((r[0] as u8, g[0] as u8, b[30] as u8)))
+                            },
+                            5 => {
+                                let v = piter.next().unwrap();
+                                self.style = self.style.add(TerminalStyle::bg_color(ansi_colours::rgb_from_ansi256(v[0] as u8)))
+                            },
+                            _ => {}
+                        }
+                    },
 
                     _ => {}
                 }
-            },
-
-            'H' => {
-                if let Some(y) = piter.next() { self.cursor.y = y[0] as i16 - 1 };
-                if let Some(x) = piter.next() { self.cursor.x = x[0] as i16 - 1 };
-
-                //eprintln!("cursor at {:?}", self.cursor);
-            },
-
-            'A' => { self.cursor.y -= piter.next().unwrap()[0] as i16; }
-            'B' => { self.cursor.y += piter.next().unwrap()[0] as i16; }
-            'C' => { self.cursor.x += piter.next().unwrap()[0] as i16; }
-            'D' => { self.cursor.x -= piter.next().unwrap()[0] as i16; }
+            }
+            '@' => {
+                for x in self.cursor.x .. self.term_width {
+                    self.write_atom(Point2::new(x, self.cursor.y), Some(TerminalAtom::new(' ', self.style)));
+                }
+            }
+            'A' => {
+                self.cursor.y -= piter.next().unwrap_or(&[1])[0] as i16;
+            }
+            'B' => {
+                self.cursor.y += piter.next().unwrap_or(&[1])[0] as i16;
+                if self.cursor.x >= self.term_width {
+                    self.cursor.x = 0;
+                }
+            }
+            'C' => {
+                self.cursor.x += piter.next().unwrap_or(&[1])[0] as i16;
+                if self.cursor.x >= self.term_width {
+                    self.cursor.x = 0;
+                }
+            }
+            'D' => {
+                self.cursor.x -= piter.next().unwrap_or(&[1])[0] as i16;
+                if self.cursor.x < 0 {
+                    self.cursor.x = self.term_width - 1;
+                    self.cursor.y -= 1;
+                }
+            }
+            'd' => {
+                self.cursor.y = piter.next().unwrap_or(&[1])[0] as i16 - 1;
+            }
             'E' => {
+                if self.cursor.x >= self.term_width {
+                    self.cursor.y += 1;
+                }
                 self.cursor.x = 0;
-                self.cursor.y += piter.next().unwrap()[0] as i16;
+                self.cursor.y += piter.next().unwrap_or(&[1])[0] as i16;
             }
             'F' => {
                 self.cursor.x = 0;
-                self.cursor.y -= piter.next().unwrap()[0] as i16;
+                self.cursor.y -= piter.next().unwrap_or(&[1])[0] as i16;
             }
             'G' => {
                 self.cursor.x = piter.next().unwrap()[0] as i16 - 1;
             }
-
-            's' => {
-                self.cursor_stack.push(self.cursor);
+            'H' => {
+                if let Some(y) = piter.next() { self.cursor.y = y[0] as i16 - 1 };
+                if let Some(x) = piter.next() { self.cursor.x = x[0] as i16 - 1 };
             }
-            'u' => {
-                if let Some(c) = self.cursor_stack.pop() {
-                    self.cursor = c;
-                }
-            }
-            
             'J' => {
                 let x = piter.next().unwrap_or(&[0 as u16; 1]);
                 match x[0] {
@@ -311,40 +343,49 @@ impl Perform for PerfAtom {
                                 self.write_atom(Point2::new(x, y), None);
                             }
                         }
+
+                        self.cursor = Point2::new(0, 0);
                     }
 
                     // invalid
                     _ => {}
                 }
-            }
-            
+            }            
             'K' => {
-                let x = piter.next().unwrap();
+                let x = piter.next().unwrap_or(&[0]);
                 match x[0] {
 
-                    // clear cursor until end
+                    // clear from cursor until end of line
                     0 => {
                         for x in self.cursor.x .. self.term_width {
-                            self.write_atom(Point2::new(x, self.cursor.y), None);
+                            self.write_atom(Point2::new(x, self.cursor.y), Some(TerminalAtom::new(' ', self.get_style())));
                         }
                     },
 
-                    // clear start until cursor
+                    // clear from start of line until cursor
                     1 => {
                         for x in 0 .. self.cursor.x {
-                            self.write_atom(Point2::new(x, self.cursor.y), None);
+                            self.write_atom(Point2::new(x, self.cursor.y), Some(TerminalAtom::new(' ', self.get_style())));
                         }                        
                     },
 
                     // clear entire line
                     2 => {
                         for x in 0 .. self.term_width {
-                            self.write_atom(Point2::new(x, self.cursor.y), None);
+                            self.write_atom(Point2::new(x, self.cursor.y), Some(TerminalAtom::new(' ', self.get_style())));
                         }                        
                     },
 
                     // invalid
                     _ => {}
+                }
+            }
+            's' => {
+                self.cursor_stack.push(self.cursor);
+            }
+            'u' => {
+                if let Some(c) = self.cursor_stack.pop() {
+                    self.cursor = c;
                 }
             }
             
@@ -358,14 +399,7 @@ impl Perform for PerfAtom {
             "[esc_dispatch] intermediates={:?}, ignore={:?}, byte={:02x}",
         intermediates, ignore, byte
         );
-         */
-
-        match byte {
-
-            
-            
-            _ => {}
-        }
+*/
     }
 }
 
