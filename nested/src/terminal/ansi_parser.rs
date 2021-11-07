@@ -26,7 +26,9 @@ pub fn read_ansi_from<R: Read + Unpin>(ansi_reader: &mut R, port: InnerViewPort<
     let mut performer = PerfAtom {
         cursor: Point2::new(0, 0),
         style: TerminalStyle::default(),
-        term_width: 200,
+        term_width: 180,
+
+        cursor_stack: Vec::new(),
 
         buf: IndexBuffer::new(port),
 
@@ -79,6 +81,8 @@ struct PerfAtom {
     cursor: Point2<i16>,
     style: TerminalStyle,
 
+    cursor_stack: Vec<Point2<i16>>,
+
     buf: IndexBuffer<Point2<i16>, TerminalAtom>,
 }
 
@@ -110,10 +114,30 @@ impl Perform for PerfAtom {
     fn execute(&mut self, byte: u8) {
         //eprintln!("[execute] {:02x}", byte);
         match byte {
+            // linefeed
             b'\n' => {
                 self.cursor.x = 0;
                 self.cursor.y += 1;
             },
+
+            // carriage return
+            b'\r' => {
+                self.cursor.x = 0;
+            },
+
+            // horizontal tab
+            b'\t' => {
+                self.cursor.x += 8 - (self.cursor.x % 8);
+            },
+
+            // backspace
+            0x8 => {
+                self.cursor.x -= 1;
+                if self.cursor.x < 0 {
+                    self.cursor.y -= 0;
+                    self.cursor.x = self.term_width - 1;
+                }
+            }
             _ => {}
         }
     }
@@ -228,16 +252,59 @@ impl Perform for PerfAtom {
                 self.cursor.x = 0;
                 self.cursor.y += piter.next().unwrap()[0] as i16;
             }
+            'F' => {
+                self.cursor.x = 0;
+                self.cursor.y -= piter.next().unwrap()[0] as i16;
+            }
+            'G' => {
+                self.cursor.x = piter.next().unwrap()[0] as i16 - 1;
+            }
 
+            's' => {
+                self.cursor_stack.push(self.cursor);
+            }
+            'u' => {
+                if let Some(c) = self.cursor_stack.pop() {
+                    self.cursor = c;
+                }
+            }
+            
             'J' => {
                 let x = piter.next().unwrap_or(&[0 as u16; 1]);
                 match x[0] {
+
+                    // clear from cursor until end of screen
                     0 => {
-                        
+                        let mut pos = self.cursor;
+
+                        while pos.y < 100 {
+                            self.write_atom(pos, None);
+                            pos.x += 1;
+
+                            if pos.x >= self.term_width {
+                                pos.x = 0;
+                                pos.y += 1;
+                            }
+                        }
                     },
+
+                    // clear from cursor to begin
                     1 => {
-                        
+                        let mut pos = self.cursor;
+                        while pos.y >= 0 || pos.x >= 0 {
+                            self.write_atom(pos, None);
+
+                            pos.x -= 1;
+                            if pos.x < 0 {
+                                pos.x = self.term_width;
+                                pos.y -= 1;
+                            }                            
+                        }
+
+                        //self.cursor.
                     }
+
+                    // erase entire screen
                     2 => {
                         for y in 0 .. 100 {
                             for x in 0 .. self.term_width {
@@ -291,7 +358,14 @@ impl Perform for PerfAtom {
             "[esc_dispatch] intermediates={:?}, ignore={:?}, byte={:02x}",
         intermediates, ignore, byte
         );
-*/
+         */
+
+        match byte {
+
+            
+            
+            _ => {}
+        }
     }
 }
 
