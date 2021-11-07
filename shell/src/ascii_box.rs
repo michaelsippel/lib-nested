@@ -13,7 +13,7 @@ use{
             ObserverBroadcast,
             context::{ReprTree, Object, MorphismType, MorphismMode, Context},
             port::{UpdateTask}},
-        index::{IndexView},
+        index::{IndexArea, IndexView},
         grid::{GridWindowIterator},
         terminal::{
             Terminal,
@@ -57,14 +57,19 @@ impl AsciiBox {
         if self.extent != new_extent {
             let old_extent = self.extent;
             self.extent = new_extent;
-            self.notify_each(GridWindowIterator::from(Point2::new(0, 0) .. Point2::new(2+std::cmp::max(old_extent.x, new_extent.x), 2+std::cmp::max(old_extent.y, new_extent.y))));
+            self.cast.notify(
+                &IndexArea::Range(
+                    Point2::new(0, 0) ..=
+                        Point2::new(
+                            1+std::cmp::max(old_extent.x, new_extent.x),
+                            1+std::cmp::max(old_extent.y, new_extent.y))));
         }
     }
 
     pub fn fit_content(&mut self) {
         if let Some(c) = self.content.as_ref() {
-            let p = c.range().end;
-            self.resize(Vector2::new(p.x, p.y));
+            let p = *c.area().range().end();
+            self.resize(Vector2::new(p.x+1, p.y+1));
         } else {
             self.resize(Vector2::new(0, 0));
         }
@@ -74,17 +79,17 @@ impl AsciiBox {
 impl Observer<dyn TerminalView> for AsciiBox {
     fn reset(&mut self, new_content: Option<Arc<dyn TerminalView>>) {
         self.content = new_content;
-        self.notify_each(GridWindowIterator::from(Point2::new(0, 0) .. Point2::new(self.extent.x+2, self.extent.y+2)));
+        self.fit_content();
     }
 
-    fn notify(&mut self, pt: &Point2<i16>) {
-        self.cast.notify(&(pt + Vector2::new(1, 1)));
+    fn notify(&mut self, area: &IndexArea<Point2<i16>>) {
+        self.cast.notify(&area.map(|pt| pt + Vector2::new(1, 1)));
         self.fit_content();
     }
 }
 
 impl View for AsciiBox {
-    type Msg = Point2<i16>;
+    type Msg = IndexArea<Point2<i16>>;
 }
 
 impl IndexView<Point2<i16>> for AsciiBox {
@@ -114,19 +119,19 @@ impl IndexView<Point2<i16>> for AsciiBox {
                 None
             }
         } else if
+            pt.x > 0 &&
+            pt.y > 0 &&
             pt.x < self.extent.x+1 &&
             pt.y < self.extent.y+1
         {
-            self.content.get(&(pt - Vector2::new(1, 1)))
+            Some(self.content.get(&(pt - Vector2::new(1, 1))).unwrap_or(TerminalAtom::from(' ')))
         } else {
             None
         }
     }
 
-    fn area(&self) -> Option<Vec<Point2<i16>>> {
-        Some(GridWindowIterator::from(
-            Point2::new(0, 0) .. Point2::new(self.extent.x+2, self.extent.y+2)
-        ).collect())
+    fn area(&self) -> IndexArea<Point2<i16>> {
+        IndexArea::Range(Point2::new(0, 0) ..= Point2::new(1,1)+self.extent)
     }
-
 }
+

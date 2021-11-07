@@ -16,12 +16,13 @@ use {
             channel::{
                 ChannelSender, ChannelReceiver,
                 ChannelData,
-                set_channel
+                set_channel,
+                queue_channel
             }
         },
         singleton::{SingletonView},
         sequence::{SequenceView},
-        index::{IndexView}
+        index::{IndexArea, IndexView}
     }
 };
 
@@ -75,13 +76,13 @@ where ArgKey: Clone + Hash + Eq,
         port.get_view_arc()
     }
 
-    pub fn new_index_arg<Key: Hash + Eq + Clone + Send + Sync + std::fmt::Debug + 'static, Item: 'static>(
+    pub fn new_index_arg<Key: Clone + Send + Sync + 'static, Item: 'static>(
         &mut self,
         arg_key: ArgKey,
         port: OuterViewPort<dyn IndexView<Key, Item = Item>>,
-        notify: impl Fn(&mut P, &Key) + Send + Sync + 'static
+        notify: impl Fn(&mut P, &IndexArea<Key>) + Send + Sync + 'static
     ) -> Arc<RwLock<Option<Arc<dyn IndexView<Key, Item = Item>>>>> {
-        port.add_observer(self.new_arg(arg_key, Arc::new(port.0.clone()), notify, set_channel()));
+        port.add_observer(self.new_arg(arg_key, Arc::new(port.0.clone()), notify, queue_channel()));
         port.get_view_arc()
     }
 
@@ -96,7 +97,7 @@ where ArgKey: Clone + Hash + Eq,
         (tx, rx): (ChannelSender<D>, ChannelReceiver<D>)
     )
         -> Arc<RwLock<ProjectionArg<P, V, D>>>
-    where V::Msg: Send + Sync + std::fmt::Debug,
+    where V::Msg: Send + Sync,
           D::IntoIter: Send + Sync + 'static
     {
         self.remove_arg(&arg_key);
@@ -151,8 +152,7 @@ impl<P, V, D> UpdateTask for ProjectionArg<P, V, D>
 where P: Send + Sync + 'static,
       V: View + ?Sized,
       D: ChannelData<Item = V::Msg>,
-      D::IntoIter: Send + Sync,
-V::Msg: std::fmt::Debug
+      D::IntoIter: Send + Sync
 {
     fn update(&self) {
         if let Some(p) = self.proj.read().unwrap().upgrade() {
@@ -175,8 +175,7 @@ impl<P, V, D> UpdateTask for RwLock<ProjectionArg<P, V, D>>
 where P: Send + Sync + 'static,
       V: View + ?Sized,
       D: ChannelData<Item = V::Msg>,
-      D::IntoIter: Send + Sync,
-V::Msg: std::fmt::Debug
+      D::IntoIter: Send + Sync
 {
     fn update(&self) {
         self.read().unwrap().update();
@@ -225,19 +224,18 @@ where P: Send + Sync + 'static,
 impl<P, Key, Item, D> Observer<dyn IndexView<Key, Item = Item>> for ProjectionArg<P, dyn IndexView<Key, Item = Item>, D>
 where P: Send + Sync + 'static,
       Key: Clone + Send + Sync,
-      D: ChannelData<Item = Key>,
+      D: ChannelData<Item = IndexArea<Key>>,
       D::IntoIter: Send + Sync
 {
     fn reset(&mut self, new_src: Option<Arc<dyn IndexView<Key, Item = Item>>>) {
         let old_area = self.src.area();
         self.src = new_src;
-        let new_area = self.src.area();
 
-        if let Some(area) = old_area { self.notify_each(area); }
-        if let Some(area) = new_area { self.notify_each(area); }
+        self.notify(&old_area);
+        self.notify(&self.src.area())
     }
 
-    fn notify(&mut self, msg: &Key) {
+    fn notify(&mut self, msg: &IndexArea<Key>) {
         self.tx.send(msg.clone());
     }
 }

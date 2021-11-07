@@ -14,7 +14,7 @@ pub use {
             InnerViewPort,
             OuterViewPort
         },
-        index::{IndexView},
+        index::{IndexArea, IndexView},
         grid::{GridView}
     }
 };
@@ -106,7 +106,7 @@ where DstKey: Clone + Send + Sync,
       F1: Fn(&SrcKey) -> DstKey + Send + Sync,
       F2: Fn(&DstKey) -> Option<SrcKey> + Send + Sync,
 {
-    type Msg = DstKey;
+    type Msg = IndexArea<DstKey>;
 }
 
 impl<DstKey, SrcKey, SrcView, F1, F2> IndexView<DstKey> for MapIndexKey<DstKey, SrcKey, SrcView, F1, F2>
@@ -122,8 +122,8 @@ where DstKey: Clone + Send + Sync,
         self.src_view.get(&(self.f2)(key)?)
     }
 
-    fn area(&self) -> Option<Vec<DstKey>> {
-        Some(self.src_view.area()?.iter().map(&self.f1).collect())
+    fn area(&self) -> IndexArea<DstKey> {
+        self.src_view.area().map(&self.f1)
     }
 }
 
@@ -137,14 +137,12 @@ where DstKey: Clone + Send + Sync,
     fn reset(&mut self, view: Option<Arc<SrcView>>) {
         let old_area = self.area();
         self.src_view = view;
-        let new_area = self.area();
-
-        if let Some(area) = old_area { self.cast.notify_each(area); }
-        if let Some(area) = new_area { self.cast.notify_each(area); }
+        self.cast.notify(&old_area);
+        self.cast.notify(&self.area());
     }
 
-    fn notify(&mut self, msg: &SrcKey) {
-        self.cast.notify(&(self.f1)(msg));
+    fn notify(&mut self, msg: &IndexArea<SrcKey>) {
+        self.cast.notify(&msg.map(&self.f1));
     }
 }
 

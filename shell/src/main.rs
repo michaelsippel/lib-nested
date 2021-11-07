@@ -21,7 +21,7 @@ use{
             ObserverBroadcast,
             context::{ReprTree, Object, MorphismType, MorphismMode, Context},
             port::{UpdateTask}},
-        index::{IndexView},
+        index::{IndexView, IndexArea},
         grid::{GridWindowIterator},
         sequence::{SequenceView, SequenceViewExt},
         vec::{VecBuffer},
@@ -43,6 +43,24 @@ use{
         process::ProcessLauncher
     }
 };
+
+struct TestView {}
+
+impl View for TestView {
+    type Msg = IndexArea<Point2<i16>>;
+}
+
+impl IndexView<Point2<i16>> for TestView {
+    type Item = TerminalAtom;
+
+    fn get(&self, pt: &Point2<i16>) -> Option<TerminalAtom> {
+        Some(TerminalAtom::from('.'))
+    }
+
+    fn area(&self) -> IndexArea<Point2<i16>> {
+        IndexArea::Full
+    }
+}
 
 #[async_std::main]
 async fn main() {
@@ -99,35 +117,22 @@ async fn main() {
                 tree_addr: vec![ 0 ]
             });
 
-            loop {
-                term_port.update();
-                /*
-                if let Some(p) = pty.as_mut() {
-                    if p.get_status() {
-                        if let Some(ptybox) = ptybox.take() {
-                            ptybox.write().unwrap().fit_content();
-                        }
-                        pty = None;
-                        process_list_editor.up();
+            let tp = term_port.clone();
+            async_std::task::spawn(
+                async move {
+                    loop {
+                        tp.update();
+                        async_std::task::sleep(std::time::Duration::from_millis(10)).await;
                     }
                 }
-*/
-                term_port.update();
-
+            );
+            
+            loop {
                 let ev = term.next_event().await;
-/*
-                if let Some(pty) = pty.as_mut() {
-                    pty.handle_terminal_event(&ev);
-                } else {
-*/
                 match ev {
                     TerminalEvent::Resize(new_size) => {
                         cur_size.set(new_size);
-                        term_port.inner().get_broadcast().notify_each(
-                            nested::grid::GridWindowIterator::from(
-                                Point2::new(0,0) .. Point2::new(new_size.x, new_size.y)
-                            )
-                        );
+                        term_port.inner().get_broadcast().notify(&IndexArea::Full);
                     }
                     TerminalEvent::Input(Event::Key(Key::Ctrl('c'))) |
                     TerminalEvent::Input(Event::Key(Key::Ctrl('g'))) |
@@ -157,27 +162,7 @@ async fn main() {
                         process_list_editor.goto_end();
                     }
                     TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {
-                        //let mut output_port = ViewPort::new();
                         process_list_editor.get_item().unwrap().write().unwrap().launch_pty2();
-/*
-                        let box_port = ViewPort::new();                        
-                        let test_box = AsciiBox::new(
-                            Vector2::new(80, 25),
-                            output_port.outer()
-                                .map_item(|_,a| a.add_style_back(TerminalStyle::fg_color((230, 230, 230)))),
-                            box_port.inner()
-                        );
-
-                        ptybox = Some(test_box.clone());
-
-                        table_buf.remove(Point2::new(0, y-1));
-
-                        let mut p = box_port.outer().map_item(|_idx, x| x.add_style_back(TerminalStyle::fg_color((90, 120, 100)))                            .offset(Vector2::new(0, -1));
-                        table_port.update_hooks.write().unwrap().push(Arc::new(p.clone().0));
-
-                        y += 1;
-                        table_buf.insert(Point2::new(0, y), p.clone());
-*/
                     }
 
                     ev => {
@@ -229,7 +214,8 @@ async fn main() {
                 }
             }
 
-            //drop(term);
+            drop(term);
+            drop(term_port);
         }
     );
 

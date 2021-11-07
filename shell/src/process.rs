@@ -134,10 +134,6 @@ impl ProcessLauncher {
 
     pub fn launch_pty2(&mut self) {
         self.launch_pty(self.pty_port.inner());
-        //self.ptybox.write().unwrap().fit_content();
-
-        //let mut p =
-        //table_port.update_hooks.write().unwrap().push(Arc::new(p.clone().0));
     }
 
     pub fn launch_pty(&mut self, port: InnerViewPort<dyn TerminalView>) -> Option<crate::pty::PTY> {

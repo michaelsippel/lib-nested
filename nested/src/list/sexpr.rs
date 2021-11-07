@@ -3,6 +3,7 @@ use {
         core::{InnerViewPort, Observer, ObserverBroadcast, OuterViewPort, View, ViewPort},
         projection::ProjectionHelper,
         sequence::SequenceView,
+        index::{IndexArea},
         terminal::{make_label, TerminalStyle, TerminalView},
     },
     cgmath::Point2,
@@ -141,19 +142,16 @@ pub struct VerticalSexprDecorator {
 }
 
 impl View for VerticalSexprDecorator {
-    type Msg = Point2<i16>;
+    type Msg = IndexArea<Point2<i16>>;
 }
 
 impl IndexView<Point2<i16>> for VerticalSexprDecorator {
     type Item = OuterViewPort<dyn TerminalView>;
 
-    fn area(&self) -> Option<Vec<Point2<i16>>> {
-        let mut area = (0..self.items.len()?)
-            .map(|i| Point2::new(1 as i16, i as i16))
-            .collect::<Vec<_>>();
-        area.push(Point2::new(0, 0));
-        area.push(Point2::new(2, self.items.len()? as i16 - 1));
-        Some(area)
+    fn area(&self) -> IndexArea<Point2<i16>> {
+        IndexArea::Range(
+            Point2::new(0, 0) ..= Point2::new(2, std::cmp::max(self.items.len().unwrap() as i16 - 1, 0))
+        )
     }
 
     fn get(&self, pt: &Point2<i16>) -> Option<Self::Item> {
@@ -218,9 +216,11 @@ impl VerticalSexprDecorator {
             opening_port: make_label(opening),
             closing_port: make_label(closing),
             items: proj_helper.new_sequence_arg((), items_port, |s: &mut Self, item_idx| {
-                s.cast.notify(&Point2::new(1, *item_idx as i16));
-                s.cast.notify(&Point2::new(2, *item_idx as i16 - 1));
-                s.cast.notify(&Point2::new(2, *item_idx as i16));
+                s.cast.notify(
+                    &IndexArea::Range(
+                        Point2::new(0, *item_idx as i16) ..= Point2::new(2, *item_idx as i16)
+                    )
+                );
             }),
             list_style: TerminalStyle::fg_color(match level {
                 0 => (200, 120, 10),

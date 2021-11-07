@@ -5,11 +5,11 @@ use {
     std::sync::RwLock,
     crate::{
         core::{
-            View, Observer, ObserverExt, ObserverBroadcast,
+            View, Observer, ObserverBroadcast,
             ViewPort, InnerViewPort, OuterViewPort
         },
         sequence::SequenceView,
-        index::IndexView,
+        index::{IndexArea, IndexView},
         grid::GridView
     }
 };
@@ -56,7 +56,7 @@ impl<Item: 'static> OuterViewPort<dyn SequenceView<Item = Item>> {
 
 impl<SrcView> View for Sequence2Index<SrcView>
 where SrcView: SequenceView + ?Sized + 'static {
-    type Msg = usize;
+    type Msg = IndexArea<usize>;
 }
 
 impl<SrcView> IndexView<usize> for Sequence2Index<SrcView>
@@ -67,8 +67,16 @@ where SrcView: SequenceView + ?Sized + 'static {
         self.src_view.get(key)
     }
 
-    fn area(&self) -> Option<Vec<usize>> {
-        Some((0 .. self.src_view.len()?).collect())
+    fn area(&self) -> IndexArea<usize> {
+        if let Some(len) = self.src_view.len() {
+            if len > 0 {
+                IndexArea::Range(0 ..= len-1)
+            } else {
+                IndexArea::Empty
+            }
+        } else {
+            IndexArea::Full
+        }
     }
 }
 
@@ -77,14 +85,13 @@ where SrcView: SequenceView + ?Sized + 'static {
     fn reset(&mut self, view: Option<Arc<SrcView>>) {
         let old_area = self.area();
         self.src_view = view;
-        let new_area = self.area();
 
-        if let Some(area) = old_area { self.cast.notify_each(area); }
-        if let Some(area) = new_area { self.cast.notify_each(area); }
+        self.cast.notify(&old_area);
+        self.cast.notify(&self.area());
     }
 
-    fn notify(&mut self, msg: &usize) {
-        self.cast.notify(msg);
+    fn notify(&mut self, idx: &usize) {
+        self.cast.notify(&IndexArea::Set(vec![ *idx ]));
     }
 }
 

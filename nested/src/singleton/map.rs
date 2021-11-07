@@ -4,7 +4,7 @@ use {
     crate::{
         singleton::{SingletonView},
         core::{
-            Observer, ObserverExt, ObserverBroadcast,
+            Observer, ObserverBroadcast,
             View, ViewPort, OuterViewPort
         }
     }

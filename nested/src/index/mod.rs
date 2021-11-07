@@ -6,7 +6,7 @@ pub mod buffer;
 use {
     std::{
         sync::Arc,
-        ops::Deref,
+        ops::{Deref, RangeInclusive},
     },
     std::sync::RwLock,
     crate::core::View
@@ -14,15 +14,34 @@ use {
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-pub trait IndexView<Key> : View<Msg = Key>
+#[derive(Clone)]
+pub enum IndexArea<Key> {
+    Empty,
+    Full,
+    Set(Vec<Key>),
+    Range(RangeInclusive<Key>),
+    //Procedural(Arc<dyn Fn() -> Box<dyn Iterator<Item = Key>>>)
+}
+
+impl<Key> IndexArea<Key> {
+    pub fn map<T>(&self, f: impl Fn(&Key) -> T) -> IndexArea<T> {
+        match self {
+            IndexArea::Empty => IndexArea::Empty,
+            IndexArea::Full => IndexArea::Full,
+            IndexArea::Set(v) => IndexArea::Set(v.iter().map(&f).collect()),
+            IndexArea::Range(r) => IndexArea::Range(f(&r.start()) ..= f(&r.end()))
+        }
+    }
+}
+
+pub trait IndexView<Key> : View<Msg = IndexArea<Key>>
 where Key: Send + Sync {
     type Item;
 
     fn get(&self, key: &Key) -> Option<Self::Item>;
 
-    // todo: AreaIterator enum to switch between Allocated and Procedural area
-    fn area(&self) -> Option<Vec<Key>> {
-        None
+    fn area(&self) -> IndexArea<Key> {
+        IndexArea::Full
     }
 }
 
@@ -38,7 +57,7 @@ where Key: Send + Sync,
         self.read().unwrap().get(key)
     }
 
-    fn area(&self) -> Option<Vec<Key>> {
+    fn area(&self) -> IndexArea<Key> {
         self.read().unwrap().area()
     }
 }
@@ -53,7 +72,7 @@ where Key: Send + Sync,
         self.deref().get(key)
     }
 
-    fn area(&self) -> Option<Vec<Key>> {
+    fn area(&self) -> IndexArea<Key> {
         self.deref().area()
     }
 }
@@ -68,17 +87,17 @@ where Key: Send + Sync,
         self.as_ref()?.get(key)
     }
 
-    fn area(&self) -> Option<Vec<Key>> {
+    fn area(&self) -> IndexArea<Key> {
         if let Some(v) = self.as_ref() {
             v.area()
         } else {
-            Some(Vec::new())
+            IndexArea::Empty
         }
     }
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
-
+/*
 pub trait ImplIndexView : Send + Sync {
     type Key : Send + Sync;
     type Value;
@@ -104,4 +123,4 @@ impl<V: ImplIndexView> IndexView<V::Key> for V {
         (self as &V).area()
     }
 }
-
+*/

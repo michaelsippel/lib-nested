@@ -3,10 +3,10 @@ use {
     std::sync::RwLock,
     crate::{
         singleton::{SingletonView},
-        index::{IndexView},
+        index::{IndexArea, IndexView},
         grid::{GridView},
         core::{
-            Observer, ObserverExt, ObserverBroadcast,
+            Observer, ObserverBroadcast,
             View, ViewPort, OuterViewPort
         }
     }
@@ -52,7 +52,7 @@ where SrcView: SingletonView + ?Sized
 impl<SrcView> View for Singleton2Index<SrcView>
 where SrcView: SingletonView + ?Sized
 {
-    type Msg = ();
+    type Msg = IndexArea<()>;
 }
 
 impl<SrcView> IndexView<()> for Singleton2Index<SrcView>
@@ -60,9 +60,10 @@ where SrcView: SingletonView + ?Sized
 {
     type Item = SrcView::Item;
 
-    fn area(&self) -> Option<Vec<()>> {
-        Some(vec![()])
+    fn area(&self) -> IndexArea<()> {
+        IndexArea::Full
     }
+
     fn get(&self, _msg: &()) -> Option<Self::Item> {
         Some(self.src_view.as_ref().unwrap().get())
     }
@@ -75,11 +76,11 @@ where SrcView: SingletonView + ?Sized
 {
     fn reset(&mut self, view: Option<Arc<SrcView>>) {
         self.src_view = view;
-        self.cast.notify(&());
+        self.cast.notify(&IndexArea::Full);
     }
 
-    fn notify(&mut self, msg: &()) {
-        self.cast.notify(msg);
+    fn notify(&mut self, _: &()) {
+        self.cast.notify(&IndexArea::Full);
     }
 }
 
