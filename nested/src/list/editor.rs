@@ -698,7 +698,11 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
 
     pub fn get_item(&self) -> Option<Arc<RwLock<ItemEditor>>> {
         if let Some(idx) = self.cursor.get().idx {
-            Some(self.data.get(idx))
+            if idx < self.data.len() {
+                Some(self.data.get(idx))
+            } else {
+                None
+            }
         } else {
             None
         }

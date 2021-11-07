@@ -162,7 +162,9 @@ async fn main() {
                         process_list_editor.goto_end();
                     }
                     TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {
-                        process_list_editor.get_item().unwrap().write().unwrap().launch_pty2();
+                        if let Some(launcher) = process_list_editor.get_item() {
+                            launcher.write().unwrap().launch_pty2();
+                        }
                     }
 
                     ev => {
