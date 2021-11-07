@@ -15,6 +15,7 @@ use {
             OuterViewPort,
             port::UpdateTask
         },
+        index::{IndexArea},
         terminal::{TerminalView}
     },
     nako::{
@@ -26,7 +27,7 @@ use {
         },
     },
     nakorender::{
-        backend::{Backend, LayerId, LayerId2d, LayerInfo},
+        backend::{Backend, LayerId, LayerId2d, LayerInfo, LayerSampling},
         marp::MarpBackend,
         winit, camera::Camera2d
     },
@@ -98,7 +99,8 @@ impl SdfTerm {
                 id.into(),
                 LayerInfo {
                     extent: UVec2::new(1 + self.font_height / 2, self.font_height),
-                    location: IVec2::new(pt.x as i32 * self.font_height as i32 / 2, pt.y as i32 * self.font_height as i32)
+                    location: IVec2::new(pt.x as i32 * self.font_height as i32 / 2, pt.y as i32 * self.font_height as i32),
+                    sampling: LayerSampling::OverSampling(1),
                 });
 
             self.bg_layers.insert(*pt, (false, id));
@@ -117,7 +119,8 @@ impl SdfTerm {
                 id.into(),
                 LayerInfo {
                     extent: UVec2::new(1 + self.font_height / 2, self.font_height),
-                    location: IVec2::new(pt.x as i32 * self.font_height as i32 / 2, pt.y as i32 * self.font_height as i32)
+                    location: IVec2::new(pt.x as i32 * self.font_height as i32 / 2, pt.y as i32 * self.font_height as i32),
+                    sampling: LayerSampling::OverSampling(4),
                 });
 
             self.fg_layers.insert(*pt, (false, id));
@@ -155,18 +158,21 @@ impl SdfTerm {
             if let Some(c) = atom.c {
                 let font_index = 0;
                 let fontkit = Font::from_bytes(self.font.clone(), font_index).unwrap();
-                let mut ch = Character::from_font(&fontkit, c).with_size(1.0);
+                let mut ch = Character::from_font(&fontkit, c);//.with_size(1.0);
 
                 let (r,g,b) = atom.style.fg_color.unwrap_or((0, 0, 0));
 
-                ch.color = Vec3::new(
-                    (r as f32 / 255.0).clamp(0.0, 1.0),
-                    (g as f32 / 255.0).clamp(0.0, 1.0),
-                    (b as f32 / 255.0).clamp(0.0, 1.0),
-                );
-
                 let mut stream = PrimaryStream2d::new();
-                stream = ch.record_character(stream);
+                stream = ch.record_modifier_character(
+                    stream,
+                    Vec2::new(0.0, 0.0),
+                    1.0,
+                    Color(Vec3::new(
+                        (r as f32 / 255.0).clamp(0.0, 1.0),
+                        (g as f32 / 255.0).clamp(0.0, 1.0),
+                        (b as f32 / 255.0).clamp(0.0, 1.0),
+                    ))
+                );
 
                 self.renderer.lock().unwrap().update_sdf_2d(self.fg_layers.get(pt).unwrap().1, stream.build());
                 self.fg_layers.get_mut(pt).unwrap().0 = true;
@@ -184,14 +190,13 @@ impl SdfTerm {
 impl Observer<dyn TerminalView> for SdfTerm {
     fn reset(&mut self, new_view: Option<Arc<dyn TerminalView>>) {
         self.src_view = new_view;
-
-        for pt in self.src_view.area().unwrap_or(vec![]) {
-            self.notify(&pt);
-        }
+        self.notify(&self.src_view.area());
     }
 
-    fn notify(&mut self, pt: &Point2<i16>) {
-        self.update(pt);
+    fn notify(&mut self, area: &IndexArea<Point2<i16>>) {
+        for pt in area.iter() {
+            self.update(&pt);
+        }
     }
 }
 
