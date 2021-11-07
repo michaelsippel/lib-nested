@@ -14,7 +14,7 @@ pub use {
             InnerViewPort,
             OuterViewPort
         },
-        index::{IndexView}
+        index::{IndexArea, IndexView}
     }
 };
 
@@ -76,7 +76,7 @@ where Key: Clone + Send + Sync,
       SrcView: IndexView<Key> + ?Sized,
       F: Fn(&Key, &SrcView::Item) -> DstItem + Send + Sync
 {
-    type Msg = Key;
+    type Msg = IndexArea<Key>;
 }
 
 impl<Key, DstItem, SrcView, F> IndexView<Key> for MapIndexItem<Key, DstItem, SrcView, F>
@@ -90,7 +90,7 @@ where Key: Clone + Send + Sync,
         self.src_view.get(key).as_ref().map(|item| (self.f)(key, item))
     }
 
-    fn area(&self) -> Option<Vec<Key>> {
+    fn area(&self) -> IndexArea<Key> {
         self.src_view.area()
     }
 }
@@ -102,15 +102,15 @@ where Key: Clone + Send + Sync,
 {
     fn reset(&mut self, view: Option<Arc<SrcView>>) {
         let old_area = self.area();
-        self.src_view = view;
-        let new_area = self.area();
 
-        if let Some(area) = old_area { self.cast.notify_each(area); }
-        if let Some(area) = new_area { self.cast.notify_each(area); }
+        self.src_view = view;
+
+        self.cast.notify(&old_area);
+        self.cast.notify(&self.src_view.area())
     }
 
-    fn notify(&mut self, msg: &Key) {
-        self.cast.notify(msg);
+    fn notify(&mut self, area: &IndexArea<Key>) {
+        self.cast.notify(area);
     }
 }
 

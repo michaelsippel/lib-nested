@@ -6,7 +6,6 @@ use {
         core::{ViewPort, OuterViewPort},
         singleton::{SingletonView, SingletonBuffer},
         sequence::{SequenceView},
-        vec::VecBuffer,
         terminal::{TerminalView, TerminalStyle, TerminalEvent, TerminalEditor, TerminalEditorResult},
         list::{ListEditor, sexpr::ListDecoration},
         tree_nav::{TreeNav, TreeNavResult, TreeCursor}

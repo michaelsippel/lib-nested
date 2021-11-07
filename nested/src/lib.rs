@@ -15,7 +15,6 @@ pub mod list;
 pub mod tree_nav;
 
 pub mod string_editor;
-pub mod leveled_term_view;
 
 pub mod bimap;
 

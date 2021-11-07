@@ -27,6 +27,7 @@ use {
                 set_channel
             }
         },
+        index::{IndexArea},
         grid::{GridWindowIterator}
     },
     super::{
@@ -119,24 +120,40 @@ struct TermOutObserver {
     writer: Arc<TermOutWriter>
 }
 
+impl TermOutObserver {
+    fn send_area(&mut self, area: IndexArea<Point2<i16>>) {
+        match area {
+            IndexArea::Empty => {},
+            IndexArea::Full => {
+                let (w, h) = termion::terminal_size().unwrap();
+                for pos in GridWindowIterator::from(Point2::new(0, 0) .. Point2::new(w as i16, h as i16)) {
+                    self.dirty_pos_tx.send(pos);
+                }
+            }
+            IndexArea::Range(r) => {
+                for pos in GridWindowIterator::from(r) {
+                    self.dirty_pos_tx.send(pos);
+                }
+            }
+            IndexArea::Set(v) => {
+                for pos in v {
+                    self.dirty_pos_tx.send(pos);
+                }
+            }
+        }        
+    }
+}
+
 impl Observer<dyn TerminalView> for TermOutObserver {
     fn reset(&mut self, view: Option<Arc<dyn TerminalView>>) {
         self.writer.reset();
-
-        let (w, h) = termion::terminal_size().unwrap();
         if let Some(view) = view {
-            for pos in view.area().unwrap_or(
-                GridWindowIterator::from(
-                    Point2::new(0, 0) .. Point2::new(w as i16, h as i16)
-                ).collect()
-            ) {
-                self.dirty_pos_tx.send(pos);
-            }
+            self.send_area(view.area());
         }
     }
 
-    fn notify(&mut self, pos: &Point2<i16>) {
-        self.dirty_pos_tx.send(*pos);
+    fn notify(&mut self, area: &IndexArea<Point2<i16>>) {
+        self.send_area(area.clone());
     }
 }
 
@@ -166,10 +183,24 @@ impl TermOutWriter {
 
         // draw atoms until view port is destroyed
         while let Some(dirty_pos) = self.dirty_pos_rx.recv().await {
+            let (w, h) = termion::terminal_size().unwrap();
+
             if let Some(view) = self.view.read().unwrap().as_ref() {
                 let mut out = self.out.write().unwrap();
 
-                for pos in dirty_pos.into_iter().filter(|p| p.x >= 0 && p.y >= 0) {
+                let d = dirty_pos.into_iter().filter(|p| p.x >= 0 && p.y >= 0 && p.x < w as i16 && p.y < w as i16);//.collect::<Vec<_>>();
+                /*
+                d.sort_by(|a,b| {
+                    if a.y < b.y {
+                        std::cmp::Ordering::Less
+                    } else if a.y == b.y {
+                        a.x.cmp(&b.x)
+                    } else {
+                        std::cmp::Ordering::Greater
+                    }
+                });
+*/
+                for pos in d {
                     if pos != cur_pos {
                         write!(out, "{}", termion::cursor::Goto(pos.x as u16 + 1, pos.y as u16 + 1))?;
                     }

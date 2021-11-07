@@ -5,8 +5,8 @@ use {
     std::sync::RwLock,
     cgmath::Point2,
     crate::{
-        core::{InnerViewPort, OuterViewPort, Observer, ObserverBroadcast},
-        index::{ImplIndexView},
+        core::{InnerViewPort, OuterViewPort, View, Observer, ObserverBroadcast},
+        index::{IndexArea, IndexView},
         terminal::{TerminalAtom, TerminalView},
         projection::ProjectionHelper
     }
@@ -46,8 +46,8 @@ impl TerminalCompositor {
             self.proj_helper.new_index_arg(
                 idx,
                 v,
-                |s: &mut Self, pos| {
-                    s.cast.notify(pos);
+                |s: &mut Self, area| {
+                    s.cast.notify(area);
                 }
             )
         );
@@ -56,9 +56,12 @@ impl TerminalCompositor {
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-impl ImplIndexView for TerminalCompositor {
-    type Key = Point2<i16>;
-    type Value = TerminalAtom;
+impl View for TerminalCompositor {
+    type Msg = IndexArea<Point2<i16>>;
+}
+
+impl IndexView<Point2<i16>> for TerminalCompositor {
+    type Item = TerminalAtom;
 
     fn get(&self, pos: &Point2<i16>) -> Option<TerminalAtom> {
         let mut atom = None;
@@ -74,21 +77,11 @@ impl ImplIndexView for TerminalCompositor {
         atom
     }
 
-    fn area(&self) -> Option<Vec<Point2<i16>>> {
-        let mut area = Some(Vec::new());
+    fn area(&self) -> IndexArea<Point2<i16>> {
+        let mut area = IndexArea::Empty;
 
         for layer in self.layers.iter() {
-            if let (
-                Some(mut new_area),
-                Some(area)
-            ) = (
-                layer.area(),
-                area.as_mut()
-            ) {
-                area.append(&mut new_area);
-            } else {
-                area = None;
-            }
+            area = area.union(layer.area());
         }
 
         area

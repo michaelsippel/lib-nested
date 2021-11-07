@@ -13,7 +13,7 @@ use {
             View,
             InnerViewPort
         },
-        index::IndexView
+        index::{IndexArea, IndexView}
     }
 };
 
@@ -25,7 +25,7 @@ impl<Key, Item> View for IndexBufferView<Key, Item>
 where Key: Clone + Hash + Eq + Send + Sync + 'static,
       Item: Clone + Send + Sync + 'static
 {
-    type Msg = Key;
+    type Msg = IndexArea<Key>;
 }
 
 impl<Key, Item> IndexView<Key> for IndexBufferView<Key, Item>
@@ -38,11 +38,10 @@ where Key: Clone + Hash + Eq + Send + Sync + 'static,
         self.0.read().unwrap().get(key).cloned()
     }
 
-    fn area(&self) -> Option<Vec<Key>> {
-        Some(self.0.read().unwrap().keys().cloned().collect())
+    fn area(&self) -> IndexArea<Key> {
+        IndexArea::Set(self.0.read().unwrap().keys().cloned().collect())
     }
 }
-
 
 pub struct IndexBuffer<Key, Item>
 where Key: Clone + Hash + Eq + Send + Sync + 'static,
@@ -68,7 +67,7 @@ where Key: Clone + Hash + Eq + Send + Sync + 'static,
 
     pub fn insert(&mut self, key: Key, item: Item) {
         self.data.write().unwrap().insert(key.clone(), item);
-        self.cast.notify(&key);
+        self.cast.notify(&IndexArea::Set(vec![ key ]));
     }
 
     pub fn insert_iter<T>(&mut self, iter: T)
@@ -80,7 +79,7 @@ where Key: Clone + Hash + Eq + Send + Sync + 'static,
 
     pub fn remove(&mut self, key: Key) {
         self.data.write().unwrap().remove(&key);
-        self.cast.notify(&key);        
+        self.cast.notify(&IndexArea::Set(vec![ key ]));
     }
 }
 

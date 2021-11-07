@@ -3,22 +3,9 @@ use {
     termion::event::{Event, Key},
     crate::{
         core::{
-            View,
             ViewPort,
             OuterViewPort,
-            InnerViewPort,
-            ObserverBroadcast,
-            Observer,
-            ObserverExt,
-            context::{
-                ReprTree,
-                Object,
-                MorphismType,
-                MorphismMode,
-                Context
-            }
         },
-        projection::ProjectionHelper,
         singleton::{SingletonView, SingletonBuffer},
         sequence::{SequenceView},
         vec::{VecBuffer},
@@ -30,7 +17,6 @@ use {
             TerminalEditorResult,
             make_label
         },
-        leveled_term_view::LeveledTermView,
         list::{SExprView, ListDecoration, ListCursor, ListCursorMode, editor_view::{ListEditorView, ListEditorViewSegment}},
         tree_nav::{TreeCursor, TreeNav, TreeNavResult, TerminalTreeEditor}
     }
@@ -61,6 +47,7 @@ where ItemEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
 
     style: ListEditorStyle,
     level: usize,
+    cur_dist: Arc<RwLock<usize>>,
 }
 
 impl<ItemEditor, FnMakeItemEditor> TreeNav for ListEditor<ItemEditor, FnMakeItemEditor>
@@ -326,6 +313,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
                                 tree_addr: vec![]
                             }
                         );
+                        *self.cur_dist.write().unwrap() += 1;
                     }
                 }
                 TreeNavResult::Continue
@@ -586,7 +574,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
 }
 
 impl<ItemEditor, FnMakeItemEditor> ListEditor<ItemEditor, FnMakeItemEditor>
-where ItemEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
+where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
       FnMakeItemEditor: Fn() -> Arc<RwLock<ItemEditor>>
 {
     pub fn get_seg_seq_view(&self) -> OuterViewPort<dyn SequenceView<Item = OuterViewPort<dyn TerminalView>>> {
@@ -596,31 +584,38 @@ where ItemEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
             self.data_port.outer().to_sequence().map(|ed| ed.read().unwrap().get_term_view()),
             segment_view_port.inner()
         );
+
         segment_view_port.into_outer()
             .map(
-                |segment| match segment {
+                move |segment| {
+                    let cursor_col = (90, 60, 200);
+                match segment {
                     ListEditorViewSegment::InsertCursor =>
                         make_label("|")
                         .map_item(
-                            |_pt, atom|
-                            atom.add_style_back(TerminalStyle::fg_color((90,60,200)))
-                                //.add_style_back(TerminalStyle::bg_color((0,0,0)))
+                            move |_pt, atom|
+                            atom.add_style_back(TerminalStyle::fg_color(cursor_col))
                                 .add_style_back(TerminalStyle::bold(true))
                         ),
                     ListEditorViewSegment::Select(sub_view) =>
                         sub_view.map_item(
-                            |_pt, atom|
-                            atom.add_style_front(TerminalStyle::bg_color((90,60,200)))
+                            move |_pt, atom| {
+                                let old_col = atom.style.bg_color.unwrap_or(cursor_col);
+                                atom.add_style_front(TerminalStyle::bg_color(((old_col.0 as f32 * 0.4) as u8, (old_col.1 as f32 * 0.4) as u8, (old_col.2 as f32 * 0.4) as u8)))
+                            }
                         ),
                     ListEditorViewSegment::Modify(sub_view) => {
                         sub_view.clone().map_item(
-                            |_pt, atom|
-                            atom.add_style_back(TerminalStyle::bg_color((22,15,50)))
+                            move |_pt, atom| {
+                                let old_col = atom.style.bg_color.unwrap_or(cursor_col);
+                                atom.add_style_front(TerminalStyle::bg_color(((old_col.0 as f32 * 0.4) as u8, (old_col.1 as f32 * 0.4) as u8, (old_col.2 as f32 * 0.4) as u8)))
+                            }
                                 //.add_style_back(TerminalStyle::bold(true))
                         )
                     },
                     ListEditorViewSegment::View(sub_view) =>
                         sub_view.clone()
+                }
                 }
             )
     }
@@ -644,6 +639,7 @@ where ItemEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
         self.get_seg_seq_view()
             .decorate("\"", "\"", "", 1)
             .to_grid_horizontal()
+
             .flatten()
     }
 
@@ -681,7 +677,8 @@ where ItemEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
 
             style,
             make_item_editor,
-            level: 0
+            level: 0,
+            cur_dist: Arc::new(RwLock::new(0))
         };
         le.set_style(style);
         le

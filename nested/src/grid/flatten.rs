@@ -1,18 +1,19 @@
 use {
     std::{
         sync::Arc,
+        cmp::max,
         collections::HashMap
     },
     std::sync::RwLock,
     cgmath::{Point2, Vector2},
     crate::{
         core::{
-            View, Observer, ObserverBroadcast, ObserverExt,
+            View, Observer, ObserverBroadcast,
             ViewPort, InnerViewPort, OuterViewPort,
             port::UpdateTask
         },
         grid::{GridView, GridWindowIterator},
-        index::IndexView,
+        index::{IndexArea, IndexView},
         projection::ProjectionHelper
     }
 };
@@ -48,7 +49,7 @@ where Item: 'static
 impl<Item> View for Flatten<Item>
 where Item: 'static
 {
-    type Msg = Point2<i16>;
+    type Msg = IndexArea<Point2<i16>>;
 }
 
 impl<Item> IndexView<Point2<i16>> for Flatten<Item>
@@ -57,13 +58,15 @@ where Item: 'static
     type Item = Item;
 
     fn get(&self, idx: &Point2<i16>) -> Option<Self::Item> {
-        let chunk_idx = self.get_chunk_idx(*idx)?;        
-        let chunk = self.chunks.get(&chunk_idx)?;        
+        let chunk_idx = self.get_chunk_idx(*idx)?;
+        let chunk = self.chunks.get(&chunk_idx)?;
         chunk.view.get(&(*idx - chunk.offset))
     }
 
-    fn area(&self) -> Option<Vec<Point2<i16>>> {
-        Some(GridWindowIterator::from(Point2::new(0, 0) .. self.limit).collect())
+    fn area(&self) -> IndexArea<Point2<i16>> {
+        IndexArea::Range(
+            Point2::new(0, 0) ..= self.limit
+        )
     }
 }
 
@@ -83,8 +86,10 @@ where Item: 'static
                 top: proj_helper.new_index_arg(
                     Point2::new(-1, -1),
                     top_port,
-                    |s: &mut Self, chunk_idx| {
-                        s.update_chunk(*chunk_idx);
+                    |s: &mut Self, chunk_area| {
+                        for chunk_idx in chunk_area.iter() {
+                            s.update_chunk(chunk_idx);
+                        }
                     }
                 ),
                 chunks: HashMap::new(),
@@ -104,20 +109,26 @@ where Item: 'static
             let view = self.proj_helper.new_index_arg(
                 chunk_idx,
                 chunk_port.clone(),
-                move |s: &mut Self, idx| {
+                move |s: &mut Self, area| {
                     if let Some(chunk) = s.chunks.get(&chunk_idx) {
-                        if chunk.limit != chunk.view.range().end {
+                        if chunk.limit != *chunk.view.area().range().end() {
                             s.update_all_offsets();
                         }
                     }
+
                     if let Some(chunk) = s.chunks.get(&chunk_idx) {
-                        s.cast.notify(&(idx + chunk.offset));
+                        s.cast.notify(
+                            &area.map(|pt| pt + chunk.offset)
+                        );
                     }
                 }
             );
 
             if let Some(chunk) = self.chunks.get_mut(&chunk_idx) {
                 chunk.view = view;
+                self.cast.notify(
+                    &chunk.view.area().map(|pt| pt + chunk.offset)
+                );
             } else {
                 self.chunks.insert(
                     chunk_idx,
@@ -129,94 +140,99 @@ where Item: 'static
                 );
             }
 
-            chunk_port.0.update();
             self.update_all_offsets();
-            chunk_port.0.update();
         } else {
             self.proj_helper.remove_arg(&chunk_idx);
 
-            let mut dirty_idx = Vec::new();
-            if let Some(chunk) = self.chunks.get_mut(&chunk_idx) {
-                dirty_idx.extend(
-                    GridWindowIterator::from(
-                        Point2::new(chunk.offset.x, chunk.offset.y)
-                            .. Point2::new(chunk.offset.x + chunk.limit.x, chunk.offset.y + chunk.limit.y))
-                );
+            if let Some(chunk) = self.chunks.remove(&chunk_idx) {
+                self.update_all_offsets();
             }
-
-            self.chunks.remove(&chunk_idx);
-            self.cast.notify_each(dirty_idx);
-            self.update_all_offsets();
         }
     }
 
     /// recalculate all chunk offsets
     /// and update size of flattened grid
     fn update_all_offsets(&mut self) {
-        let mut dirty_idx = Vec::new();
+        let top_range = self.top.area().range();
+        let mut col_widths = vec![0 as i16; (top_range.end().x+1) as usize];
+        let mut row_heights = vec![0 as i16; (top_range.end().y+1) as usize];
 
-        let top_range = self.top.range();
-        let mut col_widths = vec![0 as i16; (top_range.end.x) as usize];
-        let mut row_heights = vec![0 as i16; (top_range.end.y) as usize];
-
-        for chunk_idx in GridWindowIterator::from(self.top.range()) {
+        for chunk_idx in GridWindowIterator::from(top_range.clone()) {
             if let Some(chunk) = self.chunks.get_mut(&chunk_idx) {
-                let lim = chunk.view.range().end;
-                col_widths[chunk_idx.x as usize] = std::cmp::max(col_widths[chunk_idx.x as usize], lim.x);
-                row_heights[chunk_idx.y as usize] = std::cmp::max(row_heights[chunk_idx.y as usize], lim.y);
+                let chunk_range = chunk.view.area().range();
+                let lim = *chunk_range.end();
+
+                col_widths[chunk_idx.x as usize] =
+                    max(
+                        col_widths[chunk_idx.x as usize],
+                        if lim.x < 0 { 0 } else { lim.x+1 }
+                    );
+                row_heights[chunk_idx.y as usize] =
+                    max(
+                        row_heights[chunk_idx.y as usize],
+                        if lim.y < 0 { 0 } else { lim.y+1 }
+                    );
             }
         }
 
-        for chunk_idx in GridWindowIterator::from(self.top.range()) {
+        for chunk_idx in GridWindowIterator::from(top_range.clone()) {
             if let Some(chunk) = self.chunks.get_mut(&chunk_idx) {
                 let old_offset = chunk.offset;
                 let old_limit = chunk.limit;
 
-                chunk.limit = chunk.view.range().end;
+                chunk.limit = *chunk.view.area().range().end();
                 chunk.offset = Vector2::new(
                     (0 .. chunk_idx.x as usize).map(|x| col_widths[x]).sum(),
                     (0 .. chunk_idx.y as usize).map(|y| row_heights[y]).sum()
                 );
+/*
                 if old_offset != chunk.offset {
-                    dirty_idx.extend(
-                        GridWindowIterator::from(
-                            Point2::new(std::cmp::min(old_offset.x, chunk.offset.x),
-                                        std::cmp::min(old_offset.y, chunk.offset.y))
-                                .. Point2::new(std::cmp::max(old_offset.x + old_limit.x, chunk.offset.x + chunk.limit.x),
-                                               std::cmp::max(old_offset.y + old_limit.y, chunk.offset.y + chunk.limit.y)))
+                    self.cast.notify(
+                        &IndexArea::Range(
+                            Point2::new(
+                                std::cmp::min(old_offset.x, chunk.offset.x),
+                                std::cmp::min(old_offset.y, chunk.offset.y)
+                            )
+                                ..= Point2::new(
+                                    std::cmp::max(old_offset.x + old_limit.x, chunk.offset.x + chunk.limit.x),
+                                    std::cmp::max(old_offset.y + old_limit.y, chunk.offset.y + chunk.limit.y)
+                                )
+                        )
                     );
                 }
+*/
             }
         }
 
         let old_limit = self.limit;
         self.limit = Point2::new(
-            (0 .. top_range.end.x as usize).map(|x| col_widths[x]).sum(),
-            (0 .. top_range.end.y as usize).map(|y| row_heights[y]).sum()
+            if top_range.end().x > 0 {
+                (0 ..= top_range.end().x as usize).map(|x| col_widths[x]).sum::<i16>() - 1
+            } else {
+                0
+            },
+            if top_range.end().y > 0 {
+                (0 ..= top_range.end().y as usize).map(|y| row_heights[y]).sum::<i16>() - 1
+            } else {
+                0
+            }
         );
 
-        // fixme: dirty hack to mitigate the buggy notifications, not efficien
-        dirty_idx.extend(
-            GridWindowIterator::from(
-                Point2::new(0, 0) .. Point2::new(
-                    std::cmp::max(old_limit.x, self.limit.x),
-                    std::cmp::max(old_limit.y, self.limit.y)
-                )
+        self.cast.notify(
+            &IndexArea::Range(
+                Point2::new(0, 0) ..= Point2::new(max(self.limit.x, old_limit.x), max(self.limit.y, old_limit.y))
             )
         );
-
-        self.cast.notify_each(dirty_idx);
     }
 
     /// given an index in the flattened sequence,
     /// which sub-sequence does it belong to?
     fn get_chunk_idx(&self, glob_pos: Point2<i16>) -> Option<Point2<i16>> {
-        for chunk_idx in GridWindowIterator::from(self.top.range()) {
+        for chunk_idx in GridWindowIterator::from(self.top.area().range()) {
             if let Some(chunk) = self.chunks.get(&chunk_idx) {
-                let chunk_range = chunk.view.range();
-                let end = chunk_range.end + chunk.offset;
+                let end = chunk.limit + chunk.offset;
 
-                if glob_pos.x < end.x && glob_pos.y < end.y {
+                if glob_pos.x <= end.x && glob_pos.y <= end.y {
                     return Some(chunk_idx);
                 }
             }

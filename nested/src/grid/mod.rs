@@ -1,15 +1,12 @@
+
 use {
     std::{
-        ops::{Range, RangeInclusive}
+        ops::RangeInclusive,
+        cmp::{min, max}
     },
     cgmath::{Point2},
-    crate::{
-        index::{IndexView}
-    }
+    crate::index::{IndexArea, IndexView}
 };
-
-pub mod offset;
-pub mod flatten;
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
@@ -17,65 +14,68 @@ pub trait GridView = IndexView<Point2<i16>>;
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-impl<Item> dyn GridView<Item = Item> {
-    pub fn range(&self) -> Range<Point2<i16>> {
-        if let Some(area) = self.area() {
-            Point2::new(
-                area.iter().map(|p| p.x).min().unwrap_or(0),
-                area.iter().map(|p| p.y).min().unwrap_or(0)
-            ) ..
-                Point2::new(
-                    area.iter().map(|p| p.x+1).max().unwrap_or(0),
-                    area.iter().map(|p| p.y+1).max().unwrap_or(0)
-                )
-        } else {
-            Point2::new(i16::MIN, i16::MIN) .. Point2::new(i16::MAX, i16::MAX)
-        }
-    }
-}
+pub mod offset;
+pub mod flatten;
+pub mod window_iterator;
+
+pub use window_iterator::GridWindowIterator;
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-pub struct GridWindowIterator {
-    next: Point2<i16>,
-    range: Range<Point2<i16>>
-}
+impl IndexArea<Point2<i16>> {
 
-impl From<Range<Point2<i16>>> for GridWindowIterator {
-    fn from(range: Range<Point2<i16>>) -> Self {
-        GridWindowIterator {
-            next: range.start,
-            range
+    // todo: this is not perfect (e.g. diagonals are inefficient)
+    pub fn iter(&self) -> GridWindowIterator {
+        GridWindowIterator::from(self.range())
+    }
+
+    pub fn range(&self) -> RangeInclusive<Point2<i16>> {
+        match self {
+            IndexArea::Empty => Point2::new(i16::MAX, i16::MAX) ..= Point2::new(i16::MIN, i16::MIN),
+            IndexArea::Full => panic!("range from full grid area"),
+            IndexArea::Set(v) =>
+                Point2::new(
+                    v.iter().map(|p| p.x).min().unwrap_or(0),
+                    v.iter().map(|p| p.y).min().unwrap_or(0)
+                ) ..=
+                Point2::new(
+                    v.iter().map(|p| p.x).max().unwrap_or(0),
+                    v.iter().map(|p| p.y).max().unwrap_or(0)
+                ),
+            IndexArea::Range(r) => r.clone()
         }
     }
-}
 
-impl From<RangeInclusive<Point2<i16>>> for GridWindowIterator {
-    fn from(range: RangeInclusive<Point2<i16>>) -> Self {
-        GridWindowIterator {
-            next: *range.start(),
-            range: *range.start() .. Point2::new(range.end().x+1, range.end().y+1)
-        }
-    }
-}
+    pub fn union(self, other: IndexArea<Point2<i16>>) -> IndexArea<Point2<i16>> {
+        match (self, other) {
+            (IndexArea::Empty, a) |
+            (a, IndexArea::Empty) => a,
 
-impl Iterator for GridWindowIterator {
-    type Item = Point2<i16>;
+            (IndexArea::Full, _) |
+            (_, IndexArea::Full) => IndexArea::Full,
 
-    fn next(&mut self) -> Option<Point2<i16>> {
-        if self.next.y < self.range.end.y {
-            let next = self.next;
+            (IndexArea::Set(mut va), IndexArea::Set(mut vb)) => {
+                va.extend(vb.into_iter());
+                IndexArea::Set(va)
+            },
 
-            if self.next.x+1 < self.range.end.x {
-                self.next.x += 1;
-            } else {
-                self.next.x = self.range.start.x;
-                self.next.y += 1;
-            }
+            (IndexArea::Range(r), IndexArea::Set(mut v)) |
+            (IndexArea::Set(mut v), IndexArea::Range(r)) => {
+                v.extend(GridWindowIterator::from(r));
+                IndexArea::Set(v)
+            },
 
-            Some(next)
-        } else {
-            None
+            (IndexArea::Range(ra), IndexArea::Range(rb)) => IndexArea::Range(
+                Point2::new(
+                    min(ra.start().x, rb.start().x),
+                    min(ra.start().y, rb.start().y)
+                )
+                    ..=
+                    Point2::new(
+                        max(ra.end().x, rb.end().x),
+                        max(ra.end().y, rb.end().y)
+                    )
+            )
         }
     }
 }
