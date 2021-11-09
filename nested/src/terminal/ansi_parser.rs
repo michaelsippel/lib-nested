@@ -29,7 +29,7 @@ pub fn read_ansi_from<R: Read + Unpin>(ansi_reader: &mut R, port: InnerViewPort<
         invert: false,
         term_width: 80,
 
-        cursor_stack: Vec::new(),
+        cursor_save: Point2::new(0, 0),
 
         buf: IndexBuffer::new(port),
 
@@ -81,7 +81,7 @@ struct PerfAtom {
     cursor: Point2<i16>,
     style: TerminalStyle,
     invert: bool,
-    cursor_stack: Vec<Point2<i16>>,
+    cursor_save: Point2<i16>,
 
     buf: IndexBuffer<Point2<i16>, TerminalAtom>,
 }
@@ -104,10 +104,40 @@ impl PerfAtom {
         style
     }
 
+    fn linefeed(&mut self) {
+        self.cursor.x = 0;
+        self.cursor.y += 1;        
+    }
+
+    fn carriage_return(&mut self) {
+        self.cursor.x = 0;        
+    }
+
+    fn horizontal_tab(&mut self) {
+        self.cursor.x += 8 - (self.cursor.x % 8);
+    }
+
+    fn backspace(&mut self) {
+        self.write_atom(self.cursor, None);
+        self.cursor.x -= 1;
+        if self.cursor.x < 0 {
+            self.cursor.y -= 0;
+            self.cursor.x = self.term_width - 1;
+        }        
+    }
+
     fn cursor_up(&mut self, n: usize) {
     }
 
     fn cursor_down(&mut self, n: usize) {        
+    }
+
+    fn save_cursor_position(&mut self) {
+        self.cursor_save = self.cursor;
+    }
+
+    fn restore_cursor_position(&mut self) {
+        self.cursor = self.cursor_save;
     }
 }
 
@@ -124,31 +154,10 @@ impl Perform for PerfAtom {
 
     fn execute(&mut self, byte: u8) {
         match byte {
-            // linefeed
-            b'\n' => {
-                self.cursor.x = 0;
-                self.cursor.y += 1;
-            },
-
-            // carriage return
-            b'\r' => {
-                self.cursor.x = 0;
-            },
-
-            // horizontal tab
-            b'\t' => {
-                self.cursor.x += 8 - (self.cursor.x % 8);
-            },
-
-            // backspace
-            0x8 => {
-                self.cursor.x -= 1;
-                if self.cursor.x < 0 {
-                    self.cursor.y -= 0;
-                    self.cursor.x = self.term_width - 1;
-                }
-            }
-
+            b'\n' => self.linefeed(),
+            b'\r' => self.carriage_return(),
+            b'\t' => self.horizontal_tab(),
+            0x8 => self.backspace(),
             _ => {
                 eprintln!("unhandled execute byte {:02x}", byte);
             }
@@ -161,7 +170,7 @@ impl Perform for PerfAtom {
             "[hook] params={:?}, intermediates={:?}, ignore={:?}, char={:?}",
             params, intermediates, ignore, c
         );
-        */
+*/
     }
 
     fn put(&mut self, byte: u8) {
@@ -177,15 +186,7 @@ impl Perform for PerfAtom {
     }
 
     fn csi_dispatch(&mut self, params: &Params, intermediates: &[u8], ignore: bool, c: char) {
-        /*
-        eprintln!(
-            "[csi_dispatch] params={:#?}, intermediates={:?}, ignore={:?}, char={:?}",
-            params, intermediates, ignore, c
-        );
-         */
-
         let mut piter = params.into_iter();
-
         match c {
             // Set SGR
             'm' =>  while let Some(n) = piter.next() {
@@ -224,7 +225,7 @@ impl Perform for PerfAtom {
                                 let r = piter.next().unwrap();
                                 let g = piter.next().unwrap();
                                 let b = piter.next().unwrap();
-                                self.style = self.style.add(TerminalStyle::fg_color((r[0] as u8, g[0] as u8, b[30] as u8)))
+                                self.style = self.style.add(TerminalStyle::fg_color((r[0] as u8, g[0] as u8, b[0] as u8)))
                             },
                             5 => {
                                 let v = piter.next().unwrap();
@@ -240,7 +241,7 @@ impl Perform for PerfAtom {
                                 let r = piter.next().unwrap();
                                 let g = piter.next().unwrap();
                                 let b = piter.next().unwrap();
-                                self.style = self.style.add(TerminalStyle::bg_color((r[0] as u8, g[0] as u8, b[30] as u8)))
+                                self.style = self.style.add(TerminalStyle::bg_color((r[0] as u8, g[0] as u8, b[0] as u8)))
                             },
                             5 => {
                                 let v = piter.next().unwrap();
@@ -267,10 +268,11 @@ impl Perform for PerfAtom {
                     self.cursor.x = 0;
                 }
             }
-            'C' => {
+            'C' | 'a' => {
                 self.cursor.x += piter.next().unwrap_or(&[1])[0] as i16;
                 if self.cursor.x >= self.term_width {
-                    self.cursor.x = 0;
+                    self.cursor.y += self.cursor.x / self.term_width;
+                    self.cursor.x %= self.term_width;
                 }
             }
             'D' => {
@@ -294,12 +296,12 @@ impl Perform for PerfAtom {
                 self.cursor.x = 0;
                 self.cursor.y -= piter.next().unwrap_or(&[1])[0] as i16;
             }
-            'G' => {
-                self.cursor.x = piter.next().unwrap()[0] as i16 - 1;
+            'G' | '`' => {
+                self.cursor.x = piter.next().unwrap_or(&[1])[0] as i16 - 1;
             }
-            'H' => {
-                if let Some(y) = piter.next() { self.cursor.y = y[0] as i16 - 1 };
-                if let Some(x) = piter.next() { self.cursor.x = x[0] as i16 - 1 };
+            'H' | 'f' => {
+                self.cursor.y = piter.next().unwrap_or(&[1])[0] as i16 - 1;
+                self.cursor.x = piter.next().unwrap_or(&[1])[0] as i16 - 1;
             }
             'J' => {
                 let x = piter.next().unwrap_or(&[0 as u16; 1]);
@@ -333,7 +335,7 @@ impl Perform for PerfAtom {
                             }                            
                         }
 
-                        //self.cursor.
+                        //self.cursor.x = 0;
                     }
 
                     // erase entire screen
@@ -366,40 +368,94 @@ impl Perform for PerfAtom {
                     1 => {
                         for x in 0 .. self.cursor.x {
                             self.write_atom(Point2::new(x, self.cursor.y), Some(TerminalAtom::new(' ', self.get_style())));
-                        }                        
+                        }
                     },
 
                     // clear entire line
                     2 => {
                         for x in 0 .. self.term_width {
                             self.write_atom(Point2::new(x, self.cursor.y), Some(TerminalAtom::new(' ', self.get_style())));
-                        }                        
+                        }
                     },
 
                     // invalid
                     _ => {}
                 }
             }
-            's' => {
-                self.cursor_stack.push(self.cursor);
-            }
-            'u' => {
-                if let Some(c) = self.cursor_stack.pop() {
-                    self.cursor = c;
+            /*
+            'M' => {
+                let n = piter.next().unwrap_or(&[1])[0] as i16;
+                for y in 0 .. n {
+                    for x in 0 .. self.term_width {
+                        self.write_atom(Point2::new(x, self.cursor.y+y), None);
+                    }
                 }
             }
+            'P' => {
+                for x in 0 .. piter.next().unwrap_or(&[1])[0] {
+                    self.backspace();
+                }
+            }
+            'X' => {
+                for x in 0 .. piter.next().unwrap_or(&[1])[0] {
+                    self.write_atom(Point2::new(self.cursor.x + x as i16, self.cursor.y), None);
+                }
+            }
+*/
+            's' => {
+                self.save_cursor_position();
+            }
+            'u' => {
+                self.restore_cursor_position();
+            }
             
-            _ => {}
+            _ => {
+                /*
+                eprintln!(
+                    "[csi_dispatch] params={:#?}, intermediates={:?}, ignore={:?}, char={:?}",
+                    params, intermediates, ignore, c
+                );
+*/                
+            }
         }
     }
 
     fn esc_dispatch(&mut self, intermediates: &[u8], ignore: bool, byte: u8) {
-        /*
-        eprintln!(
-            "[esc_dispatch] intermediates={:?}, ignore={:?}, byte={:02x}",
-        intermediates, ignore, byte
-        );
+
+        match (byte, intermediates) {
+            //(b'B', intermediates) => configure_charset!(StandardCharset::Ascii, intermediates),
+            (b'D', []) => self.linefeed(),
+            (b'E', []) => {
+                self.linefeed();
+                self.carriage_return();
+            },
+            /*
+            (b'H', []) => self.handler.set_horizontal_tabstop(),
+            (b'M', []) => self.handler.reverse_index(),
+            (b'Z', []) => self.handler.identify_terminal(None),
+            (b'c', []) => self.handler.reset_state(),
+            (b'0', intermediates) => {
+                configure_charset!(StandardCharset::SpecialCharacterAndLineDrawing, intermediates)
+            },
 */
+            (b'7', []) => self.save_cursor_position(),
+            //(b'8', [b'#']) => self.handler.decaln(),
+            (b'8', []) => self.restore_cursor_position(),
+/*
+            (b'=', []) => self.handler.set_keypad_application_mode(),
+            (b'>', []) => self.handler.unset_keypad_application_mode(),
+**/
+            // String terminator, do nothing (parser handles as string terminator).
+            (b'\\', []) => (),
+            _ => {
+                /*
+                eprintln!(
+                    "unhandled esc_dispatch intermediates={:?}, ignore={:?}, byte={:02x}",
+                    intermediates, ignore, byte
+                );
+*/
+            }
+        }
     }
 }
 
