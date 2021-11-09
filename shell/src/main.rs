@@ -37,7 +37,8 @@ use{
             TerminalEditor},
         string_editor::{StringEditor},
         tree_nav::{TreeNav, TreeNavResult, TreeCursor, TerminalTreeEditor},
-        list::{SExprView, ListCursorMode, ListEditor, ListEditorStyle}
+        list::{SExprView, ListCursorMode, ListEditor, ListEditorStyle},
+        projection::ProjectionHelper
     },
     crate::{
         process::ProcessLauncher
@@ -62,6 +63,100 @@ impl IndexView<Point2<i16>> for TestView {
     }
 }
 
+struct Plot {
+    limit: usize,
+    data: Arc<dyn SequenceView<Item = usize>>,
+    cast: Arc<RwLock<ObserverBroadcast<dyn TerminalView>>>,
+    proj_helper: ProjectionHelper<(), Self>
+}
+
+impl View for Plot {
+    type Msg = IndexArea<Point2<i16>>;
+}
+
+impl IndexView<Point2<i16>> for Plot {
+    type Item = TerminalAtom;
+
+    fn get(&self, pt: &Point2<i16>) -> Option<TerminalAtom> {
+        if pt.y >= 0 {
+            if let Some(cur_val) = self.data.get(&(pt.x as usize)) {
+                if cur_val <= self.limit {
+                    if pt.y == (self.limit - cur_val) as i16 {
+                        return Some(TerminalAtom::from('*'));
+                    }
+                }
+                if pt.x > 0 {
+                    if let Some(prev_val) = self.data.get(&((pt.x-1) as usize)) {
+                        if
+                            (
+                                pt.y > (self.limit - prev_val) as i16 &&
+                                pt.y < (self.limit - cur_val) as i16
+                            )
+                            ||
+                            (
+                                pt.y < (self.limit - prev_val) as i16 &&
+                                pt.y > (self.limit - cur_val) as i16
+                            )
+                        {
+                            return Some(TerminalAtom::from('|'));
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn area(&self) -> IndexArea<Point2<i16>> {
+        IndexArea::Range(
+            Point2::new(0,0)
+                ..= Point2::new(
+                    self.data.len().unwrap_or(0) as i16,
+                    self.limit as i16
+                )
+        )
+    }
+}
+
+impl Plot {
+    pub fn new(
+        data_port: OuterViewPort<dyn SequenceView<Item = usize>>,
+        out_port: InnerViewPort<dyn TerminalView>
+    ) -> Arc<RwLock<Self>> {
+        let mut proj_helper = ProjectionHelper::new(out_port.0.update_hooks.clone());
+        let proj = Arc::new(RwLock::new(
+            Plot {
+                data: proj_helper.new_sequence_arg(
+                    (),
+                    data_port,
+                    |s: &mut Self, idx| {
+                        let val = s.data.get(idx).unwrap_or(0);
+
+                        if val > s.limit {
+                            s.limit = val;
+                            s.cast.notify(&s.area());
+                        } else {
+                            s.cast.notify(&IndexArea::Range(
+                                Point2::new(*idx as i16, 0)
+                                    ..= Point2::new(*idx as i16, s.limit as i16)
+                            ));
+                        }
+                    }
+                ),
+
+                limit: 0,
+                cast: out_port.get_broadcast(),
+                proj_helper
+            }
+        ));
+
+        proj.write().unwrap().proj_helper.set_proj(&proj);
+        out_port.set_view(Some(proj.clone()));
+
+        proj
+    }
+}
+
 #[async_std::main]
 async fn main() {
     let term_port = ViewPort::new();
@@ -75,7 +170,8 @@ async fn main() {
             let table_port = ViewPort::<dyn nested::grid::GridView<Item = OuterViewPort<dyn TerminalView>>>::new();
             let mut table_buf = nested::index::buffer::IndexBuffer::new(table_port.inner());
 
-            let magic = make_label("<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>")
+            let magic =
+                make_label("<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>")
                 .map_item(
                     |pos, atom|
                     atom.add_style_back(
@@ -102,15 +198,65 @@ async fn main() {
                 ListEditorStyle::VerticalSexpr
             );
 
+            
+            let plist_vec_port = ViewPort::new();
+            let mut plist = VecBuffer::new(plist_vec_port.inner());
+
+            async_std::task::spawn(async move {
+                let (w, h) = termion::terminal_size().unwrap();
+                let mut x : usize = 0;
+                loop {
+                    let val =
+                        (
+                            5.0 + (x as f32 / 3.0).sin() * 5.0 +
+                            2.0 + ((7+x) as f32 / 5.0).sin() * 2.0 +
+                            2.0 + ((9+x) as f32 / 10.0).cos() * 3.0
+                        ) as usize;
+
+                    if x < w as usize {
+                        plist.push(val);
+                    } else {
+                        *plist.get_mut(x % (w as usize)) = val;
+                    }
+
+                    x+=1;
+                    async_std::task::sleep(std::time::Duration::from_millis(10)).await;
+
+                    if x%(w as usize) == 0 {
+                        async_std::task::sleep(std::time::Duration::from_secs(3)).await;
+                    }
+                }
+            });
+
+            let plot_port = ViewPort::new();
+            let plot = Plot::new(plist_vec_port.outer().to_sequence(), plot_port.inner());
+
             table_buf.insert_iter(vec![
                 (Point2::new(0, 0), magic.clone()),
                 (Point2::new(0, 1), status_chars_port.outer().to_sequence().to_grid_horizontal()),
                 (Point2::new(0, 2), magic.clone()),
-                (Point2::new(0, 3), process_list_editor.get_term_view())
+                (Point2::new(0, 3), process_list_editor.get_term_view()),
             ]);
 
-            compositor.write().unwrap().push(monstera::make_monstera());
-            compositor.write().unwrap().push(table_port.outer().flatten().offset(Vector2::new(40, 2)));
+            let (w, h) = termion::terminal_size().unwrap();
+
+            compositor.write().unwrap().push(
+                plot_port.outer()
+                    .map_item(|pt,a| {
+                        a.add_style_back(TerminalStyle::fg_color((255 - pt.y as u8 * 8, 100, pt.y as u8 *15)))
+                    })
+                    .offset(Vector2::new(0,h as i16-20))
+            );
+
+            compositor.write().unwrap().push(
+                monstera::make_monstera()
+                    .offset(Vector2::new(w as i16-38, 0)));
+
+            compositor.write().unwrap().push(
+                table_port.outer()
+                    .flatten()
+                    .offset(Vector2::new(3, 0))
+            );
 
             process_list_editor.goto(TreeCursor {
                 leaf_mode: ListCursorMode::Insert,
