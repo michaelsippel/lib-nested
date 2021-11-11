@@ -27,7 +27,7 @@ pub fn read_ansi_from<R: Read + Unpin>(ansi_reader: &mut R, port: InnerViewPort<
         cursor: Point2::new(0, 0),
         style: TerminalStyle::default(),
         invert: false,
-        term_width: 80,
+        term_width: 120,
 
         cursor_save: Point2::new(0, 0),
 
@@ -159,7 +159,7 @@ impl Perform for PerfAtom {
             b'\t' => self.horizontal_tab(),
             0x8 => self.backspace(),
             _ => {
-                eprintln!("unhandled execute byte {:02x}", byte);
+                //eprintln!("unhandled execute byte {:02x}", byte);
             }
         }
     }

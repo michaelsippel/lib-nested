@@ -14,15 +14,15 @@ use {
     }
 };
 
-pub struct SingletonBufferView<T: Clone + Eq + Send + Sync + 'static>(Arc<RwLock<T>>);
+pub struct SingletonBufferView<T: Clone + Send + Sync + 'static>(Arc<RwLock<T>>);
 
 impl<T> View for SingletonBufferView<T>
-where T: Clone + Eq + Send + Sync + 'static {
+where T: Clone + Send + Sync + 'static {
     type Msg = ();
 }
 
 impl<T> SingletonView for SingletonBufferView<T>
-where T: Clone + Eq + Send + Sync + 'static {
+where T: Clone + Send + Sync + 'static {
     type Item = T;
 
     fn get(&self) -> Self::Item {
@@ -32,13 +32,13 @@ where T: Clone + Eq + Send + Sync + 'static {
 
 #[derive(Clone)]
 pub struct SingletonBuffer<T>
-where T: Clone + Eq + Send + Sync + 'static {
+where T: Clone + Send + Sync + 'static {
     value: Arc<RwLock<T>>,
     cast: Arc<RwLock<ObserverBroadcast<dyn SingletonView<Item = T>>>>
 }
 
 impl<T> SingletonBuffer<T>
-where T: Clone + Eq + Send + Sync + 'static {
+where T: Clone + Send + Sync + 'static {
     pub fn new(
         value: T,
         port: InnerViewPort<dyn SingletonView<Item = T>>
@@ -58,6 +58,16 @@ where T: Clone + Eq + Send + Sync + 'static {
 
     pub fn set(&mut self, new_value: T) {
         let mut v = self.value.write().unwrap();
+        *v = new_value;
+        drop(v);
+        self.cast.notify(&());
+    }
+}
+/*
+impl<T> SingletonBuffer<T>
+where T: Clone + Eq + Send + Sync + 'static {
+    pub fn set(&mut self, new_value: T) {
+        let mut v = self.value.write().unwrap();
         if *v != new_value {
             *v = new_value;
             drop(v);
@@ -65,6 +75,6 @@ where T: Clone + Eq + Send + Sync + 'static {
         }
     }
 }
-
+*/
 // TODO: impl Deref & DerefMut
 

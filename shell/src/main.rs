@@ -34,7 +34,9 @@ use{
             TerminalEvent,
             make_label,
             TerminalView,
-            TerminalEditor},
+            TerminalEditor,
+            TerminalEditorResult
+        },
         string_editor::{StringEditor},
         tree_nav::{TreeNav, TreeNavResult, TreeCursor, TerminalTreeEditor},
         list::{SExprView, ListCursorMode, ListEditor, ListEditorStyle},
@@ -82,7 +84,11 @@ impl IndexView<Point2<i16>> for Plot {
             if let Some(cur_val) = self.data.get(&(pt.x as usize)) {
                 if cur_val <= self.limit {
                     if pt.y == (self.limit - cur_val) as i16 {
-                        return Some(TerminalAtom::from('*'));
+                        return Some(TerminalAtom::from(
+                            if cur_val < 4 { 'o' }
+                            else if cur_val < 8 { 'O' }
+                            else { '*' }
+                        ));
                     }
                 }
                 if pt.x > 0 {
@@ -98,7 +104,7 @@ impl IndexView<Point2<i16>> for Plot {
                                 pt.y > (self.limit - cur_val) as i16
                             )
                         {
-                            return Some(TerminalAtom::from('|'));
+                            return Some(TerminalAtom::from('.'));
                         }
                     }
                 }
@@ -272,66 +278,8 @@ async fn main() {
                     }
                 }
             );
-            
+
             loop {
-                let ev = term.next_event().await;
-                match ev {
-                    TerminalEvent::Resize(new_size) => {
-                        cur_size.set(new_size);
-                        term_port.inner().get_broadcast().notify(&IndexArea::Full);
-                    }
-                    TerminalEvent::Input(Event::Key(Key::Ctrl('c'))) |
-                    TerminalEvent::Input(Event::Key(Key::Ctrl('g'))) |
-                    TerminalEvent::Input(Event::Key(Key::Ctrl('d'))) => break,
-
-                    TerminalEvent::Input(Event::Key(Key::Left)) => {
-                        process_list_editor.pxev();
-                    }
-                    TerminalEvent::Input(Event::Key(Key::Right)) => {
-                        process_list_editor.nexd();
-                    }
-                    TerminalEvent::Input(Event::Key(Key::Up)) => {
-                        if process_list_editor.up() == TreeNavResult::Exit {
-                            process_list_editor.dn();
-                            process_list_editor.goto_home();
-                        }
-                    }
-                    TerminalEvent::Input(Event::Key(Key::Down)) => {
-                        if process_list_editor.dn() == TreeNavResult::Continue {
-                            process_list_editor.goto_home();
-                        }
-                    }
-                    TerminalEvent::Input(Event::Key(Key::Home)) => {
-                        process_list_editor.goto_home();
-                    }
-                    TerminalEvent::Input(Event::Key(Key::End)) => {
-                        process_list_editor.goto_end();
-                    }
-                    TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {
-                        if let Some(launcher) = process_list_editor.get_item() {
-                            launcher.write().unwrap().launch_pty2();
-                        }
-                    }
-
-                    ev => {
-                        if process_list_editor.get_cursor().leaf_mode == ListCursorMode::Select {
-                            match ev {
-                                TerminalEvent::Input(Event::Key(Key::Char('l'))) => { process_list_editor.up(); },
-                                TerminalEvent::Input(Event::Key(Key::Char('a'))) => { process_list_editor.dn(); },
-                                TerminalEvent::Input(Event::Key(Key::Char('i'))) => { process_list_editor.pxev(); },
-                                TerminalEvent::Input(Event::Key(Key::Char('e'))) => { process_list_editor.nexd(); },
-                                TerminalEvent::Input(Event::Key(Key::Char('u'))) => { process_list_editor.goto_home(); },
-                                TerminalEvent::Input(Event::Key(Key::Char('o'))) => { process_list_editor.goto_end(); },
-                                _ => {
-                                    process_list_editor.handle_terminal_event(&ev);
-                                }
-                            }
-                        } else {
-                            process_list_editor.handle_terminal_event(&ev);
-                        }
-                    }
-                }
-
                 status_chars.clear();
                 let cur = process_list_editor.get_cursor();
 
@@ -358,6 +306,79 @@ async fn main() {
                 } else {
                     for c in "Press <DN> to enter".chars() {
                         status_chars.push(TerminalAtom::new(c, TerminalStyle::fg_color((200, 200, 20))));
+                    }
+                }
+
+                let ev = term.next_event().await;
+
+                if let TerminalEvent::Resize(new_size) = ev {
+                    cur_size.set(new_size);
+                    term_port.inner().get_broadcast().notify(&IndexArea::Full);
+                    continue;
+                }
+
+                if let Some(process_editor) = process_list_editor.get_item() {
+                    let mut pe = process_editor.write().unwrap();
+                    if pe.is_captured() {
+                        if let TerminalEditorResult::Exit = pe.handle_terminal_event(&ev) {
+                            drop(pe);
+                            process_list_editor.up();
+                            process_list_editor.nexd();
+                        }
+                        continue;
+                    }
+                }
+
+                match ev {
+                    TerminalEvent::Input(Event::Key(Key::Ctrl('d'))) => break,
+                    TerminalEvent::Input(Event::Key(Key::Ctrl('l'))) => {
+                        process_list_editor.goto(TreeCursor {
+                            leaf_mode: ListCursorMode::Insert,
+                            tree_addr: vec![ 0 ]
+                        });
+                        process_list_editor.data.clear();
+                    },
+                    TerminalEvent::Input(Event::Key(Key::Left)) => {
+                        process_list_editor.pxev();
+                    }
+                    TerminalEvent::Input(Event::Key(Key::Right)) => {
+                        process_list_editor.nexd();
+                    }
+                    TerminalEvent::Input(Event::Key(Key::Up)) => {
+                        if process_list_editor.up() == TreeNavResult::Exit {
+                            process_list_editor.dn();
+                            process_list_editor.goto_home();
+                        }
+                    }
+                    TerminalEvent::Input(Event::Key(Key::Down)) => {
+                        if process_list_editor.dn() == TreeNavResult::Continue {
+                            process_list_editor.goto_home();
+                        }
+                    }
+                    TerminalEvent::Input(Event::Key(Key::Home)) => {
+                        process_list_editor.goto_home();
+                    }
+                    TerminalEvent::Input(Event::Key(Key::End)) => {
+                        process_list_editor.goto_end();
+                    }
+                    ev => {
+                        if process_list_editor.get_cursor().leaf_mode == ListCursorMode::Select {
+                            match ev {
+                                TerminalEvent::Input(Event::Key(Key::Char('l'))) => { process_list_editor.up(); },
+                                TerminalEvent::Input(Event::Key(Key::Char('a'))) => { process_list_editor.dn(); },
+                                TerminalEvent::Input(Event::Key(Key::Char('i'))) => { process_list_editor.pxev(); },
+                                TerminalEvent::Input(Event::Key(Key::Char('e'))) => { process_list_editor.nexd(); },
+                                TerminalEvent::Input(Event::Key(Key::Char('u'))) => { process_list_editor.goto_home(); },
+                                TerminalEvent::Input(Event::Key(Key::Char('o'))) => { process_list_editor.goto_end(); },
+                                _ => {
+                                    process_list_editor.handle_terminal_event(&ev);
+                                }
+                            }
+                        } else {
+                            if let TerminalEditorResult::Exit = process_list_editor.handle_terminal_event(&ev) {
+                                process_list_editor.nexd();
+                            }
+                        }
                     }
                 }
             }
