@@ -17,7 +17,8 @@ use {
         tree_nav::{TreeNav, TreeNavResult, TerminalTreeEditor, TreeCursor},
         list::{ListCursorMode, ListEditor, ListEditorStyle, sexpr::ListDecoration},
         string_editor::CharEditor,
-    }
+    },
+    crate::pty::{PTY, PTYStatus}
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
@@ -77,7 +78,7 @@ pub struct ProcessLauncher {
     suspended: bool,
 
     pty_port: ViewPort<dyn TerminalView>,
-    status_port: ViewPort<dyn SingletonView<Item = Option<portable_pty::ExitStatus>>>,
+    status_port: ViewPort<dyn SingletonView<Item = PTYStatus>>,
 
     comp_port: ViewPort<dyn TerminalView>,
     compositor: Arc<RwLock<nested::terminal::TerminalCompositor>>
@@ -156,7 +157,7 @@ impl ProcessLauncher {
                 tree_addr: vec![]
             });
             
-            self.pty = crate::pty::PTY::new(cmd, self.pty_port.inner(), self.status_port.inner());
+            self.pty = PTY::new(cmd, cgmath::Vector2::new(120, 40), self.pty_port.inner(), self.status_port.inner());
         }
     }
 
@@ -173,13 +174,18 @@ impl TerminalEditor for ProcessLauncher {
     fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
 
         // todo: move to observer of status view
-        if let Some(status) = self.status_port.outer().get_view().get() {
+        if let PTYStatus::Done{ status } = self.status_port.outer().get_view().get() {
             self.pty = None;
             self.suspended = false;
         }
 
         match event {
             TerminalEvent::Input(Event::Key(Key::Ctrl('c'))) => {
+                // todo: sigterm instead of kill?
+                if let Some(mut pty) = self.pty.as_mut() {
+                    pty.kill();
+                }
+
                 self.pty = None;
                 self.suspended = false;
                 self.cmd_editor.goto(TreeCursor {
@@ -222,7 +228,7 @@ impl TreeNav for ProcessLauncher {
 
     fn goto(&mut self, cur: TreeCursor) -> TreeNavResult {
         self.suspended = false;
-        if let Some(status) = self.status_port.outer().get_view().get() {
+        if let PTYStatus::Done{status} = self.status_port.outer().get_view().get() {
             self.pty = None;
         }
 

@@ -1,7 +1,8 @@
 
 use {
+    std::sync::{Arc, Mutex},
     termion::event::{Key, Event},
-    std::sync::Mutex,
+    cgmath::Vector2,
     nested::{
         core::{InnerViewPort},
         singleton::{SingletonView, SingletonBuffer},
@@ -13,21 +14,39 @@ pub use portable_pty::CommandBuilder;
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
+#[derive(Clone)]
+pub enum PTYStatus {
+    Running{ pid: u32 },
+    Done{ status: portable_pty::ExitStatus }
+}
+
+impl Default for PTYStatus {
+    fn default() -> Self {
+        PTYStatus::Running {
+            pid: 0
+        }
+    }
+}
+
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+
 pub struct PTY {
-    master: Mutex<Box<dyn portable_pty::MasterPty + Send>>
+    master: Mutex<Box<dyn portable_pty::MasterPty + Send>>,
+    child: Arc<Mutex<Box<dyn portable_pty::Child + Send + Sync>>>
 }
 
 impl PTY {
     pub fn new(
         cmd: portable_pty::CommandBuilder,
+        max_size: Vector2<i16>,
         term_port: InnerViewPort<dyn TerminalView>,
-        status_port: InnerViewPort<dyn SingletonView<Item = Option<portable_pty::ExitStatus>>>
+        status_port: InnerViewPort<dyn SingletonView<Item = PTYStatus>>
     ) -> Option<Self> {
 
         // Create a new pty
         let mut pair = portable_pty::native_pty_system().openpty(portable_pty::PtySize {
-            rows: 25,
-            cols: 120,
+            rows: max_size.y as u16,
+            cols: max_size.x as u16,
 
             // Not all systems support pixel_width, pixel_height,
             // but it is good practice to set it to something
@@ -40,27 +59,38 @@ impl PTY {
 
         if let Ok(mut child) = pair.slave.spawn_command(cmd) {
             let mut reader = pair.master.try_clone_reader().unwrap();
+            let mut status_buf = SingletonBuffer::new(PTYStatus::Running{ pid: child.process_id().expect("") }, status_port);
+
+            let child = Arc::new(Mutex::new(child));
 
             async_std::task::spawn_blocking(
                 move || {
                     nested::terminal::ansi_parser::read_ansi_from(&mut reader, term_port);
                 });
 
-            async_std::task::spawn_blocking(
+            async_std::task::spawn_blocking({
+                let child = child.clone();
                 move || {
-                    let mut status_buf = SingletonBuffer::new(None, status_port);
-                    if let Ok(status) = child.wait() {
-                        status_buf.set(Some(status));
+                    loop {
+                        if let Ok(Some(status)) = child.lock().unwrap().try_wait() {
+                            status_buf.set(PTYStatus::Done{ status });
+                            break;
+                        }
                     }
                 }
-            );
+            });
 
             Some(PTY {
-                master: Mutex::new(pair.master)
+                master: Mutex::new(pair.master),
+                child
             })
         } else {
             None
         }
+    }
+
+    pub fn kill(&mut self) {
+        self.child.lock().unwrap().kill();
     }
 
     pub fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
@@ -94,19 +124,19 @@ impl PTY {
                 TerminalEditorResult::Continue
             }
             TerminalEvent::Input(Event::Key(Key::Up)) => {
-                self.master.lock().unwrap().write(&[0, b'\x1B', b'[', b'A']).unwrap();
+                self.master.lock().unwrap().write(&[b'\x1B', b'[', b'A']).unwrap();
                 TerminalEditorResult::Continue
             }
             TerminalEvent::Input(Event::Key(Key::Down)) => {
-                self.master.lock().unwrap().write(&[0, b'\x1B', b'[', b'B']).unwrap();
+                self.master.lock().unwrap().write(&[b'\x1B', b'[', b'B']).unwrap();
                 TerminalEditorResult::Continue
             }
             TerminalEvent::Input(Event::Key(Key::Right)) => {
-                self.master.lock().unwrap().write(&[0, b'\x1B', b'[', b'C']).unwrap();
+                self.master.lock().unwrap().write(&[b'\x1B', b'[', b'C']).unwrap();
                 TerminalEditorResult::Continue
             }
             TerminalEvent::Input(Event::Key(Key::Left)) => {
-                self.master.lock().unwrap().write(&[0, b'\x1B', b'[', b'D']).unwrap();
+                self.master.lock().unwrap().write(&[b'\x1B', b'[', b'D']).unwrap();
                 TerminalEditorResult::Continue
             }
             _ => {
