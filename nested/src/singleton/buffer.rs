@@ -1,6 +1,7 @@
 use {
     std::{
-        sync::{Arc}
+        sync::{Arc},
+        ops::{Deref, DerefMut}
     },
     std::sync::RwLock,
     crate::{
@@ -13,6 +14,8 @@ use {
         singleton::{SingletonView}
     }
 };
+
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub struct SingletonBufferView<T: Clone + Send + Sync + 'static>(Arc<RwLock<T>>);
 
@@ -29,6 +32,8 @@ where T: Clone + Send + Sync + 'static {
         self.0.read().unwrap().clone()
     }
 }
+
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 #[derive(Clone)]
 pub struct SingletonBuffer<T>
@@ -56,6 +61,13 @@ where T: Clone + Send + Sync + 'static {
         self.value.read().unwrap().clone()
     }
 
+    pub fn get_mut(&self) -> MutableSingletonAccess<T> {
+        MutableSingletonAccess {
+            buf: self.clone(),
+            val: self.get()
+        }
+    }
+
     pub fn set(&mut self, new_value: T) {
         let mut v = self.value.write().unwrap();
         *v = new_value;
@@ -63,18 +75,36 @@ where T: Clone + Send + Sync + 'static {
         self.cast.notify(&());
     }
 }
-/*
-impl<T> SingletonBuffer<T>
-where T: Clone + Eq + Send + Sync + 'static {
-    pub fn set(&mut self, new_value: T) {
-        let mut v = self.value.write().unwrap();
-        if *v != new_value {
-            *v = new_value;
-            drop(v);
-            self.cast.notify(&());
-        }
+
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+
+pub struct MutableSingletonAccess<T>
+where T: Clone + Send + Sync + 'static {
+    buf: SingletonBuffer<T>,
+    val: T,
+}
+
+impl<T> Deref for MutableSingletonAccess<T>
+where T: Clone + Send + Sync + 'static {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        &self.val
     }
 }
-*/
-// TODO: impl Deref & DerefMut
+
+impl<T> DerefMut for MutableSingletonAccess<T>
+where T: Clone + Send + Sync + 'static {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.val
+    }
+}
+
+impl<T> Drop for MutableSingletonAccess<T>
+where T: Clone + Send + Sync + 'static {
+    fn drop(&mut self) {
+        self.buf.set(self.val.clone());
+    }
+}
+
 
