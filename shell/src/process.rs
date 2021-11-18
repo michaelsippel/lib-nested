@@ -109,6 +109,8 @@ impl ProcessLauncher {
                 ListEditorStyle::Plain
         );
 
+        
+        
         compositor.write().unwrap().push(
             box_port.outer()
                 .map_item(|_idx, x| x.add_style_back(TerminalStyle::fg_color((90, 120, 100))))
@@ -125,7 +127,7 @@ impl ProcessLauncher {
             cmd_editor,
             pty: None,
             ptybox: crate::ascii_box::AsciiBox::new(
-                    cgmath::Vector2::new(80, 25),
+                    cgmath::Vector2::new(0, 0),
                     pty_port.outer()
                         .map_item(|_,a:&TerminalAtom| a.add_style_back(TerminalStyle::fg_color((230, 230, 230)))),
                     box_port.inner()
@@ -151,6 +153,7 @@ impl ProcessLauncher {
             // Spawn a shell into the pty
             let mut cmd = crate::pty::CommandBuilder::new(strings[0].as_str());
             cmd.args(&strings[1..]);
+            cmd.cwd(".");
 
             self.cmd_editor.goto(TreeCursor {
                 leaf_mode: ListCursorMode::Insert,

@@ -65,7 +65,7 @@ impl PTY {
 
             async_std::task::spawn_blocking(
                 move || {
-                    nested::terminal::ansi_parser::read_ansi_from(&mut reader, term_port);
+                    nested::terminal::ansi_parser::read_ansi_from(&mut reader, max_size, term_port);
                 });
 
             async_std::task::spawn_blocking({
@@ -76,6 +76,8 @@ impl PTY {
                             status_buf.set(PTYStatus::Done{ status });
                             break;
                         }
+
+                        std::thread::sleep(std::time::Duration::from_millis(10));
                     }
                 }
             });

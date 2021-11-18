@@ -166,7 +166,7 @@ where P: Send + Sync + 'static,
                 }
             }
         } else {
-            eprintln!("proj update: upgrade fail");
+            //eprintln!("proj update: upgrade fail");
         }
     }
 }

@@ -31,7 +31,7 @@ use {
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-pub fn read_ansi_from<R: Read + Unpin>(ansi_reader: &mut R, port: InnerViewPort<dyn TerminalView>) {
+pub fn read_ansi_from<R: Read + Unpin>(ansi_reader: &mut R, max_size: Vector2<i16>, port: InnerViewPort<dyn TerminalView>) {
     let mut statemachine = Parser::new();
 
     let buf_port = ViewPort::new();
@@ -41,7 +41,7 @@ pub fn read_ansi_from<R: Read + Unpin>(ansi_reader: &mut R, port: InnerViewPort<
 
     let mut performer = PerfAtom {
         buf: IndexBuffer::new(buf_port.inner()),
-        size: SingletonBuffer::new(Vector2::new(120, 40), size_port.inner()),
+        size: SingletonBuffer::new(max_size, size_port.inner()),
         offset: SingletonBuffer::new(Vector2::new(0, 0), offset_port.inner()),
         cursor: SingletonBuffer::new(Point2::new(0, 0), cursor_port.inner()),
         cursty: TerminalStyle::default(),
@@ -340,7 +340,7 @@ impl PerfAtom {
     }
 
     fn backspace(&mut self) {
-        //self.write_atom(self.cursor.get(), None);
+        self.write_atom(self.cursor.get(), None);
         let mut c = self.cursor.get_mut();
         c.x -= 1;
         if c.x < 0 {
@@ -350,13 +350,50 @@ impl PerfAtom {
     }
 
     fn cursor_up(&mut self, n: usize) {
-        self.cursor.get_mut().y -= n as i16;
+        if self.cursor.get().y <= 0 {
+            self.scroll_dn(1);
+        } else {
+            self.cursor.get_mut().y -= n as i16;
+        }
     }
 
     fn cursor_dn(&mut self, n: usize) {
-        self.cursor.get_mut().y += n as i16;
+        let mut c = self.cursor.get_mut();
+        let s = self.size.get();
 
-        // todo: scroll ?
+        if c.y + (n as i16) < s.y {
+            c.y += n as i16;
+        } else {
+            let r = (n as i16) - (s.y - 1 - c.y);
+            c.y = s.y-1;
+            self.scroll_up(r as usize);
+        }
+    }
+
+    fn cursor_pxev(&mut self, n: usize) {
+        let mut c = self.cursor.get_mut();
+        let s = self.size.get();
+        
+        if c.y - (n as i16) >= 0 {
+            c.y -= n as i16;
+        } else {
+            let r = (n as i16) - c.y;
+            c.y = 0;
+            self.scroll_dn(r as usize);
+        }
+    }
+
+    fn cursor_nexd(&mut self, n: usize) {
+        let mut c = self.cursor.get_mut();
+        c.x += n as i16;
+        if c.x >= self.size.get().x {
+            c.y += c.x / self.size.get().x;
+            c.x %= self.size.get().x;
+        }
+    }
+    
+    fn insert_blank_lines(&mut self, n: usize) {
+        //eprintln!("insert blank lines");
     }
 
     fn scroll_up(&mut self, n: usize) {
@@ -365,6 +402,7 @@ impl PerfAtom {
 
     fn scroll_dn(&mut self, n: usize) {
         self.offset.get_mut().y -= n as i16;
+        //self.cursor_up(n);
     }
 
     fn save_cursor_position(&mut self) {
@@ -405,11 +443,13 @@ impl Perform for PerfAtom {
             "[hook] params={:?}, intermediates={:?}, ignore={:?}, char={:?}",
             params, intermediates, ignore, c
         );
-*/
+         */
     }
 
     fn put(&mut self, byte: u8) {
-        //eprintln!("[put] {:02x}", byte);
+        /*
+        eprintln!("[put] {:02x}", byte);
+         */
     }
 
     fn unhook(&mut self) {
@@ -418,6 +458,17 @@ impl Perform for PerfAtom {
 
     fn osc_dispatch(&mut self, params: &[&[u8]], bell_terminated: bool) {
         //eprintln!("[osc_dispatch] params={:?} bell_terminated={}", params, bell_terminated);
+
+        match params[0] {            
+            // Reset foreground color
+            b"110" => self.set_fg_color(&TTYColor::White),
+            // Reset background color
+            b"111" => self.set_bg_color(&TTYColor::Black),
+            // Reset text cursor color
+            b"112" => {},
+
+            _ => {}
+        }
     }
 
     fn csi_dispatch(&mut self, params: &Params, intermediates: &[u8], ignore: bool, c: char) {
@@ -508,28 +559,18 @@ impl Perform for PerfAtom {
                 }
             }
             '@' => {
-                let c = self.cursor.get();
-                for x in c.x .. self.size.get().x {
-                    self.write_atom(Point2::new(x, c.y), Some(TerminalAtom::new(' ', self.cursty)));
+                let n = piter.next().unwrap_or(&[1])[0] as usize;
+                for _ in 0..n {
+                    self.print(' ');
                 }
             }
             'A' => { self.cursor_up(piter.next().unwrap_or(&[1])[0] as usize); }
             'B' => { self.cursor_dn(piter.next().unwrap_or(&[1])[0] as usize); }
             'C' | 'a' => {
-                let mut c = self.cursor.get_mut();
-                c.x += piter.next().unwrap_or(&[1])[0] as i16;
-                if c.x >= self.size.get().x {
-                    c.y += c.x / self.size.get().x;
-                    c.x %= self.size.get().x;
-                }
+                self.cursor_nexd(piter.next().unwrap_or(&[1])[0] as usize);
             }
             'D' => {
-                let mut c = self.cursor.get_mut();
-                c.x -= piter.next().unwrap_or(&[1])[0] as i16;
-                if c.x < 0 {
-                    c.x = self.size.get().x - 1;
-                    c.y -= 1;
-                }
+                self.cursor_pxev(piter.next().unwrap_or(&[1])[0] as usize);
             }
             'd' => {
                 self.cursor.get_mut().y = piter.next().unwrap_or(&[1])[0] as i16 - 1;
@@ -546,6 +587,7 @@ impl Perform for PerfAtom {
                 let mut c = self.cursor.get_mut();
                 c.x = 0;
                 c.y -= piter.next().unwrap_or(&[1])[0] as i16;
+                
             }
             'G' | '`' => {
                 self.cursor.get_mut().x = piter.next().unwrap_or(&[1])[0] as i16 - 1;
@@ -562,7 +604,6 @@ impl Perform for PerfAtom {
                     // clear from cursor until end of screen
                     0 => {
                         let mut pos = self.cursor.get();
-
                         while pos.y < 100 {
                             self.write_atom(pos, None);
                             pos.x += 1;
@@ -637,26 +678,36 @@ impl Perform for PerfAtom {
                     _ => {}
                 }
             }
-            /*
+            'L' => {
+                self.insert_blank_lines(piter.next().unwrap_or(&[1])[0] as usize);
+            }
+
             'M' => {
+                //eprintln!("delete lines");
+                /*
                 let n = piter.next().unwrap_or(&[1])[0] as i16;
                 for y in 0 .. n {
                     for x in 0 .. self.size.get().x {
                         self.write_atom(Point2::new(x, self.cursor.y+y), None);
                     }
                 }
+*/
             }
+            /*
             'P' => {
                 for x in 0 .. piter.next().unwrap_or(&[1])[0] {
                     self.backspace();
                 }
             }
+*/
             'X' => {
+                //eprintln!("delete chars");
+                let c = self.cursor.get();
                 for x in 0 .. piter.next().unwrap_or(&[1])[0] {
-                    self.write_atom(Point2::new(self.cursor.x + x as i16, self.cursor.y), None);
+                    self.write_atom(Point2::new(c.x + x as i16, c.y), Some(TerminalAtom::new(' ', self.get_style())));
                 }
             }
-             */
+
             'S' => { self.scroll_up(piter.next().unwrap_or(&[1])[0] as usize); }
             'T' => { self.scroll_dn(piter.next().unwrap_or(&[1])[0] as usize); }
             's' => { self.save_cursor_position(); }
@@ -667,7 +718,7 @@ impl Perform for PerfAtom {
                     "[csi_dispatch] params={:#?}, intermediates={:?}, ignore={:?}, char={:?}",
                     params, intermediates, ignore, c
                 );
-*/                
+*/
             }
         }
     }
