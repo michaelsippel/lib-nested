@@ -1,15 +1,13 @@
 use {
-    std::{
-        sync::{Arc}
-    },
-    std::sync::RwLock,
-    cgmath::Point2,
     crate::{
-        core::{InnerViewPort, OuterViewPort, View, Observer, ObserverBroadcast},
+        core::{InnerViewPort, Observer, ObserverBroadcast, OuterViewPort, View},
         index::{IndexArea, IndexView},
+        projection::ProjectionHelper,
         terminal::{TerminalAtom, TerminalView},
-        projection::ProjectionHelper
-    }
+    },
+    cgmath::Point2,
+    std::sync::Arc,
+    std::sync::RwLock,
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
@@ -17,22 +15,18 @@ use {
 pub struct TerminalCompositor {
     layers: Vec<Arc<dyn TerminalView>>,
     cast: Arc<RwLock<ObserverBroadcast<dyn TerminalView>>>,
-    proj_helper: ProjectionHelper<usize, Self>
+    proj_helper: ProjectionHelper<usize, Self>,
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 impl TerminalCompositor {
-    pub fn new(
-        port: InnerViewPort<dyn TerminalView>
-    ) -> Arc<RwLock<Self>> {
-        let comp = Arc::new(RwLock::new(
-            TerminalCompositor {
-                layers: Vec::new(),
-                cast: port.get_broadcast(),
-                proj_helper: ProjectionHelper::new(port.0.update_hooks.clone())
-            }
-        ));
+    pub fn new(port: InnerViewPort<dyn TerminalView>) -> Arc<RwLock<Self>> {
+        let comp = Arc::new(RwLock::new(TerminalCompositor {
+            layers: Vec::new(),
+            cast: port.get_broadcast(),
+            proj_helper: ProjectionHelper::new(port.0.update_hooks.clone()),
+        }));
 
         comp.write().unwrap().proj_helper.set_proj(&comp);
         port.set_view(Some(comp.clone()));
@@ -43,13 +37,10 @@ impl TerminalCompositor {
     pub fn push(&mut self, v: OuterViewPort<dyn TerminalView>) {
         let idx = self.layers.len();
         self.layers.push(
-            self.proj_helper.new_index_arg(
-                idx,
-                v,
-                |s: &mut Self, area| {
+            self.proj_helper
+                .new_index_arg(idx, v, |s: &mut Self, area| {
                     s.cast.notify(area);
-                }
-            )
+                }),
         );
     }
 }
@@ -87,4 +78,3 @@ impl IndexView<Point2<i16>> for TerminalCompositor {
         area
     }
 }
-

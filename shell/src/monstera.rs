@@ -1,18 +1,15 @@
-
 use {
     cgmath::Point2,
     nested::{
-        core::{ViewPort, OuterViewPort},
+        core::{OuterViewPort, ViewPort},
+        terminal::{make_label, TerminalStyle, TerminalView},
         vec::VecBuffer,
-        terminal::{
-            TerminalStyle, TerminalView, make_label
-        },
-    }
+    },
 };
 
 pub fn make_monstera() -> OuterViewPort<dyn TerminalView> {
     let monstera_lines_port = ViewPort::new();
-    let monstera_lines = VecBuffer::with_data(
+    let _monstera_lines = VecBuffer::with_data(
         vec![
             make_label("                   |"),
             make_label("                   |"),
@@ -36,21 +33,19 @@ pub fn make_monstera() -> OuterViewPort<dyn TerminalView> {
             make_label("        *. (       |       ) .*"),
             make_label("             \\_ .  |   . _/"),
             make_label("                 \\ | /"),
-            make_label("                   .")
+            make_label("                   ."),
         ],
-        monstera_lines_port.inner()
+        monstera_lines_port.inner(),
     );
 
-    monstera_lines_port.outer()
+    monstera_lines_port
+        .outer()
         .to_sequence()
         .to_index()
         .map_key(
             |idx| Point2::new(0 as i16, *idx as i16),
-            |pt| if pt.x == 0 { Some(pt.y as usize) } else { None }
+            |pt| if pt.x == 0 { Some(pt.y as usize) } else { None },
         )
         .flatten()
-        .map_item(
-            |p, at| at.add_style_back(TerminalStyle::fg_color((0,100,10)))
-        )
+        .map_item(|_p, at| at.add_style_back(TerminalStyle::fg_color((0, 100, 10))))
 }
-

@@ -1,22 +1,18 @@
-
 pub mod buffer;
 pub mod map;
 pub mod to_index;
 //pub mod unwrap;
 
 use {
-    std::{
-        sync::Arc,
-        ops::Deref
-    },
+    crate::core::View,
     std::sync::RwLock,
-    crate::core::{View}
+    std::{ops::Deref, sync::Arc},
 };
 
 pub use buffer::SingletonBuffer;
 
 // TODO: #[ImplForArc, ImplForRwLock]
-pub trait SingletonView : View<Msg = ()> {
+pub trait SingletonView: View<Msg = ()> {
     type Item;
 
     fn get(&self) -> Self::Item;
@@ -41,7 +37,9 @@ impl<V: SingletonView + ?Sized> SingletonView for Arc<V> {
 }
 
 impl<V: SingletonView> SingletonView for Option<V>
-where V::Item: Default{
+where
+    V::Item: Default,
+{
     type Item = V::Item;
 
     fn get(&self) -> Self::Item {
@@ -61,8 +59,7 @@ impl<T> OuterViewPort<dyn SingletonView<Item = T>> {
     }
 
     pub fn map<U: Send + Sync + 'static>(&self, f: impl Fn(T) -> U) -> OuterViewPort<dyn SingletonView<Item = U>> {
-        
+
     }
 }
  */
-

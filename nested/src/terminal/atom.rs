@@ -1,12 +1,12 @@
 use {
     super::TerminalStyle,
-    serde::{Serialize, Deserialize}
+    serde::{Deserialize, Serialize},
 };
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug)]
 pub struct TerminalAtom {
     pub c: Option<char>,
-    pub style: TerminalStyle
+    pub style: TerminalStyle,
 }
 
 impl TerminalAtom {
@@ -15,7 +15,10 @@ impl TerminalAtom {
     }
 
     pub fn new_bg(bg_color: (u8, u8, u8)) -> Self {
-        TerminalAtom { c: None, style: TerminalStyle::bg_color(bg_color) }
+        TerminalAtom {
+            c: None,
+            style: TerminalStyle::bg_color(bg_color),
+        }
     }
 
     pub fn add_style_front(mut self, style: TerminalStyle) -> Self {
@@ -33,7 +36,7 @@ impl From<char> for TerminalAtom {
     fn from(c: char) -> Self {
         TerminalAtom {
             c: Some(c),
-            style: TerminalStyle::default()
+            style: TerminalStyle::default(),
         }
     }
 }
@@ -42,7 +45,7 @@ impl From<Option<char>> for TerminalAtom {
     fn from(c: Option<char>) -> Self {
         TerminalAtom {
             c,
-            style: TerminalStyle::default()
+            style: TerminalStyle::default(),
         }
     }
 }
@@ -51,8 +54,7 @@ impl From<&char> for TerminalAtom {
     fn from(c: &char) -> Self {
         TerminalAtom {
             c: Some(*c),
-            style: TerminalStyle::default()
+            style: TerminalStyle::default(),
         }
     }
 }
-

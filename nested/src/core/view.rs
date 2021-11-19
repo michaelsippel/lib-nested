@@ -1,12 +1,11 @@
-
-                    /*\
+/*\
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                    View
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                     \*/
-pub trait View : Send + Sync {
+pub trait View: Send + Sync {
     /// Notification message for the observers
-    type Msg : Send + Sync;
+    type Msg: Send + Sync;
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
@@ -25,4 +24,3 @@ impl<V: View + ?Sized> View for Arc<V> {
 impl<V: View> View for Option<V> {
     type Msg = V::Msg;
 }
-

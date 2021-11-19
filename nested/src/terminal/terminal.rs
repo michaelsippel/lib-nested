@@ -1,44 +1,32 @@
 use {
-    std::{
-        sync::Arc,
-        io::{Write, stdout, stdin},
-        collections::HashSet
-    },
-    std::sync::RwLock,
-    async_std::{
-        stream::StreamExt,
-        task
-    },
-    signal_hook,
-    signal_hook_async_std::Signals,
-    cgmath::{Vector2, Point2},
-    termion::{
-        raw::IntoRawMode,
-        input::{TermRead, MouseTerminal}
-    },
+    super::{TerminalStyle, TerminalView},
     crate::{
         core::{
-            OuterViewPort,
-            Observer,
-            channel::{
-                ChannelReceiver,
-                ChannelSender,
-                queue_channel,
-                set_channel
-            }
+            channel::{queue_channel, set_channel, ChannelReceiver, ChannelSender},
+            Observer, OuterViewPort,
         },
-        index::{IndexArea},
-        grid::{GridWindowIterator}
+        grid::GridWindowIterator,
+        index::IndexArea,
     },
-    super::{
-        TerminalStyle,
-        TerminalView
+    async_std::{stream::StreamExt, task},
+    cgmath::{Point2, Vector2},
+    signal_hook,
+    signal_hook_async_std::Signals,
+    std::sync::RwLock,
+    std::{
+        collections::HashSet,
+        io::{stdin, stdout, Write},
+        sync::Arc,
+    },
+    termion::{
+        input::{MouseTerminal, TermRead},
+        raw::IntoRawMode,
     },
 };
 
 pub enum TerminalEvent {
     Resize(Vector2<i16>),
-    Input(termion::event::Event)
+    Input(termion::event::Event),
 }
 
 pub struct Terminal {
@@ -46,24 +34,22 @@ pub struct Terminal {
     _observer: Arc<RwLock<TermOutObserver>>,
 
     events: ChannelReceiver<Vec<TerminalEvent>>,
-    _signal_handle: signal_hook_async_std::Handle
+    _signal_handle: signal_hook_async_std::Handle,
 }
 
 impl Terminal {
-    pub fn new(
-        port: OuterViewPort<dyn TerminalView>
-    ) -> Self {
+    pub fn new(port: OuterViewPort<dyn TerminalView>) -> Self {
         let (dirty_pos_tx, dirty_pos_rx) = set_channel();
 
         let writer = Arc::new(TermOutWriter {
             out: RwLock::new(MouseTerminal::from(stdout().into_raw_mode().unwrap())),
             dirty_pos_rx,
-            view: port.get_view_arc()
+            view: port.get_view_arc(),
         });
 
         let observer = Arc::new(RwLock::new(TermOutObserver {
             dirty_pos_tx,
-            writer: writer.clone()
+            writer: writer.clone(),
         }));
 
         port.add_observer(observer.clone());
@@ -82,7 +68,7 @@ impl Terminal {
         event_tx.send(TerminalEvent::Resize(Vector2::new(w as i16, h as i16)));
 
         // and again on SIGWINCH
-        let signals = Signals::new(&[ signal_hook::consts::signal::SIGWINCH ]).unwrap();
+        let signals = Signals::new(&[signal_hook::consts::signal::SIGWINCH]).unwrap();
         let handle = signals.handle();
 
         task::spawn(async move {
@@ -90,9 +76,9 @@ impl Terminal {
             while let Some(signal) = signals.next().await {
                 match signal {
                     signal_hook::consts::signal::SIGWINCH => {
-                        let (w,h) = termion::terminal_size().unwrap();
+                        let (w, h) = termion::terminal_size().unwrap();
                         event_tx.send(TerminalEvent::Resize(Vector2::new(w as i16, h as i16)));
-                    },
+                    }
                     _ => unreachable!(),
                 }
             }
@@ -102,7 +88,7 @@ impl Terminal {
             writer,
             _observer: observer,
             events: event_rx,
-            _signal_handle: handle
+            _signal_handle: handle,
         }
     }
 
@@ -117,16 +103,18 @@ impl Terminal {
 
 struct TermOutObserver {
     dirty_pos_tx: ChannelSender<HashSet<Point2<i16>>>,
-    writer: Arc<TermOutWriter>
+    writer: Arc<TermOutWriter>,
 }
 
 impl TermOutObserver {
     fn send_area(&mut self, area: IndexArea<Point2<i16>>) {
         match area {
-            IndexArea::Empty => {},
+            IndexArea::Empty => {}
             IndexArea::Full => {
                 let (w, h) = termion::terminal_size().unwrap();
-                for pos in GridWindowIterator::from(Point2::new(0, 0) .. Point2::new(w as i16, h as i16)) {
+                for pos in
+                    GridWindowIterator::from(Point2::new(0, 0)..Point2::new(w as i16, h as i16))
+                {
                     self.dirty_pos_tx.send(pos);
                 }
             }
@@ -140,7 +128,7 @@ impl TermOutObserver {
                     self.dirty_pos_tx.send(pos);
                 }
             }
-        }        
+        }
     }
 }
 
@@ -160,7 +148,7 @@ impl Observer<dyn TerminalView> for TermOutObserver {
 pub struct TermOutWriter {
     out: RwLock<MouseTerminal<termion::raw::RawTerminal<std::io::Stdout>>>,
     dirty_pos_rx: ChannelReceiver<HashSet<Point2<i16>>>,
-    view: Arc<RwLock<Option<Arc<dyn TerminalView>>>>
+    view: Arc<RwLock<Option<Arc<dyn TerminalView>>>>,
 }
 
 impl TermOutWriter {
@@ -173,36 +161,45 @@ impl TermOutWriter {
 impl TermOutWriter {
     pub async fn show(&self) -> std::io::Result<()> {
         // init
-        write!(self.out.write().unwrap(), "{}{}{}",
-               termion::cursor::Hide,
-               termion::cursor::Goto(1, 1),
-               termion::style::Reset)?;
+        write!(
+            self.out.write().unwrap(),
+            "{}{}{}",
+            termion::cursor::Hide,
+            termion::cursor::Goto(1, 1),
+            termion::style::Reset
+        )?;
 
         let mut cur_pos = Point2::<i16>::new(0, 0);
         let mut cur_style = TerminalStyle::default();
 
         // draw atoms until view port is destroyed
         while let Some(dirty_pos) = self.dirty_pos_rx.recv().await {
-            let (w, h) = termion::terminal_size().unwrap();
+            let (w, _h) = termion::terminal_size().unwrap();
 
             if let Some(view) = self.view.read().unwrap().as_ref() {
                 let mut out = self.out.write().unwrap();
 
-                let d = dirty_pos.into_iter().filter(|p| p.x >= 0 && p.y >= 0 && p.x < w as i16 && p.y < w as i16);//.collect::<Vec<_>>();
-                /*
-                d.sort_by(|a,b| {
-                    if a.y < b.y {
-                        std::cmp::Ordering::Less
-                    } else if a.y == b.y {
-                        a.x.cmp(&b.x)
-                    } else {
-                        std::cmp::Ordering::Greater
-                    }
-                });
-*/
+                let d = dirty_pos
+                    .into_iter()
+                    .filter(|p| p.x >= 0 && p.y >= 0 && p.x < w as i16 && p.y < w as i16); //.collect::<Vec<_>>();
+                                                                                           /*
+                                                                                                           d.sort_by(|a,b| {
+                                                                                                               if a.y < b.y {
+                                                                                                                   std::cmp::Ordering::Less
+                                                                                                               } else if a.y == b.y {
+                                                                                                                   a.x.cmp(&b.x)
+                                                                                                               } else {
+                                                                                                                   std::cmp::Ordering::Greater
+                                                                                                               }
+                                                                                                           });
+                                                                                           */
                 for pos in d {
                     if pos != cur_pos {
-                        write!(out, "{}", termion::cursor::Goto(pos.x as u16 + 1, pos.y as u16 + 1))?;
+                        write!(
+                            out,
+                            "{}",
+                            termion::cursor::Goto(pos.x as u16 + 1, pos.y as u16 + 1)
+                        )?;
                     }
 
                     if let Some(atom) = view.get(&pos) {
@@ -232,4 +229,3 @@ impl TermOutWriter {
         std::io::Result::Ok(())
     }
 }
-

@@ -1,9 +1,9 @@
 use {
     crate::{
         core::{InnerViewPort, Observer, ObserverBroadcast, OuterViewPort, View, ViewPort},
+        index::IndexArea,
         projection::ProjectionHelper,
         sequence::SequenceView,
-        index::{IndexArea},
         terminal::{make_label, TerminalStyle, TerminalView},
     },
     cgmath::Point2,
@@ -122,7 +122,7 @@ impl ListDecoration for OuterViewPort<dyn SequenceView<Item = OuterViewPort<dyn 
         let port = ViewPort::new();
         ListDecorator::new(opening, closing, delim, level, self.clone(), port.inner());
         port.into_outer()
-    }    
+    }
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
@@ -150,7 +150,8 @@ impl IndexView<Point2<i16>> for VerticalSexprDecorator {
 
     fn area(&self) -> IndexArea<Point2<i16>> {
         IndexArea::Range(
-            Point2::new(0, 0) ..= Point2::new(2, std::cmp::max(self.items.len().unwrap() as i16 - 1, 0))
+            Point2::new(0, 0)
+                ..=Point2::new(2, std::cmp::max(self.items.len().unwrap() as i16 - 1, 0)),
         )
     }
 
@@ -216,11 +217,9 @@ impl VerticalSexprDecorator {
             opening_port: make_label(opening),
             closing_port: make_label(closing),
             items: proj_helper.new_sequence_arg((), items_port, |s: &mut Self, item_idx| {
-                s.cast.notify(
-                    &IndexArea::Range(
-                        Point2::new(0, *item_idx as i16) ..= Point2::new(2, *item_idx as i16)
-                    )
-                );
+                s.cast.notify(&IndexArea::Range(
+                    Point2::new(0, *item_idx as i16)..=Point2::new(2, *item_idx as i16),
+                ));
             }),
             list_style: TerminalStyle::fg_color(match level {
                 0 => (200, 120, 10),

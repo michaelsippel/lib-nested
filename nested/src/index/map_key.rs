@@ -1,27 +1,19 @@
 pub use {
-    std::{
-        sync::Arc,
-        boxed::Box
-    },
-    std::sync::RwLock,
     crate::{
         core::{
-            View,
-            Observer,
-            ObserverExt,
-            ObserverBroadcast,
-            ViewPort,
-            InnerViewPort,
-            OuterViewPort
+            InnerViewPort, Observer, ObserverBroadcast, ObserverExt, OuterViewPort, View, ViewPort,
         },
+        grid::GridView,
         index::{IndexArea, IndexView},
-        grid::{GridView}
-    }
+    },
+    std::sync::RwLock,
+    std::{boxed::Box, sync::Arc},
 };
 
 impl<SrcKey, Item> OuterViewPort<dyn IndexView<SrcKey, Item = Item>>
-where SrcKey: Clone + Send + Sync + 'static,
-      Item: 'static
+where
+    SrcKey: Clone + Send + Sync + 'static,
+    Item: 'static,
 {
     pub fn map_key<
         DstKey: Clone + Send + Sync + 'static,
@@ -30,7 +22,7 @@ where SrcKey: Clone + Send + Sync + 'static,
     >(
         &self,
         f1: F1,
-        f2: F2
+        f2: F2,
     ) -> OuterViewPort<dyn IndexView<DstKey, Item = Item>> {
         let port = ViewPort::new();
         port.add_update_hook(Arc::new(self.0.clone()));
@@ -42,57 +34,58 @@ where SrcKey: Clone + Send + Sync + 'static,
 }
 
 impl<Item> OuterViewPort<dyn IndexView<usize, Item = Item>>
-where Item: 'static
+where
+    Item: 'static,
 {
     pub fn to_grid_horizontal(&self) -> OuterViewPort<dyn GridView<Item = Item>> {
         self.map_key(
             |idx| cgmath::Point2::new(*idx as i16, 0),
-            |pt| if pt.y == 0 { Some(pt.x as usize) } else { None }
+            |pt| if pt.y == 0 { Some(pt.x as usize) } else { None },
         )
     }
 
     pub fn to_grid_vertical(&self) -> OuterViewPort<dyn GridView<Item = Item>> {
         self.map_key(
             |idx| cgmath::Point2::new(0, *idx as i16),
-            |pt| if pt.x == 0 { Some(pt.y as usize) } else { None }
-        )        
+            |pt| if pt.x == 0 { Some(pt.y as usize) } else { None },
+        )
     }
 }
 
 pub struct MapIndexKey<DstKey, SrcKey, SrcView, F1, F2>
-where DstKey: Clone + Send + Sync,
-      SrcKey: Clone + Send + Sync,
-      SrcView: IndexView<SrcKey> + ?Sized,
-      F1: Fn(&SrcKey) -> DstKey + Send + Sync,
-      F2: Fn(&DstKey) -> Option<SrcKey> + Send + Sync,
+where
+    DstKey: Clone + Send + Sync,
+    SrcKey: Clone + Send + Sync,
+    SrcView: IndexView<SrcKey> + ?Sized,
+    F1: Fn(&SrcKey) -> DstKey + Send + Sync,
+    F2: Fn(&DstKey) -> Option<SrcKey> + Send + Sync,
 {
     src_view: Option<Arc<SrcView>>,
     f1: F1,
     f2: F2,
-    cast: Arc<RwLock<ObserverBroadcast<dyn IndexView<DstKey, Item = SrcView::Item>>>>
+    cast: Arc<RwLock<ObserverBroadcast<dyn IndexView<DstKey, Item = SrcView::Item>>>>,
 }
 
 impl<DstKey, SrcKey, SrcView, F1, F2> MapIndexKey<DstKey, SrcKey, SrcView, F1, F2>
-where DstKey: Clone + Send + Sync + 'static,
-      SrcKey: Clone + Send + Sync + 'static,
-      SrcView: IndexView<SrcKey> + ?Sized + 'static,
-      SrcView::Item: 'static,
-      F1: Fn(&SrcKey) -> DstKey + Send + Sync + 'static,
-      F2: Fn(&DstKey) -> Option<SrcKey> + Send + Sync + 'static,
+where
+    DstKey: Clone + Send + Sync + 'static,
+    SrcKey: Clone + Send + Sync + 'static,
+    SrcView: IndexView<SrcKey> + ?Sized + 'static,
+    SrcView::Item: 'static,
+    F1: Fn(&SrcKey) -> DstKey + Send + Sync + 'static,
+    F2: Fn(&DstKey) -> Option<SrcKey> + Send + Sync + 'static,
 {
     fn new(
         port: InnerViewPort<dyn IndexView<DstKey, Item = SrcView::Item>>,
         f1: F1,
-        f2: F2
+        f2: F2,
     ) -> Arc<RwLock<Self>> {
-        let map = Arc::new(RwLock::new(
-            MapIndexKey {
-                src_view: None,
-                f1,
-                f2,
-                cast: port.get_broadcast()
-            }
-        ));
+        let map = Arc::new(RwLock::new(MapIndexKey {
+            src_view: None,
+            f1,
+            f2,
+            cast: port.get_broadcast(),
+        }));
 
         port.set_view(Some(map.clone()));
         map
@@ -100,21 +93,24 @@ where DstKey: Clone + Send + Sync + 'static,
 }
 
 impl<DstKey, SrcKey, SrcView, F1, F2> View for MapIndexKey<DstKey, SrcKey, SrcView, F1, F2>
-where DstKey: Clone + Send + Sync,
-      SrcKey: Clone + Send + Sync,
-      SrcView: IndexView<SrcKey> + ?Sized,
-      F1: Fn(&SrcKey) -> DstKey + Send + Sync,
-      F2: Fn(&DstKey) -> Option<SrcKey> + Send + Sync,
+where
+    DstKey: Clone + Send + Sync,
+    SrcKey: Clone + Send + Sync,
+    SrcView: IndexView<SrcKey> + ?Sized,
+    F1: Fn(&SrcKey) -> DstKey + Send + Sync,
+    F2: Fn(&DstKey) -> Option<SrcKey> + Send + Sync,
 {
     type Msg = IndexArea<DstKey>;
 }
 
-impl<DstKey, SrcKey, SrcView, F1, F2> IndexView<DstKey> for MapIndexKey<DstKey, SrcKey, SrcView, F1, F2>
-where DstKey: Clone + Send + Sync,
-      SrcKey: Clone + Send + Sync,
-      SrcView: IndexView<SrcKey> + ?Sized,
-      F1: Fn(&SrcKey) -> DstKey + Send + Sync,
-      F2: Fn(&DstKey) -> Option<SrcKey> + Send + Sync,
+impl<DstKey, SrcKey, SrcView, F1, F2> IndexView<DstKey>
+    for MapIndexKey<DstKey, SrcKey, SrcView, F1, F2>
+where
+    DstKey: Clone + Send + Sync,
+    SrcKey: Clone + Send + Sync,
+    SrcView: IndexView<SrcKey> + ?Sized,
+    F1: Fn(&SrcKey) -> DstKey + Send + Sync,
+    F2: Fn(&DstKey) -> Option<SrcKey> + Send + Sync,
 {
     type Item = SrcView::Item;
 
@@ -127,12 +123,14 @@ where DstKey: Clone + Send + Sync,
     }
 }
 
-impl<DstKey, SrcKey, SrcView, F1, F2> Observer<SrcView> for MapIndexKey<DstKey, SrcKey, SrcView, F1, F2>
-where DstKey: Clone + Send + Sync,
-      SrcKey: Clone + Send + Sync,
-      SrcView: IndexView<SrcKey> + ?Sized,
-      F1: Fn(&SrcKey) -> DstKey + Send + Sync,
-      F2: Fn(&DstKey) -> Option<SrcKey> + Send + Sync,
+impl<DstKey, SrcKey, SrcView, F1, F2> Observer<SrcView>
+    for MapIndexKey<DstKey, SrcKey, SrcView, F1, F2>
+where
+    DstKey: Clone + Send + Sync,
+    SrcKey: Clone + Send + Sync,
+    SrcView: IndexView<SrcKey> + ?Sized,
+    F1: Fn(&SrcKey) -> DstKey + Send + Sync,
+    F2: Fn(&DstKey) -> Option<SrcKey> + Send + Sync,
 {
     fn reset(&mut self, view: Option<Arc<SrcView>>) {
         let old_area = self.area();
@@ -145,4 +143,3 @@ where DstKey: Clone + Send + Sync,
         self.cast.notify(&msg.map(&self.f1));
     }
 }
-

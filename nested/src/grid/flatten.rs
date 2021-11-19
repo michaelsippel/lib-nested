@@ -1,25 +1,19 @@
 use {
-    std::{
-        sync::Arc,
-        cmp::max,
-        collections::HashMap
-    },
-    std::sync::RwLock,
-    cgmath::{Point2, Vector2},
     crate::{
-        core::{
-            View, Observer, ObserverBroadcast,
-            ViewPort, InnerViewPort, OuterViewPort,
-            port::UpdateTask
-        },
+        core::{InnerViewPort, Observer, ObserverBroadcast, OuterViewPort, View, ViewPort},
         grid::{GridView, GridWindowIterator},
         index::{IndexArea, IndexView},
-        projection::ProjectionHelper
-    }
+        projection::ProjectionHelper,
+    },
+    cgmath::{Point2, Vector2},
+    std::sync::RwLock,
+    std::{cmp::max, collections::HashMap, sync::Arc},
 };
 
 impl<Item> OuterViewPort<dyn GridView<Item = OuterViewPort<dyn GridView<Item = Item>>>>
-where Item: 'static{
+where
+    Item: 'static,
+{
     pub fn flatten(&self) -> OuterViewPort<dyn GridView<Item = Item>> {
         let port = ViewPort::new();
         port.add_update_hook(Arc::new(self.0.clone()));
@@ -29,31 +23,35 @@ where Item: 'static{
 }
 
 pub struct Chunk<Item>
-where Item: 'static
+where
+    Item: 'static,
 {
     offset: Vector2<i16>,
     limit: Point2<i16>,
-    view: Arc<dyn GridView<Item = Item>>
+    view: Arc<dyn GridView<Item = Item>>,
 }
 
 pub struct Flatten<Item>
-where Item: 'static
+where
+    Item: 'static,
 {
     limit: Point2<i16>,
     top: Arc<dyn GridView<Item = OuterViewPort<dyn GridView<Item = Item>>>>,
     chunks: HashMap<Point2<i16>, Chunk<Item>>,
     cast: Arc<RwLock<ObserverBroadcast<dyn GridView<Item = Item>>>>,
-    proj_helper: ProjectionHelper<Point2<i16>, Self>
+    proj_helper: ProjectionHelper<Point2<i16>, Self>,
 }
 
 impl<Item> View for Flatten<Item>
-where Item: 'static
+where
+    Item: 'static,
 {
     type Msg = IndexArea<Point2<i16>>;
 }
 
 impl<Item> IndexView<Point2<i16>> for Flatten<Item>
-where Item: 'static
+where
+    Item: 'static,
 {
     type Item = Item;
 
@@ -64,38 +62,36 @@ where Item: 'static
     }
 
     fn area(&self) -> IndexArea<Point2<i16>> {
-        IndexArea::Range(
-            Point2::new(0, 0) ..= self.limit
-        )
+        IndexArea::Range(Point2::new(0, 0)..=self.limit)
     }
 }
 
 /* TODO: remove unused projection args (bot-views) if they get replaced by a new viewport  */
 impl<Item> Flatten<Item>
-where Item: 'static
+where
+    Item: 'static,
 {
     pub fn new(
         top_port: OuterViewPort<dyn GridView<Item = OuterViewPort<dyn GridView<Item = Item>>>>,
-        out_port: InnerViewPort<dyn GridView<Item = Item>>
+        out_port: InnerViewPort<dyn GridView<Item = Item>>,
     ) -> Arc<RwLock<Self>> {
         let mut proj_helper = ProjectionHelper::new(out_port.0.update_hooks.clone());
 
-        let flat = Arc::new(RwLock::new(
-            Flatten {
-                limit: Point2::new(0, 0),
-                top: proj_helper.new_index_arg(
-                    Point2::new(-1, -1),
-                    top_port,
-                    |s: &mut Self, chunk_area| {
-                        for chunk_idx in chunk_area.iter() {
-                            s.update_chunk(chunk_idx);
-                        }
+        let flat = Arc::new(RwLock::new(Flatten {
+            limit: Point2::new(0, 0),
+            top: proj_helper.new_index_arg(
+                Point2::new(-1, -1),
+                top_port,
+                |s: &mut Self, chunk_area| {
+                    for chunk_idx in chunk_area.iter() {
+                        s.update_chunk(chunk_idx);
                     }
-                ),
-                chunks: HashMap::new(),
-                cast: out_port.get_broadcast(),
-                proj_helper
-            }));
+                },
+            ),
+            chunks: HashMap::new(),
+            cast: out_port.get_broadcast(),
+            proj_helper,
+        }));
 
         flat.write().unwrap().proj_helper.set_proj(&flat);
         out_port.set_view(Some(flat.clone()));
@@ -117,26 +113,23 @@ where Item: 'static
                     }
 
                     if let Some(chunk) = s.chunks.get(&chunk_idx) {
-                        s.cast.notify(
-                            &area.map(|pt| pt + chunk.offset)
-                        );
+                        s.cast.notify(&area.map(|pt| pt + chunk.offset));
                     }
-                }
+                },
             );
 
             if let Some(chunk) = self.chunks.get_mut(&chunk_idx) {
                 chunk.view = view;
-                self.cast.notify(
-                    &chunk.view.area().map(|pt| pt + chunk.offset)
-                );
+                self.cast
+                    .notify(&chunk.view.area().map(|pt| pt + chunk.offset));
             } else {
                 self.chunks.insert(
                     chunk_idx,
                     Chunk {
                         offset: Vector2::new(-1, -1),
                         limit: Point2::new(-1, -1),
-                        view
-                    }
+                        view,
+                    },
                 );
             }
 
@@ -144,7 +137,7 @@ where Item: 'static
         } else {
             self.proj_helper.remove_arg(&chunk_idx);
 
-            if let Some(chunk) = self.chunks.remove(&chunk_idx) {
+            if let Some(_chunk) = self.chunks.remove(&chunk_idx) {
                 self.update_all_offsets();
             }
         }
@@ -154,67 +147,73 @@ where Item: 'static
     /// and update size of flattened grid
     fn update_all_offsets(&mut self) {
         let top_range = self.top.area().range();
-        let mut col_widths = vec![0 as i16; (top_range.end().x+1) as usize];
-        let mut row_heights = vec![0 as i16; (top_range.end().y+1) as usize];
+        let mut col_widths = vec![0 as i16; (top_range.end().x + 1) as usize];
+        let mut row_heights = vec![0 as i16; (top_range.end().y + 1) as usize];
 
         for chunk_idx in GridWindowIterator::from(top_range.clone()) {
             if let Some(chunk) = self.chunks.get_mut(&chunk_idx) {
                 let chunk_range = chunk.view.area().range();
                 let lim = *chunk_range.end();
 
-                col_widths[chunk_idx.x as usize] =
-                    max(
-                        col_widths[chunk_idx.x as usize],
-                        if lim.x < 0 { 0 } else { lim.x+1 }
-                    );
-                row_heights[chunk_idx.y as usize] =
-                    max(
-                        row_heights[chunk_idx.y as usize],
-                        if lim.y < 0 { 0 } else { lim.y+1 }
-                    );
+                col_widths[chunk_idx.x as usize] = max(
+                    col_widths[chunk_idx.x as usize],
+                    if lim.x < 0 { 0 } else { lim.x + 1 },
+                );
+                row_heights[chunk_idx.y as usize] = max(
+                    row_heights[chunk_idx.y as usize],
+                    if lim.y < 0 { 0 } else { lim.y + 1 },
+                );
             }
         }
 
         for chunk_idx in GridWindowIterator::from(top_range.clone()) {
             if let Some(chunk) = self.chunks.get_mut(&chunk_idx) {
-                let old_offset = chunk.offset;
-                let old_limit = chunk.limit;
+                let _old_offset = chunk.offset;
+                let _old_limit = chunk.limit;
 
                 chunk.limit = *chunk.view.area().range().end();
                 chunk.offset = Vector2::new(
-                    (0 .. chunk_idx.x as usize).map(|x| col_widths[x]).sum(),
-                    (0 .. chunk_idx.y as usize).map(|y| row_heights[y]).sum()
+                    (0..chunk_idx.x as usize).map(|x| col_widths[x]).sum(),
+                    (0..chunk_idx.y as usize).map(|y| row_heights[y]).sum(),
                 );
-/*
-                if old_offset != chunk.offset {
-                    self.cast.notify(
-                        &IndexArea::Range(
-                            Point2::new(
-                                std::cmp::min(old_offset.x, chunk.offset.x),
-                                std::cmp::min(old_offset.y, chunk.offset.y)
-                            )
-                                ..= Point2::new(
-                                    std::cmp::max(old_offset.x + old_limit.x, chunk.offset.x + chunk.limit.x),
-                                    std::cmp::max(old_offset.y + old_limit.y, chunk.offset.y + chunk.limit.y)
-                                )
-                        )
-                    );
-                }
-*/
+                /*
+                                if old_offset != chunk.offset {
+                                    self.cast.notify(
+                                        &IndexArea::Range(
+                                            Point2::new(
+                                                std::cmp::min(old_offset.x, chunk.offset.x),
+                                                std::cmp::min(old_offset.y, chunk.offset.y)
+                                            )
+                                                ..= Point2::new(
+                                                    std::cmp::max(old_offset.x + old_limit.x, chunk.offset.x + chunk.limit.x),
+                                                    std::cmp::max(old_offset.y + old_limit.y, chunk.offset.y + chunk.limit.y)
+                                                )
+                                        )
+                                    );
+                                }
+                */
             }
         }
 
         let old_limit = self.limit;
         self.limit = Point2::new(
-            (0 ..= top_range.end().x as usize).map(|x| col_widths[x]).sum::<i16>() - 1,
-            (0 ..= top_range.end().y as usize).map(|y| row_heights[y]).sum::<i16>() - 1,
+            (0..=top_range.end().x as usize)
+                .map(|x| col_widths[x])
+                .sum::<i16>()
+                - 1,
+            (0..=top_range.end().y as usize)
+                .map(|y| row_heights[y])
+                .sum::<i16>()
+                - 1,
         );
 
-        self.cast.notify(
-            &IndexArea::Range(
-                Point2::new(0, 0) ..= Point2::new(max(self.limit.x, old_limit.x), max(self.limit.y, old_limit.y))
-            )
-        );
+        self.cast.notify(&IndexArea::Range(
+            Point2::new(0, 0)
+                ..=Point2::new(
+                    max(self.limit.x, old_limit.x),
+                    max(self.limit.y, old_limit.y),
+                ),
+        ));
     }
 
     /// given an index in the flattened sequence,
@@ -233,4 +232,3 @@ where Item: 'static
         None
     }
 }
-

@@ -1,21 +1,17 @@
 use {
-    std::sync::{Arc, RwLock},
     crate::{
-        core::{
-            Observer,
-            InnerViewPort,
-            OuterViewPort
-        },
+        core::{InnerViewPort, Observer, OuterViewPort},
         sequence::SequenceView,
-        vec::VecBuffer
-    }
+        vec::VecBuffer,
+    },
+    std::sync::{Arc, RwLock},
 };
 
 pub struct RadixProjection {
     src_radix: usize,
     dst_radix: usize,
     src_digits: Option<Arc<dyn SequenceView<Item = usize>>>,
-    dst_digits: RwLock<VecBuffer<usize>>
+    dst_digits: RwLock<VecBuffer<usize>>,
 }
 
 impl RadixProjection {
@@ -23,17 +19,15 @@ impl RadixProjection {
         src_radix: usize,
         dst_radix: usize,
         src_digits: OuterViewPort<dyn SequenceView<Item = usize>>,
-        dst_digits: InnerViewPort<RwLock<Vec<usize>>>
+        dst_digits: InnerViewPort<RwLock<Vec<usize>>>,
     ) -> Arc<RwLock<Self>> {
         dst_digits.0.add_update_hook(Arc::new(src_digits.0.clone()));
-        let proj = Arc::new(RwLock::new(
-            RadixProjection {
-                src_radix,
-                dst_radix,
-                src_digits: None,
-                dst_digits: RwLock::new(VecBuffer::new(dst_digits))
-            }
-        ));
+        let proj = Arc::new(RwLock::new(RadixProjection {
+            src_radix,
+            dst_radix,
+            src_digits: None,
+            dst_digits: RwLock::new(VecBuffer::new(dst_digits)),
+        }));
         src_digits.add_observer(proj.clone());
         proj
     }
@@ -41,7 +35,7 @@ impl RadixProjection {
     fn machine_int(&self) -> usize {
         let mut val = 0;
         let mut r = 1;
-        for i in 0 .. self.src_digits.len().unwrap_or(0) {
+        for i in 0..self.src_digits.len().unwrap_or(0) {
             val += r * self.src_digits.get(&i).unwrap();
             r *= self.src_radix;
         }
@@ -59,23 +53,23 @@ impl RadixProjection {
         while val > 0 {
             dst.push(val % self.dst_radix);
             val /= self.dst_radix;
-        }        
+        }
     }
 
     fn _update_dst_digit(&mut self, _idx: usize) {
         /*
-        let v = 0; // calculate new digit value
+                let v = 0; // calculate new digit value
 
-        // which src-digits are responsible?
+                // which src-digits are responsible?
 
-        if idx < self.dst_digits.len() {
-            self.dst_digits.get_mut(idx) = v;
-        } else if idx == self.dst_digits.len() {
-            self.dst_digits.push(v);
-        } else {
-            // error
-        }
-*/
+                if idx < self.dst_digits.len() {
+                    self.dst_digits.get_mut(idx) = v;
+                } else if idx == self.dst_digits.len() {
+                    self.dst_digits.push(v);
+                } else {
+                    // error
+                }
+        */
     }
 }
 

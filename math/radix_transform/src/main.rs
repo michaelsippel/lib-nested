@@ -1,55 +1,68 @@
-
-use {
-    nested::{
-        core::{
-            ViewPort,
-            TypeDict
-        },
-        vec::{VecBuffer},
-        integer::{RadixProjection}
-    }
+use nested::{
+    core::{TypeDict, ViewPort},
+    integer::RadixProjection,
+    vec::VecBuffer,
 };
 
 #[async_std::main]
 async fn main() {
     let mut td = TypeDict::new();
     for tn in vec![
-        "MachineWord", "MachineInt", "MachineSyllab",
-        "Vec", "Stream", "Json",
-        "Sequence", "UTF-8-Char",
-        "PositionalInt", "Digit", "LittleEndian", "BigEndian",
-        "DiffStream", "ℕ",
-        "$src_radix", "$dst_radix"
-    ] { td.add_typename(tn.into()); }
+        "MachineWord",
+        "MachineInt",
+        "MachineSyllab",
+        "Vec",
+        "Stream",
+        "Json",
+        "Sequence",
+        "UTF-8-Char",
+        "PositionalInt",
+        "Digit",
+        "LittleEndian",
+        "BigEndian",
+        "DiffStream",
+        "ℕ",
+        "$src_radix",
+        "$dst_radix",
+    ] {
+        td.add_typename(tn.into());
+    }
 
     let radix_types = vec![
         td.type_term_from_str("( ℕ )").unwrap(),
-        td.type_term_from_str("( PositionalInt 10 LittleEndian )").unwrap(),
+        td.type_term_from_str("( PositionalInt 10 LittleEndian )")
+            .unwrap(),
         td.type_term_from_str("( Sequence ( Digit 10 ) )").unwrap(),
         td.type_term_from_str("( Sequence UTF-8-Char )").unwrap(),
-        td.type_term_from_str("( Sequence MachineSyllab )").unwrap()
+        td.type_term_from_str("( Sequence MachineSyllab )").unwrap(),
     ];
 
     let src_types = vec![
         td.type_term_from_str("( ℕ )").unwrap(),
-        td.type_term_from_str("( PositionalInt $src_radix LittleEndian )").unwrap(),
-        td.type_term_from_str("( Sequence ( Digit $src_radix ) )").unwrap(),
+        td.type_term_from_str("( PositionalInt $src_radix LittleEndian )")
+            .unwrap(),
+        td.type_term_from_str("( Sequence ( Digit $src_radix ) )")
+            .unwrap(),
         td.type_term_from_str("( Sequence MachineInt )").unwrap(),
-        td.type_term_from_str("( DiffStream ( Vec MachineInt ) )").unwrap(),
+        td.type_term_from_str("( DiffStream ( Vec MachineInt ) )")
+            .unwrap(),
         td.type_term_from_str("( Json )").unwrap(),
         td.type_term_from_str("( Stream UTF-8-Char )").unwrap(),
-        td.type_term_from_str("( Stream MachineSyllab )").unwrap()
+        td.type_term_from_str("( Stream MachineSyllab )").unwrap(),
     ];
 
     let dst_types = vec![
         td.type_term_from_str("( ℕ )").unwrap(),
-        td.type_term_from_str("( PositionalInt $dst_radix LittleEndian )").unwrap(),
-        td.type_term_from_str("( Sequence ( Digit $dst_radix ) )").unwrap(),
+        td.type_term_from_str("( PositionalInt $dst_radix LittleEndian )")
+            .unwrap(),
+        td.type_term_from_str("( Sequence ( Digit $dst_radix ) )")
+            .unwrap(),
         td.type_term_from_str("( Sequence MachineInt )").unwrap(),
-        td.type_term_from_str("( DiffStream ( Vec MachineInt ) )").unwrap(),
+        td.type_term_from_str("( DiffStream ( Vec MachineInt ) )")
+            .unwrap(),
         td.type_term_from_str("( Json )").unwrap(),
         td.type_term_from_str("( Stream UTF-8-Char )").unwrap(),
-        td.type_term_from_str("( Stream MachineSyllab )").unwrap()
+        td.type_term_from_str("( Stream MachineSyllab )").unwrap(),
     ];
 
     nested::magic_header();
@@ -99,27 +112,26 @@ async fn main() {
         src_radix,
         dst_radix,
         src_digits_port.outer().to_sequence(),
-        dst_digits_port.inner()
+        dst_digits_port.inner(),
     );
 
     // output dst digits
     let writer = {
-        use std::{
-            os::unix::io::FromRawFd
-        };
+        use std::os::unix::io::FromRawFd;
 
-        dst_digits_port.outer().serialize_json(unsafe { std::fs::File::from_raw_fd(1) })
+        dst_digits_port
+            .outer()
+            .serialize_json(unsafe { std::fs::File::from_raw_fd(1) })
     };
 
     // start reading src digits
     {
-        use async_std::{
-            os::unix::io::FromRawFd
-        };
+        use async_std::os::unix::io::FromRawFd;
 
-        src_digits.from_json(unsafe { async_std::fs::File::from_raw_fd(0) }).await;
+        src_digits
+            .from_json(unsafe { async_std::fs::File::from_raw_fd(0) })
+            .await;
     }
 
     drop(writer);
 }
-

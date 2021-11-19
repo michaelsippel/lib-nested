@@ -1,19 +1,21 @@
 use {
-    std::{
-        sync::Arc,
-        ops::{Deref, DerefMut},
+    crate::{
+        core::{InnerViewPort, Observer, ObserverBroadcast, View},
+        vec::VecDiff,
     },
     std::sync::RwLock,
-    crate::{
-        core::{View, Observer, ObserverBroadcast, InnerViewPort},
-        vec::VecDiff
-    }
+    std::{
+        ops::{Deref, DerefMut},
+        sync::Arc,
+    },
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 impl<T> View for Vec<T>
-where T: Clone + Send + Sync + 'static {
+where
+    T: Clone + Send + Sync + 'static,
+{
     type Msg = VecDiff<T>;
 }
 
@@ -21,19 +23,18 @@ where T: Clone + Send + Sync + 'static {
 
 #[derive(Clone)]
 pub struct VecBuffer<T>
-where T: Clone + Send + Sync + 'static
+where
+    T: Clone + Send + Sync + 'static,
 {
     data: Arc<RwLock<Vec<T>>>,
-    cast: Arc<RwLock<ObserverBroadcast<RwLock<Vec<T>>>>>
+    cast: Arc<RwLock<ObserverBroadcast<RwLock<Vec<T>>>>>,
 }
 
 impl<T> VecBuffer<T>
-where T: Clone + Send + Sync + 'static
+where
+    T: Clone + Send + Sync + 'static,
 {
-    pub fn with_data(
-        data: Vec<T>,
-        port: InnerViewPort<RwLock<Vec<T>>>
-    ) -> Self {
+    pub fn with_data(data: Vec<T>, port: InnerViewPort<RwLock<Vec<T>>>) -> Self {
         let mut b = VecBuffer::new(port);
         for x in data.into_iter() {
             b.push(x);
@@ -45,17 +46,30 @@ where T: Clone + Send + Sync + 'static
     pub fn new(port: InnerViewPort<RwLock<Vec<T>>>) -> Self {
         let data = Arc::new(RwLock::new(Vec::new()));
         port.set_view(Some(data.clone()));
-        VecBuffer { data, cast: port.get_broadcast() }
+        VecBuffer {
+            data,
+            cast: port.get_broadcast(),
+        }
     }
 
     pub fn apply_diff(&mut self, diff: VecDiff<T>) {
         let mut data = self.data.write().unwrap();
         match &diff {
-            VecDiff::Clear => { data.clear(); },
-            VecDiff::Push(val) => { data.push(val.clone()); },
-            VecDiff::Remove(idx) => { data.remove(*idx); },
-            VecDiff::Insert{ idx, val } => { data.insert(*idx, val.clone()); },
-            VecDiff::Update{ idx, val } => { data[*idx] = val.clone(); }
+            VecDiff::Clear => {
+                data.clear();
+            }
+            VecDiff::Push(val) => {
+                data.push(val.clone());
+            }
+            VecDiff::Remove(idx) => {
+                data.remove(*idx);
+            }
+            VecDiff::Insert { idx, val } => {
+                data.insert(*idx, val.clone());
+            }
+            VecDiff::Update { idx, val } => {
+                data[*idx] = val.clone();
+            }
         }
         drop(data);
 
@@ -83,18 +97,18 @@ where T: Clone + Send + Sync + 'static
     }
 
     pub fn insert(&mut self, idx: usize, val: T) {
-        self.apply_diff(VecDiff::Insert{ idx, val });
+        self.apply_diff(VecDiff::Insert { idx, val });
     }
 
     pub fn update(&mut self, idx: usize, val: T) {
-        self.apply_diff(VecDiff::Update{ idx, val });
+        self.apply_diff(VecDiff::Update { idx, val });
     }
 
     pub fn get_mut(&mut self, idx: usize) -> MutableVecAccess<T> {
         MutableVecAccess {
             buf: self.clone(),
             idx,
-            val: self.get(idx)
+            val: self.get(idx),
         }
     }
 }
@@ -102,14 +116,18 @@ where T: Clone + Send + Sync + 'static
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub struct MutableVecAccess<T>
-where T: Clone + Send + Sync + 'static {
+where
+    T: Clone + Send + Sync + 'static,
+{
     buf: VecBuffer<T>,
     idx: usize,
     val: T,
 }
 
 impl<T> Deref for MutableVecAccess<T>
-where T: Clone + Send + Sync + 'static {
+where
+    T: Clone + Send + Sync + 'static,
+{
     type Target = T;
 
     fn deref(&self) -> &T {
@@ -118,17 +136,19 @@ where T: Clone + Send + Sync + 'static {
 }
 
 impl<T> DerefMut for MutableVecAccess<T>
-where T: Clone + Send + Sync + 'static {
+where
+    T: Clone + Send + Sync + 'static,
+{
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.val
     }
 }
 
 impl<T> Drop for MutableVecAccess<T>
-where T: Clone + Send + Sync + 'static {
+where
+    T: Clone + Send + Sync + 'static,
+{
     fn drop(&mut self) {
         self.buf.update(self.idx, self.val.clone());
     }
 }
-
-

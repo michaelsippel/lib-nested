@@ -1,22 +1,20 @@
 use {
-    std::{
-        sync::Arc,
-        collections::BTreeMap
-    },
-    std::sync::RwLock,
     crate::{
         core::{
-            View, Observer, ObserverBroadcast, ObserverExt,
-            ViewPort, InnerViewPort, OuterViewPort,
-            port::UpdateTask
+            port::UpdateTask, InnerViewPort, Observer, ObserverBroadcast, ObserverExt,
+            OuterViewPort, View, ViewPort,
         },
+        projection::ProjectionHelper,
         sequence::SequenceView,
-        projection::ProjectionHelper
-    }
+    },
+    std::sync::RwLock,
+    std::{collections::BTreeMap, sync::Arc},
 };
 
 impl<Item> OuterViewPort<dyn SequenceView<Item = OuterViewPort<dyn SequenceView<Item = Item>>>>
-where Item: 'static{
+where
+    Item: 'static,
+{
     pub fn flatten(&self) -> OuterViewPort<dyn SequenceView<Item = Item>> {
         let port = ViewPort::new();
         Flatten::new(self.clone(), port.inner());
@@ -25,31 +23,35 @@ where Item: 'static{
 }
 
 pub struct Chunk<Item>
-where Item: 'static
+where
+    Item: 'static,
 {
     offset: usize,
     len: usize,
-    view: Arc<dyn SequenceView<Item = Item>>
+    view: Arc<dyn SequenceView<Item = Item>>,
 }
 
 pub struct Flatten<Item>
-where Item: 'static
+where
+    Item: 'static,
 {
     length: usize,
     top: Arc<dyn SequenceView<Item = OuterViewPort<dyn SequenceView<Item = Item>>>>,
     chunks: BTreeMap<usize, Chunk<Item>>,
     cast: Arc<RwLock<ObserverBroadcast<dyn SequenceView<Item = Item>>>>,
-    proj_helper: ProjectionHelper<usize, Self>
+    proj_helper: ProjectionHelper<usize, Self>,
 }
 
 impl<Item> View for Flatten<Item>
-where Item: 'static
+where
+    Item: 'static,
 {
     type Msg = usize;
 }
 
 impl<Item> SequenceView for Flatten<Item>
-where Item: 'static
+where
+    Item: 'static,
 {
     type Item = Item;
 
@@ -65,28 +67,26 @@ where Item: 'static
 
 /* TODO: remove unused projection args (bot-views) if they get replaced by a new viewport  */
 impl<Item> Flatten<Item>
-where Item: 'static
+where
+    Item: 'static,
 {
     pub fn new(
-        top_port: OuterViewPort<dyn SequenceView<Item = OuterViewPort<dyn SequenceView<Item = Item>>>>,
-        out_port: InnerViewPort<dyn SequenceView<Item = Item>>
+        top_port: OuterViewPort<
+            dyn SequenceView<Item = OuterViewPort<dyn SequenceView<Item = Item>>>,
+        >,
+        out_port: InnerViewPort<dyn SequenceView<Item = Item>>,
     ) -> Arc<RwLock<Self>> {
         let mut proj_helper = ProjectionHelper::new(out_port.0.update_hooks.clone());
 
-        let flat = Arc::new(RwLock::new(
-            Flatten {
-                length: 0,
-                top: proj_helper.new_sequence_arg(
-                    usize::MAX,
-                    top_port,
-                    |s: &mut Self, chunk_idx| {
-                        s.update_chunk(*chunk_idx);
-                    }
-                ),
-                chunks: BTreeMap::new(),
-                cast: out_port.get_broadcast(),
-                proj_helper
-            }));
+        let flat = Arc::new(RwLock::new(Flatten {
+            length: 0,
+            top: proj_helper.new_sequence_arg(usize::MAX, top_port, |s: &mut Self, chunk_idx| {
+                s.update_chunk(*chunk_idx);
+            }),
+            chunks: BTreeMap::new(),
+            cast: out_port.get_broadcast(),
+            proj_helper,
+        }));
 
         flat.write().unwrap().proj_helper.set_proj(&flat);
         out_port.set_view(Some(flat.clone()));
@@ -118,9 +118,9 @@ where Item: 'static
                                 s.cast.notify(&(idx + chunk_offset));
                                 s.cast.notify_each(dirty_idx);
                             }
-                        }
-                    )
-                }
+                        },
+                    ),
+                },
             );
 
             chunk_port.0.update();
@@ -152,7 +152,7 @@ where Item: 'static
             if old_offset != cur_offset {
                 dirty_idx.extend(
                     std::cmp::min(old_offset, cur_offset)
-                        .. std::cmp::max(old_offset, cur_offset) + chunk.len
+                        ..std::cmp::max(old_offset, cur_offset) + chunk.len,
                 );
             }
 
@@ -162,13 +162,13 @@ where Item: 'static
         let old_length = self.length;
         self.length = cur_offset;
 
-        dirty_idx.extend(self.length .. old_length);
+        dirty_idx.extend(self.length..old_length);
         dirty_idx
     }
 
     /// given an index in the flattened sequence,
     /// which sub-sequence does it belong to?
-    fn get_chunk_idx(&self, glob_idx: usize) -> Option<usize> {        
+    fn get_chunk_idx(&self, glob_idx: usize) -> Option<usize> {
         let mut offset = 0;
         for (chunk_idx, chunk) in self.chunks.iter() {
             offset += chunk.view.len().unwrap_or(0);
@@ -179,4 +179,3 @@ where Item: 'static
         None
     }
 }
-

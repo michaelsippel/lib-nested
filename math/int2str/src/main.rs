@@ -1,9 +1,4 @@
-
-use std::{
-    fs::File,
-    io::{Read},
-    os::unix::io::FromRawFd
-};
+use std::{fs::File, io::Read, os::unix::io::FromRawFd};
 
 fn main() {
     nested::magic_header();
@@ -11,15 +6,18 @@ fn main() {
     nested::magic_header();
 
     let mut f0 = unsafe { File::from_raw_fd(0) };
-    eprintln!("
+    eprintln!(
+        "
 >0:
   ( ℕ )
   ( MachineInt )
   ( MachineWord )
   ( Stream MachineSyllab )
-");
+"
+    );
 
-    eprintln!("
+    eprintln!(
+        "
 <1:
   ( ℕ )
   ( PositionalInt 10 BigEndian )
@@ -27,7 +25,8 @@ fn main() {
   ( Sequence UTF-8-Char )
   ( Stream UTF-8-Char )
   ( Stream MachineSyllab )
-");
+"
+    );
 
     nested::magic_header();
 
@@ -35,4 +34,3 @@ fn main() {
     f0.read_exact(&mut bytes).expect("");
     println!("{}", u64::from_le_bytes(bytes));
 }
-

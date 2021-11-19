@@ -1,8 +1,7 @@
-
 use std::{
     fs::File,
     io::{Read, Write},
-    os::unix::io::FromRawFd
+    os::unix::io::FromRawFd,
 };
 
 fn fib(n: u64) -> u64 {
@@ -10,7 +9,7 @@ fn fib(n: u64) -> u64 {
     let mut y1 = 1;
     let mut y2 = 0;
 
-    for _ in 0 .. n {
+    for _ in 0..n {
         y = y1 + y2;
         y2 = y1;
         y1 = y;
@@ -26,26 +25,32 @@ fn main() {
 
     nested::magic_header();
 
-    eprintln!("
-interface (Sequence ℕ) 0 1");
+    eprintln!(
+        "
+interface (Sequence ℕ) 0 1"
+    );
 
     let mut f0 = unsafe { File::from_raw_fd(0) };
-    eprintln!("
+    eprintln!(
+        "
 >0: n
   ( ℕ )
   ( MachineInt )
   ( MachineWord )
   ( Stream MachineSyllab )
-");
+"
+    );
 
     let mut f1 = unsafe { File::from_raw_fd(1) };
-    eprintln!("
+    eprintln!(
+        "
 <1: n'th fibonacci number
   ( ℕ )
   ( MachineInt )
   ( MachineWord )
   ( Stream MachineSyllab )
-");
+"
+    );
 
     nested::magic_header();
 
@@ -55,4 +60,3 @@ interface (Sequence ℕ) 0 1");
     bytes = fib(n).to_le_bytes();
     f1.write(&bytes).expect("");
 }
-

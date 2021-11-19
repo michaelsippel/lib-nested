@@ -1,36 +1,29 @@
-
 use {
-    std::{
-        sync::Arc,
-        collections::HashMap,
-        hash::Hash
+    crate::{
+        core::{InnerViewPort, Observer, ObserverBroadcast, View},
+        index::{IndexArea, IndexView},
     },
     std::sync::RwLock,
-    crate::{
-        core::{
-            Observer,
-            ObserverBroadcast,
-            View,
-            InnerViewPort
-        },
-        index::{IndexArea, IndexView}
-    }
+    std::{collections::HashMap, hash::Hash, sync::Arc},
 };
 
 pub struct IndexBufferView<Key, Item>(Arc<RwLock<HashMap<Key, Item>>>)
-where Key: Clone + Hash + Eq + Send + Sync + 'static,
-      Item: Clone + Send + Sync + 'static;
+where
+    Key: Clone + Hash + Eq + Send + Sync + 'static,
+    Item: Clone + Send + Sync + 'static;
 
 impl<Key, Item> View for IndexBufferView<Key, Item>
-where Key: Clone + Hash + Eq + Send + Sync + 'static,
-      Item: Clone + Send + Sync + 'static
+where
+    Key: Clone + Hash + Eq + Send + Sync + 'static,
+    Item: Clone + Send + Sync + 'static,
 {
     type Msg = IndexArea<Key>;
 }
 
 impl<Key, Item> IndexView<Key> for IndexBufferView<Key, Item>
-where Key: Clone + Hash + Eq + Send + Sync + 'static,
-      Item: Clone + Send + Sync + 'static
+where
+    Key: Clone + Hash + Eq + Send + Sync + 'static,
+    Item: Clone + Send + Sync + 'static,
 {
     type Item = Item;
 
@@ -44,16 +37,18 @@ where Key: Clone + Hash + Eq + Send + Sync + 'static,
 }
 
 pub struct IndexBuffer<Key, Item>
-where Key: Clone + Hash + Eq + Send + Sync + 'static,
-      Item: Clone + Send + Sync + 'static
+where
+    Key: Clone + Hash + Eq + Send + Sync + 'static,
+    Item: Clone + Send + Sync + 'static,
 {
     data: Arc<RwLock<HashMap<Key, Item>>>,
-    cast: Arc<RwLock<ObserverBroadcast<dyn IndexView<Key, Item = Item>>>>
+    cast: Arc<RwLock<ObserverBroadcast<dyn IndexView<Key, Item = Item>>>>,
 }
 
 impl<Key, Item> IndexBuffer<Key, Item>
-where Key: Clone + Hash + Eq + Send + Sync + 'static,
-      Item: Clone + Send + Sync + 'static
+where
+    Key: Clone + Hash + Eq + Send + Sync + 'static,
+    Item: Clone + Send + Sync + 'static,
 {
     pub fn new(port: InnerViewPort<dyn IndexView<Key, Item = Item>>) -> Self {
         let data = Arc::new(RwLock::new(HashMap::<Key, Item>::new()));
@@ -61,17 +56,19 @@ where Key: Clone + Hash + Eq + Send + Sync + 'static,
 
         IndexBuffer {
             data,
-            cast: port.get_broadcast()
+            cast: port.get_broadcast(),
         }
     }
 
     pub fn insert(&mut self, key: Key, item: Item) {
         self.data.write().unwrap().insert(key.clone(), item);
-        self.cast.notify(&IndexArea::Set(vec![ key ]));
+        self.cast.notify(&IndexArea::Set(vec![key]));
     }
 
     pub fn insert_iter<T>(&mut self, iter: T)
-    where T: IntoIterator<Item = (Key, Item)> {
+    where
+        T: IntoIterator<Item = (Key, Item)>,
+    {
         for (key, item) in iter {
             self.insert(key, item);
         }
@@ -79,7 +76,6 @@ where Key: Clone + Hash + Eq + Send + Sync + 'static,
 
     pub fn remove(&mut self, key: Key) {
         self.data.write().unwrap().remove(&key);
-        self.cast.notify(&IndexArea::Set(vec![ key ]));
+        self.cast.notify(&IndexArea::Set(vec![key]));
     }
 }
-

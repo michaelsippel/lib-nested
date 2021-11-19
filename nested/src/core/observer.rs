@@ -1,22 +1,18 @@
 use {
-    crate::{
-        core::{
-            View,
-            channel::{channel, ChannelSender, ChannelReceiver}
-        }
+    crate::core::{
+        channel::{channel, ChannelReceiver, ChannelSender},
+        View,
     },
-    std::{
-        sync::{Arc, Weak}
-    },
-    std::sync::RwLock
+    std::sync::RwLock,
+    std::sync::{Arc, Weak},
 };
 
-                    /*\
+/*\
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                  Observer
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                     \*/
-pub trait Observer<V: View + ?Sized> : Send + Sync {
+pub trait Observer<V: View + ?Sized>: Send + Sync {
     fn reset(&mut self, _view: Option<Arc<V>>) {}
     fn notify(&mut self, msg: &V::Msg);
 }
@@ -35,7 +31,7 @@ impl<V: View + ?Sized, O: Observer<V>> Observer<V> for Arc<RwLock<O>> {
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-pub trait ObserverExt<V: View + ?Sized> : Observer<V> {    
+pub trait ObserverExt<V: View + ?Sized>: Observer<V> {
     fn notify_each(&mut self, it: impl IntoIterator<Item = V::Msg>);
 }
 
@@ -47,25 +43,30 @@ impl<V: View + ?Sized, T: Observer<V>> ObserverExt<V> for T {
     }
 }
 
-                    /*\
+/*\
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                  Broadcast
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                     \*/
 pub struct ObserverBroadcast<V: View + ?Sized>
-where V::Msg : Send + Sync {
+where
+    V::Msg: Send + Sync,
+{
     rx: ChannelReceiver<Vec<V::Msg>>,
     tx: ChannelSender<Vec<V::Msg>>,
-    observers: Vec<Weak<RwLock<dyn Observer<V>>>>
+    observers: Vec<Weak<RwLock<dyn Observer<V>>>>,
 }
 
 impl<V: View + ?Sized> ObserverBroadcast<V>
-where V::Msg : Clone + Send + Sync {
+where
+    V::Msg: Clone + Send + Sync,
+{
     pub fn new() -> Self {
         let (tx, rx) = channel::<Vec<V::Msg>>();
         ObserverBroadcast {
-            rx, tx,
-            observers: Vec::new()
+            rx,
+            tx,
+            observers: Vec::new(),
         }
     }
 
@@ -94,7 +95,9 @@ where V::Msg : Clone + Send + Sync {
 }
 
 impl<V: View + ?Sized> Observer<V> for ObserverBroadcast<V>
-where V::Msg: Clone {
+where
+    V::Msg: Clone,
+{
     fn reset(&mut self, view: Option<Arc<V>>) {
         for o in self.iter() {
             o.write().unwrap().reset(view.clone());
@@ -109,26 +112,32 @@ where V::Msg: Clone {
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub struct NotifyFnObserver<V, F>
-where V: View + ?Sized,
-      F: Fn(&V::Msg) + Send + Sync {
+where
+    V: View + ?Sized,
+    F: Fn(&V::Msg) + Send + Sync,
+{
     f: F,
-    _phantom: std::marker::PhantomData<V>
+    _phantom: std::marker::PhantomData<V>,
 }
 
 impl<V, F> NotifyFnObserver<V, F>
-where V: View + ?Sized,
-      F: Fn(&V::Msg) + Send + Sync {
+where
+    V: View + ?Sized,
+    F: Fn(&V::Msg) + Send + Sync,
+{
     pub fn new(f: F) -> Self {
         NotifyFnObserver {
             f,
-            _phantom: std::marker::PhantomData
+            _phantom: std::marker::PhantomData,
         }
     }
 }
 
 impl<V, F> Observer<V> for NotifyFnObserver<V, F>
-where V: View + ?Sized,
-      F: Fn(&V::Msg) + Send + Sync {
+where
+    V: View + ?Sized,
+    F: Fn(&V::Msg) + Send + Sync,
+{
     fn notify(&mut self, msg: &V::Msg) {
         (self.f)(msg);
     }
@@ -137,30 +146,34 @@ where V: View + ?Sized,
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub struct ResetFnObserver<V, F>
-where V: View + ?Sized,
-      F: Fn(Option<Arc<V>>) + Send + Sync {
+where
+    V: View + ?Sized,
+    F: Fn(Option<Arc<V>>) + Send + Sync,
+{
     f: F,
-    _phantom: std::marker::PhantomData<V>
+    _phantom: std::marker::PhantomData<V>,
 }
 
 impl<V, F> ResetFnObserver<V, F>
-where V: View + ?Sized,
-      F: Fn(Option<Arc<V>>) + Send + Sync {
+where
+    V: View + ?Sized,
+    F: Fn(Option<Arc<V>>) + Send + Sync,
+{
     pub fn new(f: F) -> Self {
         ResetFnObserver {
             f,
-            _phantom: std::marker::PhantomData
+            _phantom: std::marker::PhantomData,
         }
     }
 }
 
 impl<V, F> Observer<V> for ResetFnObserver<V, F>
-where V: View + ?Sized,
-      F: Fn(Option<Arc<V>>) + Send + Sync {
+where
+    V: View + ?Sized,
+    F: Fn(Option<Arc<V>>) + Send + Sync,
+{
     fn notify(&mut self, _msg: &V::Msg) {}
     fn reset(&mut self, view: Option<Arc<V>>) {
         (self.f)(view);
     }
 }
-
-

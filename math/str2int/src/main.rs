@@ -1,8 +1,7 @@
-
 use std::{
     fs::File,
     io::{Read, Write},
-    os::unix::io::FromRawFd
+    os::unix::io::FromRawFd,
 };
 
 fn main() {
@@ -10,16 +9,19 @@ fn main() {
     eprintln!("       Parse MachineInt from String");
     nested::magic_header();
 
-    eprintln!("
+    eprintln!(
+        "
 $1: radix
   ( ℕ )
   ( PositionalInt 10 BigEndian )
   ( Sequence ( Digit 10 ) )
   ( Sequence UTF-8-Char )
   ( Sequence MachineSyllab )
-");
+"
+    );
 
-    eprintln!("
+    eprintln!(
+        "
 >0: n
   ( ℕ )
   ( PositionalInt $radix BigEndian )
@@ -27,15 +29,18 @@ $1: radix
   ( Sequence UTF-8-Char )
   ( Stream UTF-8-Char )
   ( Stream MachineSyllab )
-");
+"
+    );
 
-    eprintln!("
+    eprintln!(
+        "
 <1: n
   ( ℕ )
   ( MachineInt )
   ( MachineWord )
   ( Stream MachineSyllab )
-");
+"
+    );
 
     nested::magic_header();
 
@@ -55,6 +60,10 @@ $1: radix
     let mut chars = Vec::new();
     f0.read_to_end(&mut chars).expect("");
     chars.retain(|c| (*c as char).is_alphanumeric());
-    f1.write(&u64::from_str_radix(&String::from_utf8_lossy(&chars), radix).unwrap().to_le_bytes()).expect("");
+    f1.write(
+        &u64::from_str_radix(&String::from_utf8_lossy(&chars), radix)
+            .unwrap()
+            .to_le_bytes(),
+    )
+    .expect("");
 }
-

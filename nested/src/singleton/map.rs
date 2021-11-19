@@ -1,24 +1,18 @@
 use {
+    crate::{
+        core::{Observer, ObserverBroadcast, OuterViewPort, View, ViewPort},
+        singleton::SingletonView,
+    },
     std::sync::Arc,
     std::sync::RwLock,
-    crate::{
-        singleton::{SingletonView},
-        core::{
-            Observer, ObserverBroadcast,
-            View, ViewPort, OuterViewPort
-        }
-    }
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 impl<Item: 'static> OuterViewPort<dyn SingletonView<Item = Item>> {
-    pub fn map<
-        DstItem: 'static,
-        F: Fn(Item) -> DstItem + Send + Sync + 'static
-    >(
+    pub fn map<DstItem: 'static, F: Fn(Item) -> DstItem + Send + Sync + 'static>(
         &self,
-        f: F
+        f: F,
     ) -> OuterViewPort<dyn SingletonView<Item = DstItem>> {
         let port = ViewPort::new();
         port.add_update_hook(Arc::new(self.0.clone()));
@@ -26,7 +20,7 @@ impl<Item: 'static> OuterViewPort<dyn SingletonView<Item = Item>> {
         let map = Arc::new(RwLock::new(MapSingleton {
             src_view: None,
             f,
-            cast: port.inner().get_broadcast()
+            cast: port.inner().get_broadcast(),
         }));
 
         self.add_observer(map.clone());
@@ -38,26 +32,29 @@ impl<Item: 'static> OuterViewPort<dyn SingletonView<Item = Item>> {
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub struct MapSingleton<DstItem, SrcView, F>
-where SrcView: SingletonView + ?Sized,
-      F: Fn(SrcView::Item) -> DstItem + Send + Sync
+where
+    SrcView: SingletonView + ?Sized,
+    F: Fn(SrcView::Item) -> DstItem + Send + Sync,
 {
     src_view: Option<Arc<SrcView>>,
     f: F,
-    cast: Arc<RwLock<ObserverBroadcast<dyn SingletonView<Item = DstItem>>>>
+    cast: Arc<RwLock<ObserverBroadcast<dyn SingletonView<Item = DstItem>>>>,
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 impl<DstItem, SrcView, F> View for MapSingleton<DstItem, SrcView, F>
-where SrcView: SingletonView + ?Sized,
-      F: Fn(SrcView::Item) -> DstItem + Send + Sync
+where
+    SrcView: SingletonView + ?Sized,
+    F: Fn(SrcView::Item) -> DstItem + Send + Sync,
 {
     type Msg = ();
 }
 
 impl<DstItem, SrcView, F> SingletonView for MapSingleton<DstItem, SrcView, F>
-where SrcView: SingletonView + ?Sized,
-      F: Fn(SrcView::Item) -> DstItem + Send + Sync
+where
+    SrcView: SingletonView + ?Sized,
+    F: Fn(SrcView::Item) -> DstItem + Send + Sync,
 {
     type Item = DstItem;
 
@@ -69,8 +66,9 @@ where SrcView: SingletonView + ?Sized,
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 impl<DstItem, SrcView, F> Observer<SrcView> for MapSingleton<DstItem, SrcView, F>
-where SrcView: SingletonView + ?Sized,
-      F: Fn(SrcView::Item) -> DstItem + Send + Sync
+where
+    SrcView: SingletonView + ?Sized,
+    F: Fn(SrcView::Item) -> DstItem + Send + Sync,
 {
     fn reset(&mut self, view: Option<Arc<SrcView>>) {
         self.src_view = view;
@@ -81,4 +79,3 @@ where SrcView: SingletonView + ?Sized,
         self.cast.notify(msg);
     }
 }
-

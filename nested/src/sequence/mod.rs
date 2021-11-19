@@ -1,16 +1,15 @@
-
-pub mod seq2idx;
-pub mod map;
 pub mod filter;
 pub mod flatten;
+pub mod map;
+pub mod seq2idx;
 
-pub use seq2idx::{Sequence2Index};
+pub use seq2idx::Sequence2Index;
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 use crate::core::View;
 
-pub trait SequenceView : View<Msg = usize> {
+pub trait SequenceView: View<Msg = usize> {
     type Item;
 
     fn get(&self, idx: &usize) -> Option<Self::Item>;
@@ -19,12 +18,9 @@ pub trait SequenceView : View<Msg = usize> {
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-pub trait SequenceViewExt : SequenceView {
+pub trait SequenceViewExt: SequenceView {
     fn iter<'a>(&'a self) -> SequenceViewIter<'a, Self> {
-        SequenceViewIter {
-            view: self,
-            cur: 0
-        }
+        SequenceViewIter { view: self, cur: 0 }
     }
 }
 
@@ -33,14 +29,16 @@ impl<V: SequenceView + ?Sized> SequenceViewExt for V {}
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub struct SequenceViewIter<'a, V>
-where V: SequenceView + ?Sized
+where
+    V: SequenceView + ?Sized,
 {
     view: &'a V,
-    cur: usize
+    cur: usize,
 }
 
 impl<'a, V> Iterator for SequenceViewIter<'a, V>
-where V: SequenceView + ?Sized
+where
+    V: SequenceView + ?Sized,
 {
     type Item = V::Item;
 
@@ -53,11 +51,8 @@ where V: SequenceView + ?Sized
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-use std::{
-    sync::Arc,
-    ops::{Deref}
-};
 use std::sync::RwLock;
+use std::{ops::Deref, sync::Arc};
 
 impl<V: SequenceView + ?Sized> SequenceView for RwLock<V> {
     type Item = V::Item;
@@ -98,4 +93,3 @@ impl<V: SequenceView> SequenceView for Option<V> {
         }
     }
 }
-

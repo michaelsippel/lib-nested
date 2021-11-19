@@ -1,70 +1,69 @@
 use {
+    crate::core::Observer,
+    async_std::stream::Stream,
     core::{
-        task::{Poll, Context, Waker},
-        pin::Pin
+        pin::Pin,
+        task::{Context, Poll, Waker},
     },
     std::{
-        sync::{Arc, Mutex},
         collections::HashSet,
-        hash::Hash
+        hash::Hash,
+        sync::{Arc, Mutex},
     },
-    async_std::{
-        stream::Stream
-    },
-
-    crate::{
-        core::{Observer}
-    }
 };
 
-
-                    /*\
+/*\
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                   Traits
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                     \*/
-pub trait ChannelData : Default + IntoIterator + Send + Sync {
+pub trait ChannelData: Default + IntoIterator + Send + Sync {
     fn channel_insert(&mut self, x: Self::Item);
 }
 
-
-                    /*\
+/*\
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                Queue Channel
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                     \*/
 impl<T> ChannelData for Vec<T>
-where T: Send + Sync {
+where
+    T: Send + Sync,
+{
     fn channel_insert(&mut self, x: T) {
         self.push(x);
     }
 }
 
-                    /*\
+/*\
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                  Set Channel
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                     \*/
 impl<T> ChannelData for HashSet<T>
-where T: Eq + Hash + Send + Sync {
+where
+    T: Eq + Hash + Send + Sync,
+{
     fn channel_insert(&mut self, x: T) {
         self.insert(x);
     }
 }
 
-                    /*\
+/*\
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
              Singleton Channel
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                     \*/
 impl<T> ChannelData for Option<T>
-where T: Send + Sync {
+where
+    T: Send + Sync,
+{
     fn channel_insert(&mut self, x: T) {
         *self = Some(x);
     }
 }
 
-                    /*\
+/*\
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                   Channel
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
@@ -73,7 +72,7 @@ struct ChannelState<Data: ChannelData> {
     send_buf: Option<Data>,
     recv_iter: Option<Data::IntoIter>,
     num_senders: usize,
-    waker: Option<Waker>
+    waker: Option<Waker>,
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
@@ -84,7 +83,9 @@ pub struct ChannelReceiver<Data: ChannelData>(Arc<Mutex<ChannelState<Data>>>);
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 impl<Data: ChannelData> ChannelSender<Data>
-where Data::IntoIter: Send + Sync {
+where
+    Data::IntoIter: Send + Sync,
+{
     pub fn send(&self, msg: Data::Item) {
         let mut state = self.0.lock().unwrap();
 
@@ -102,7 +103,10 @@ where Data::IntoIter: Send + Sync {
 
 use crate::core::View;
 impl<V: View + ?Sized, Data: ChannelData<Item = V::Msg>> Observer<V> for ChannelSender<Data>
-where V::Msg: Clone, Data::IntoIter: Send + Sync {
+where
+    V::Msg: Clone,
+    Data::IntoIter: Send + Sync,
+{
     fn notify(&mut self, msg: &V::Msg) {
         self.send(msg.clone());
     }
@@ -138,7 +142,7 @@ impl<Data: ChannelData> ChannelReceiver<Data> {
             Some(buf)
         } else {
             None
-        }        
+        }
     }
 }
 
@@ -164,15 +168,12 @@ impl<Data: ChannelData> std::future::Future for ChannelRead<Data> {
 impl<Data: ChannelData> Stream for ChannelReceiver<Data> {
     type Item = Data::Item;
 
-    fn poll_next(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>
-    ) -> Poll<Option<Self::Item>> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut state = self.0.lock().unwrap();
 
         if let Some(recv_iter) = state.recv_iter.as_mut() {
             if let Some(val) = recv_iter.next() {
-                return Poll::Ready(Some(val))
+                return Poll::Ready(Some(val));
             } else {
                 state.recv_iter = None
             }
@@ -191,23 +192,24 @@ impl<Data: ChannelData> Stream for ChannelReceiver<Data> {
     }
 }
 
-                    /*\
+/*\
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
              Factory Functions
 <<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                     \*/
 pub fn channel<Data: ChannelData>() -> (ChannelSender<Data>, ChannelReceiver<Data>) {
-    let state = Arc::new(Mutex::new(ChannelState{
+    let state = Arc::new(Mutex::new(ChannelState {
         send_buf: None,
         recv_iter: None,
         num_senders: 1,
-        waker: None
+        waker: None,
     }));
 
     (ChannelSender(state.clone()), ChannelReceiver(state))
 }
 
-pub fn set_channel<T: Eq + Hash + Send + Sync>() -> (ChannelSender<HashSet<T>>, ChannelReceiver<HashSet<T>>) {
+pub fn set_channel<T: Eq + Hash + Send + Sync>(
+) -> (ChannelSender<HashSet<T>>, ChannelReceiver<HashSet<T>>) {
     channel::<HashSet<T>>()
 }
 
@@ -215,7 +217,7 @@ pub fn queue_channel<T: Send + Sync>() -> (ChannelSender<Vec<T>>, ChannelReceive
     channel::<Vec<T>>()
 }
 
-pub fn singleton_channel<T: Send + Sync>() -> (ChannelSender<Option<T>>, ChannelReceiver<Option<T>>) {
+pub fn singleton_channel<T: Send + Sync>() -> (ChannelSender<Option<T>>, ChannelReceiver<Option<T>>)
+{
     channel::<Option<T>>()
 }
-

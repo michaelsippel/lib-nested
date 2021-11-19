@@ -1,15 +1,14 @@
-
+pub mod buffer;
 pub mod map_item;
 pub mod map_key;
-pub mod buffer;
 
 use {
-    std::{
-        sync::Arc,
-        ops::{Deref, RangeInclusive},
-    },
+    crate::core::View,
     std::sync::RwLock,
-    crate::core::View
+    std::{
+        ops::{Deref, RangeInclusive},
+        sync::Arc,
+    },
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
@@ -29,13 +28,15 @@ impl<Key> IndexArea<Key> {
             IndexArea::Empty => IndexArea::Empty,
             IndexArea::Full => IndexArea::Full,
             IndexArea::Set(v) => IndexArea::Set(v.iter().map(&f).collect()),
-            IndexArea::Range(r) => IndexArea::Range(f(&r.start()) ..= f(&r.end()))
+            IndexArea::Range(r) => IndexArea::Range(f(&r.start())..=f(&r.end())),
         }
     }
 }
 
-pub trait IndexView<Key> : View<Msg = IndexArea<Key>>
-where Key: Send + Sync {
+pub trait IndexView<Key>: View<Msg = IndexArea<Key>>
+where
+    Key: Send + Sync,
+{
     type Item;
 
     fn get(&self, key: &Key) -> Option<Self::Item>;
@@ -48,8 +49,9 @@ where Key: Send + Sync {
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 impl<Key, V> IndexView<Key> for RwLock<V>
-where Key: Send + Sync,
-      V: IndexView<Key> + ?Sized
+where
+    Key: Send + Sync,
+    V: IndexView<Key> + ?Sized,
 {
     type Item = V::Item;
 
@@ -63,8 +65,9 @@ where Key: Send + Sync,
 }
 
 impl<Key, V> IndexView<Key> for Arc<V>
-where Key: Send + Sync,
-      V: IndexView<Key> + ?Sized
+where
+    Key: Send + Sync,
+    V: IndexView<Key> + ?Sized,
 {
     type Item = V::Item;
 
@@ -78,8 +81,9 @@ where Key: Send + Sync,
 }
 
 impl<Key, V> IndexView<Key> for Option<V>
-where Key: Send + Sync,
-      V: IndexView<Key>
+where
+    Key: Send + Sync,
+    V: IndexView<Key>,
 {
     type Item = V::Item;
 
@@ -105,7 +109,7 @@ pub trait ImplIndexView : Send + Sync {
     fn get(&self, key: &Self::Key) -> Option<Self::Value>;
     fn area(&self) -> Option<Vec<Self::Key>> {
         None
-    }    
+    }
 }
 
 impl<V: ImplIndexView> View for V {

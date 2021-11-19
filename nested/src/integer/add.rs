@@ -1,35 +1,27 @@
 use {
-    std::sync::{Arc, RwLock},
     crate::{
         core::{InnerViewPort, OuterViewPort},
+        projection::ProjectionHelper,
         sequence::SequenceView,
         vec::VecBuffer,
-        projection::ProjectionHelper
-    }
+    },
+    std::sync::{Arc, RwLock},
 };
 
 fn posint_add(
     radix: usize,
     a: impl SequenceView<Item = usize>,
-    b: impl SequenceView<Item = usize>
+    b: impl SequenceView<Item = usize>,
 ) -> Vec<usize> {
     let mut carry = 0;
     let mut result = Vec::new();
 
-    for digit_idx in 0 .. std::cmp::max(a.len().unwrap_or(0), b.len().unwrap_or(0)) {
-        let sum =
-            a.get(&digit_idx).unwrap_or(0) +
-            b.get(&digit_idx).unwrap_or(0) +
-            carry;
+    for digit_idx in 0..std::cmp::max(a.len().unwrap_or(0), b.len().unwrap_or(0)) {
+        let sum = a.get(&digit_idx).unwrap_or(0) + b.get(&digit_idx).unwrap_or(0) + carry;
 
         result.push(sum % radix);
 
-        carry =
-            if sum > radix {
-                sum - radix
-            } else {
-                0
-            };
+        carry = if sum > radix { sum - radix } else { 0 };
     }
 
     if carry > 0 {
@@ -44,7 +36,7 @@ pub struct Add {
     a: Arc<dyn SequenceView<Item = usize>>, // PosInt, Little Endian
     b: Arc<dyn SequenceView<Item = usize>>, // PosInt, Little Endian
     c: VecBuffer<usize>,
-    _proj_helper: ProjectionHelper<usize, Self>
+    _proj_helper: ProjectionHelper<usize, Self>,
 }
 
 impl Add {
@@ -52,18 +44,16 @@ impl Add {
         radix: usize,
         a: OuterViewPort<dyn SequenceView<Item = usize>>,
         b: OuterViewPort<dyn SequenceView<Item = usize>>,
-        c: InnerViewPort<RwLock<Vec<usize>>>//<dyn SequenceView<Item = usize>>
+        c: InnerViewPort<RwLock<Vec<usize>>>, //<dyn SequenceView<Item = usize>>
     ) -> Arc<RwLock<Self>> {
         let mut proj_helper = ProjectionHelper::new(c.0.update_hooks.clone());
-        let add = Arc::new(RwLock::new(
-            Add {
-                radix,
-                a: proj_helper.new_sequence_arg(0, a, |s: &mut Self, _digit_idx| s.update()),
-                b: proj_helper.new_sequence_arg(1, b, |s: &mut Self, _digit_idx| s.update()),
-                c: VecBuffer::new(c),
-                _proj_helper: proj_helper
-            }
-        ));
+        let add = Arc::new(RwLock::new(Add {
+            radix,
+            a: proj_helper.new_sequence_arg(0, a, |s: &mut Self, _digit_idx| s.update()),
+            b: proj_helper.new_sequence_arg(1, b, |s: &mut Self, _digit_idx| s.update()),
+            c: VecBuffer::new(c),
+            _proj_helper: proj_helper,
+        }));
         add
     }
 

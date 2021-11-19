@@ -1,22 +1,21 @@
-
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum ListCursorMode {
     Insert,
     Select,
-    Modify
+    Modify,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct ListCursor {
     pub mode: ListCursorMode,
-    pub idx: Option<usize>
+    pub idx: Option<usize>,
 }
 
 impl Default for ListCursor {
     fn default() -> Self {
         ListCursor {
             mode: ListCursorMode::Select,
-            idx: None
+            idx: None,
         }
     }
 }
@@ -32,4 +31,3 @@ pub trait ListNav {
     fn get_cursor(&self) -> Option<ListCursor>;
 }
 */
-

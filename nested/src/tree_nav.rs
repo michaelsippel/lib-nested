@@ -1,10 +1,9 @@
-
 use crate::list::ListCursorMode;
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum TreeNavResult {
     Continue,
-    Exit
+    Exit,
 }
 /*
 impl From<TreeNavResult> for TerminalEditorResult {
@@ -19,14 +18,14 @@ impl From<TreeNavResult> for TerminalEditorResult {
 #[derive(Clone, Eq, PartialEq)]
 pub struct TreeCursor {
     pub leaf_mode: ListCursorMode,
-    pub tree_addr: Vec<usize>
+    pub tree_addr: Vec<usize>,
 }
 
 impl Default for TreeCursor {
     fn default() -> Self {
         TreeCursor {
             leaf_mode: ListCursorMode::Select,
-            tree_addr: vec![]
+            tree_addr: vec![],
         }
     }
 }
@@ -49,14 +48,14 @@ pub trait TreeNav {
     }
 
     fn goto_home(&mut self) -> TreeNavResult {
-        TreeNavResult::Exit        
+        TreeNavResult::Exit
     }
 
     fn goto_end(&mut self) -> TreeNavResult {
-        TreeNavResult::Exit        
+        TreeNavResult::Exit
     }
 
-    fn goto(&mut self, new_cursor: TreeCursor)  -> TreeNavResult {
+    fn goto(&mut self, _new_cursor: TreeCursor) -> TreeNavResult {
         TreeNavResult::Exit
     }
 
@@ -65,7 +64,6 @@ pub trait TreeNav {
     }
 }
 
-use crate::terminal::{TerminalView, TerminalEditor};
+use crate::terminal::{TerminalEditor};
 
 pub trait TerminalTreeEditor = TerminalEditor + TreeNav;
-

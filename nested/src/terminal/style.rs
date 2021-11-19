@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Default, Copy, Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct TerminalStyle {
@@ -6,7 +6,7 @@ pub struct TerminalStyle {
     pub bg_color: Option<(u8, u8, u8)>,
     pub bold: Option<bool>,
     pub italic: Option<bool>,
-    pub underline: Option<bool>
+    pub underline: Option<bool>,
 }
 
 impl TerminalStyle {
@@ -85,4 +85,3 @@ impl std::fmt::Display for TerminalStyle {
         Ok(())
     }
 }
-

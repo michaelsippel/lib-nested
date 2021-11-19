@@ -1,14 +1,13 @@
-
 use {
+    cgmath::Point2,
     std::ops::{Range, RangeInclusive},
-    cgmath::{Point2}
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub struct GridWindowIterator {
     next: Point2<i16>,
-    range: Range<Point2<i16>>
+    range: Range<Point2<i16>>,
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
@@ -17,7 +16,7 @@ impl From<Range<Point2<i16>>> for GridWindowIterator {
     fn from(range: Range<Point2<i16>>) -> Self {
         GridWindowIterator {
             next: range.start,
-            range
+            range,
         }
     }
 }
@@ -26,7 +25,7 @@ impl From<RangeInclusive<Point2<i16>>> for GridWindowIterator {
     fn from(range: RangeInclusive<Point2<i16>>) -> Self {
         GridWindowIterator {
             next: *range.start(),
-            range: *range.start() .. Point2::new(range.end().x+1, range.end().y+1)
+            range: *range.start()..Point2::new(range.end().x + 1, range.end().y + 1),
         }
     }
 }
@@ -41,7 +40,7 @@ impl Iterator for GridWindowIterator {
             if self.next.x < self.range.end.x {
                 let next = self.next;
 
-                if self.next.x+1 < self.range.end.x {
+                if self.next.x + 1 < self.range.end.x {
                     self.next.x += 1;
                 } else {
                     self.next.x = self.range.start.x;
@@ -57,4 +56,3 @@ impl Iterator for GridWindowIterator {
         }
     }
 }
-

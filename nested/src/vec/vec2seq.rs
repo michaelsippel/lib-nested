@@ -1,78 +1,78 @@
 use {
-    std::{
-        sync::Arc,
-    },
-    std::sync::RwLock,
     crate::{
-        core::{View, Observer, ObserverExt, ObserverBroadcast, ViewPort, InnerViewPort, OuterViewPort},
+        core::{
+            InnerViewPort, Observer, ObserverBroadcast, ObserverExt, OuterViewPort, View, ViewPort,
+        },
         sequence::SequenceView,
-        vec::VecDiff
-    }
+        vec::VecDiff,
+    },
+    std::sync::Arc,
+    std::sync::RwLock,
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 /// Adapter View implementing `Sequence` for `Vec`
 pub struct VecSequence<T>
-where T: Clone + Send + Sync + 'static {
+where
+    T: Clone + Send + Sync + 'static,
+{
     cur_len: usize,
     data: Option<Arc<RwLock<Vec<T>>>>,
-    cast: Arc<RwLock<ObserverBroadcast<dyn SequenceView<Item = T>>>>
+    cast: Arc<RwLock<ObserverBroadcast<dyn SequenceView<Item = T>>>>,
 }
 
-
 impl<T> VecSequence<T>
-where T: Clone + Send + Sync + 'static {
-    pub fn new(
-        port: InnerViewPort<dyn SequenceView<Item = T>>
-    ) -> Arc<RwLock<Self>> {
-        let seq = Arc::new(RwLock::new(
-            VecSequence {
-                cur_len: 0,
-                data: None,
-                cast: port.get_broadcast()
-            }
-        ));
+where
+    T: Clone + Send + Sync + 'static,
+{
+    pub fn new(port: InnerViewPort<dyn SequenceView<Item = T>>) -> Arc<RwLock<Self>> {
+        let seq = Arc::new(RwLock::new(VecSequence {
+            cur_len: 0,
+            data: None,
+            cast: port.get_broadcast(),
+        }));
         port.set_view(Some(seq.clone()));
         seq
     }
 }
 
 impl<T> Observer<RwLock<Vec<T>>> for VecSequence<T>
-where T: Clone + Send + Sync + 'static {
+where
+    T: Clone + Send + Sync + 'static,
+{
     fn reset(&mut self, view: Option<Arc<RwLock<Vec<T>>>>) {
         let old_len = self.cur_len;
         self.data = view;
-        let new_len =
-            if let Some(data) = self.data.as_ref() {
-                data.read().unwrap().len()
-            } else {
-                0
-            };
+        let new_len = if let Some(data) = self.data.as_ref() {
+            data.read().unwrap().len()
+        } else {
+            0
+        };
 
         self.cur_len = new_len;
-        self.cast.notify_each(0 .. std::cmp::max(old_len, new_len));
+        self.cast.notify_each(0..std::cmp::max(old_len, new_len));
     }
 
     fn notify(&mut self, diff: &VecDiff<T>) {
         match diff {
             VecDiff::Clear => {
-                self.cast.notify_each(0 .. self.cur_len);
+                self.cast.notify_each(0..self.cur_len);
                 self.cur_len = 0
-            },
+            }
             VecDiff::Push(_) => {
                 self.cast.notify(&self.cur_len);
                 self.cur_len += 1;
-            },
+            }
             VecDiff::Remove(idx) => {
-                self.cast.notify_each(*idx .. self.cur_len);
+                self.cast.notify_each(*idx..self.cur_len);
                 self.cur_len -= 1;
-            },
-            VecDiff::Insert{ idx, val: _ } => {
+            }
+            VecDiff::Insert { idx, val: _ } => {
                 self.cur_len += 1;
-                self.cast.notify_each(*idx .. self.cur_len);
-            },
-            VecDiff::Update{ idx, val: _ } => {
+                self.cast.notify_each(*idx..self.cur_len);
+            }
+            VecDiff::Update { idx, val: _ } => {
                 self.cast.notify(&idx);
             }
         }
@@ -80,18 +80,20 @@ where T: Clone + Send + Sync + 'static {
 }
 
 impl<T> View for VecSequence<T>
-where T: Clone + Send + Sync + 'static {
+where
+    T: Clone + Send + Sync + 'static,
+{
     type Msg = usize;
 }
 
 impl<T> SequenceView for VecSequence<T>
-where T: Clone + Send + Sync + 'static {
+where
+    T: Clone + Send + Sync + 'static,
+{
     type Item = T;
 
     fn get(&self, idx: &usize) -> Option<T> {
-        self.data.as_ref()?
-            .read().unwrap()
-            .get(*idx).cloned()
+        self.data.as_ref()?.read().unwrap().get(*idx).cloned()
     }
 
     fn len(&self) -> Option<usize> {
@@ -102,7 +104,9 @@ where T: Clone + Send + Sync + 'static {
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 impl<T> OuterViewPort<RwLock<Vec<T>>>
-where T: Clone + Send + Sync + 'static {
+where
+    T: Clone + Send + Sync + 'static,
+{
     pub fn to_sequence(&self) -> OuterViewPort<dyn SequenceView<Item = T>> {
         let port = ViewPort::new();
         port.add_update_hook(Arc::new(self.0.clone()));
@@ -112,5 +116,3 @@ where T: Clone + Send + Sync + 'static {
         port.into_outer()
     }
 }
-
-

@@ -1,11 +1,4 @@
-use {
-    std::{
-        collections::HashMap
-    },
-    crate::{
-        bimap::Bimap,
-    }
-};
+use {crate::bimap::Bimap, std::collections::HashMap};
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
@@ -15,20 +8,17 @@ pub type TypeID = u64;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum TypeTerm {
-    Type {
-        id: TypeID,
-        args: Vec<TypeTerm>
-    },
-    Num(i64)
+    Type { id: TypeID, args: Vec<TypeTerm> },
+    Num(i64),
 }
 
 impl TypeTerm {
     pub fn new(id: TypeID) -> Self {
-        TypeTerm::Type{ id, args: vec![] }
+        TypeTerm::Type { id, args: vec![] }
     }
 
     pub fn arg(&mut self, t: TypeTerm) -> &mut Self {
-        if let TypeTerm::Type{ id: _, args } = self {
+        if let TypeTerm::Type { id: _, args } = self {
             args.push(t);
         }
 
@@ -46,7 +36,7 @@ impl TypeTerm {
             match token {
                 "(" => {
                     term_stack.push(None);
-                },
+                }
                 ")" => {
                     let t = term_stack.pop().unwrap();
                     if term_stack.len() > 0 {
@@ -59,19 +49,24 @@ impl TypeTerm {
                     } else {
                         return t;
                     }
-                },
+                }
                 atom => {
                     let f = term_stack.last_mut().unwrap();
 
                     match f {
-                        Some(f) =>
+                        Some(f) => {
                             if atom.chars().nth(0).unwrap().is_numeric() {
                                 f.num_arg(i64::from_str_radix(atom, 10).unwrap());
                             } else {
-                                f.arg(TypeTerm::new(*names.get(atom).expect(&format!("invalid atom {}", atom))));
+                                f.arg(TypeTerm::new(
+                                    *names.get(atom).expect(&format!("invalid atom {}", atom)),
+                                ));
                             }
+                        }
                         None => {
-                            *f = Some(TypeTerm::new(*names.get(atom).expect(&format!("invalid atom {}", atom))));
+                            *f = Some(TypeTerm::new(
+                                *names.get(atom).expect(&format!("invalid atom {}", atom)),
+                            ));
                         }
                     }
                 }
@@ -84,64 +79,60 @@ impl TypeTerm {
     // only adds parenthesis where args.len > 0
     pub fn to_str1(&self, names: &HashMap<u64, String>) -> String {
         match self {
-            TypeTerm::Type{ id, args } =>
+            TypeTerm::Type { id, args } => {
                 if args.len() > 0 {
                     format!(
                         "( {} {})",
                         names[id],
                         if args.len() > 0 {
-                            args.iter().fold(
-                                String::new(),
-                                |str, term| format!("{}{} ", str, term.to_str1(names) )
-                            )
+                            args.iter().fold(String::new(), |str, term| {
+                                format!("{}{} ", str, term.to_str1(names))
+                            })
                         } else {
                             String::new()
                         }
                     )
                 } else {
                     names[id].clone()
-                },
+                }
+            }
 
-            TypeTerm::Num(n) =>
-                format!("{}", n)
+            TypeTerm::Num(n) => format!("{}", n),
         }
     }
 
     // always adds an enclosing pair of parenthesis
     pub fn to_str(&self, names: &HashMap<u64, String>) -> String {
         match self {
-            TypeTerm::Type{ id, args } =>
-                format!(
-                    "( {} {})",
-                    names[id],
-                    if args.len() > 0 {
-                        args.iter().fold(
-                            String::new(),
-                            |str, term| format!("{}{} ", str, term.to_str1(names) )
-                        )
-                    } else {
-                        String::new()
-                    }),
+            TypeTerm::Type { id, args } => format!(
+                "( {} {})",
+                names[id],
+                if args.len() > 0 {
+                    args.iter().fold(String::new(), |str, term| {
+                        format!("{}{} ", str, term.to_str1(names))
+                    })
+                } else {
+                    String::new()
+                }
+            ),
 
-            TypeTerm::Num(n) =>
-                format!("{}", n)
+            TypeTerm::Num(n) => format!("{}", n),
         }
     }
-
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub struct TypeDict {
-    typenames: Bimap::<String, u64>,
-    type_id_counter: u64
+    typenames: Bimap<String, u64>,
+    type_id_counter: u64,
 }
 
 impl TypeDict {
     pub fn new() -> Self {
         TypeDict {
             typenames: Bimap::new(),
-            type_id_counter: 0
+            type_id_counter: 0,
         }
     }
 
@@ -160,4 +151,3 @@ impl TypeDict {
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
-

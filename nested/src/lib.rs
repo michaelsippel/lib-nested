@@ -3,14 +3,14 @@
 pub mod core;
 pub mod projection;
 
-pub mod singleton;
-pub mod index;
 pub mod grid;
-pub mod sequence;
-pub mod vec;
-pub mod terminal;
+pub mod index;
 pub mod integer;
 pub mod list;
+pub mod sequence;
+pub mod singleton;
+pub mod terminal;
+pub mod vec;
 
 pub mod tree_nav;
 
@@ -21,4 +21,3 @@ pub mod bimap;
 pub fn magic_header() {
     eprintln!("<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>");
 }
-

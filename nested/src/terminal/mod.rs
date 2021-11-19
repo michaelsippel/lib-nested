@@ -1,21 +1,17 @@
-pub mod style;
-pub mod atom;
-pub mod terminal;
-pub mod compositor;
 pub mod ansi_parser;
+pub mod atom;
+pub mod compositor;
+pub mod style;
+pub mod terminal;
 
 pub use {
-    style::{TerminalStyle},
-    atom::{TerminalAtom},
-    terminal::{Terminal, TerminalEvent},
+    atom::TerminalAtom,
     compositor::TerminalCompositor,
+    style::TerminalStyle,
+    terminal::{Terminal, TerminalEvent},
 };
 
-use {
-    crate::{
-        grid::GridView
-    }
-};
+use crate::grid::GridView;
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
@@ -25,7 +21,7 @@ pub trait TerminalView = GridView<Item = TerminalAtom>;
 
 pub enum TerminalEditorResult {
     Continue,
-    Exit
+    Exit,
 }
 
 pub trait TerminalEditor {
@@ -37,25 +33,25 @@ pub trait TerminalEditor {
 
 use {
     crate::{
+        core::{OuterViewPort, ViewPort},
         vec::VecBuffer,
-        core::{ViewPort, OuterViewPort}
     },
-    cgmath::Point2
+    cgmath::Point2,
 };
 
 pub fn make_label(s: &str) -> OuterViewPort<dyn TerminalView> {
     let label_port = ViewPort::new();
-    let mut label = VecBuffer::with_data(s.chars().collect(), label_port.inner());
+    let _label = VecBuffer::with_data(s.chars().collect(), label_port.inner());
 
-    let v = label_port.outer()
+    let v = label_port
+        .outer()
         .to_sequence()
         .map(|c| TerminalAtom::from(c))
         .to_index()
         .map_key(
             |idx| Point2::new(*idx as i16, 0),
-            |pt| if pt.y == 0 { Some(pt.x as usize) } else { None }
+            |pt| if pt.y == 0 { Some(pt.x as usize) } else { None },
         );
 
     v
 }
-

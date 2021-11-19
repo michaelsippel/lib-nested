@@ -1,11 +1,9 @@
-
-pub mod radix;
 pub mod add;
 pub mod editor;
+pub mod radix;
 
 pub use {
-    radix::RadixProjection,
     add::Add,
-    editor::{DigitEditor, PosIntEditor}
+    editor::{DigitEditor, PosIntEditor},
+    radix::RadixProjection,
 };
-
