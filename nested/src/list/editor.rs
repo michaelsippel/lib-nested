@@ -38,7 +38,7 @@ where ItemEditor: TerminalEditor + ?Sized + Send + Sync + 'static,
       FnMakeItemEditor: Fn() -> Arc<RwLock<ItemEditor>>
 {
     cursor: SingletonBuffer<ListCursor>,
-    data: VecBuffer<Arc<RwLock<ItemEditor>>>,
+    pub data: VecBuffer<Arc<RwLock<ItemEditor>>>,
 
     cursor_port: ViewPort<dyn SingletonView<Item = ListCursor>>,
     data_port: ViewPort<RwLock<Vec<Arc<RwLock<ItemEditor>>>>>,
