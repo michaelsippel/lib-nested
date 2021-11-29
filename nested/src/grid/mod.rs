@@ -29,7 +29,7 @@ impl IndexArea<Point2<i16>> {
 
     pub fn range(&self) -> RangeInclusive<Point2<i16>> {
         match self {
-            IndexArea::Empty => Point2::new(i16::MAX, i16::MAX)..=Point2::new(i16::MIN, i16::MIN),
+            IndexArea::Empty => Point2::new(1, 1)..=Point2::new(0, 0),
             IndexArea::Full => panic!("range from full grid area"),
             IndexArea::Set(v) => {
                 Point2::new(
