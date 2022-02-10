@@ -66,7 +66,7 @@ where
     type Item = SrcView::Item;
 
     fn area(&self) -> IndexArea<()> {
-        IndexArea::Full
+        IndexArea::Set(vec![ () ])
     }
 
     fn get(&self, _msg: &()) -> Option<Self::Item> {
