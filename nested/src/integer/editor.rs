@@ -77,6 +77,8 @@ impl TerminalEditor for DigitEditor {
     }
 }
 
+impl TerminalTreeEditor for DigitEditor {}
+
 pub struct PosIntEditor {
     radix: u32,
     digits_editor:
@@ -182,3 +184,6 @@ impl TerminalEditor for PosIntEditor {
         }
     }
 }
+
+impl TerminalTreeEditor for PosIntEditor {}
+

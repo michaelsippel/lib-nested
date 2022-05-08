@@ -224,6 +224,7 @@ impl VerticalSexprDecorator {
             list_style: TerminalStyle::fg_color(match level {
                 0 => (200, 120, 10),
                 1 => (120, 200, 10),
+                2 => (200, 10, 120),
                 _ => (255, 255, 255),
             }),
             item_style: TerminalStyle::fg_color(match level {

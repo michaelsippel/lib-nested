@@ -2,12 +2,12 @@ use {
     crate::{
         core::{OuterViewPort, ViewPort},
         list::{sexpr::ListDecoration, ListEditor},
-        sequence::SequenceView,
+        sequence::{SequenceView, SequenceViewExt},
         singleton::{SingletonBuffer, SingletonView},
         terminal::{
             TerminalEditor, TerminalEditorResult, TerminalEvent, TerminalStyle, TerminalView,
         },
-        tree_nav::{TreeCursor, TreeNav, TreeNavResult},
+        tree_nav::{TreeCursor, TreeNav, TreeNavResult, TerminalTreeEditor},
     },
     std::sync::Arc,
     std::sync::RwLock,
@@ -62,6 +62,8 @@ impl TerminalEditor for CharEditor {
     }
 }
 
+impl TerminalTreeEditor for CharEditor {}
+
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub struct StringEditor {
@@ -82,7 +84,18 @@ impl StringEditor {
     pub fn get_data_port(&self) -> OuterViewPort<dyn SequenceView<Item = char>> {
         self.chars_editor
             .get_data_port()
-            .map(|char_editor| char_editor.read().unwrap().data.get().unwrap())
+            .map(|char_editor| char_editor.read().unwrap().data.get().unwrap_or('?'))
+    }
+
+    pub fn get_plain_editor_view(&self) -> OuterViewPort<dyn TerminalView> {
+        self.chars_editor
+            .get_seg_seq_view()
+            .to_grid_horizontal()
+            .flatten()
+    }
+    
+    pub fn get_string(&self) -> String {
+        self.get_data_port().get_view().unwrap().iter().collect()
     }
 }
 
@@ -109,7 +122,7 @@ impl TreeNav for StringEditor {
         self.chars_editor.up()
     }
     fn dn(&mut self) -> TreeNavResult {
-        TreeNavResult::Exit
+        self.chars_editor.dn()
     }
 }
 
@@ -133,3 +146,6 @@ impl TerminalEditor for StringEditor {
         }
     }
 }
+
+impl TerminalTreeEditor for StringEditor {}
+

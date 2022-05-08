@@ -5,6 +5,7 @@ pub enum TreeNavResult {
     Continue,
     Exit,
 }
+
 /*
 impl From<TreeNavResult> for TerminalEditorResult {
     fn from(v: TreeNavResult) -> TerminalEditorResult {
@@ -14,11 +15,21 @@ impl From<TreeNavResult> for TerminalEditorResult {
         }
     }
 }
-*/
+ */
+
 #[derive(Clone, Eq, PartialEq)]
 pub struct TreeCursor {
     pub leaf_mode: ListCursorMode,
     pub tree_addr: Vec<usize>,
+}
+
+impl TreeCursor {
+    pub fn home() -> Self {
+        TreeCursor {
+            leaf_mode: ListCursorMode::Select,
+            tree_addr: vec![0]
+        }
+    }
 }
 
 impl Default for TreeCursor {
@@ -66,4 +77,5 @@ pub trait TreeNav {
 
 use crate::terminal::{TerminalEditor};
 
-pub trait TerminalTreeEditor = TerminalEditor + TreeNav;
+pub trait TerminalTreeEditor : TerminalEditor + TreeNav + Send {}
+

@@ -22,6 +22,7 @@ use {
 pub enum ListEditorStyle {
     HorizontalSexpr,
     VerticalSexpr,
+    Tuple(usize),
     Path,
     String,
     Clist,
@@ -189,6 +190,7 @@ where
                                 return TreeNavResult::Continue;
                             }
 
+                            self.cursor.set(ListCursor::default());
                             TreeNavResult::Exit
                         }
                     }
@@ -201,7 +203,7 @@ where
     }
 
     fn goto_home(&mut self) -> TreeNavResult {
-        let cur = self.cursor.get();
+        let mut cur = self.cursor.get();
         if self.data.len() == 0 && cur.idx.is_none() {
             self.cursor.set(ListCursor {
                 mode: ListCursorMode::Insert,
@@ -228,38 +230,38 @@ where
                 }
             }
             ListCursorMode::Modify => {
-                let ce = self.get_item().unwrap();
-                let mut cur_edit = ce.write().unwrap();
-                let cur_mode = cur_edit.get_cursor().leaf_mode;
-                let depth = cur_edit.get_cursor().tree_addr.len();
+                if let Some(ce) = self.get_item() {
+                    let mut cur_edit = ce.write().unwrap();
+                    let cur_mode = cur_edit.get_cursor().leaf_mode;
+                    let depth = cur_edit.get_cursor().tree_addr.len();
 
-                match cur_edit.goto_home() {
-                    TreeNavResult::Exit => {
-                        drop(cur_edit);
+                    match cur_edit.goto_home() {
+                        TreeNavResult::Exit => {
+                            drop(cur_edit);
 
-                        if let Some(i) = cur.idx {
-                            self.up();
+                            if let Some(i) = cur.idx {
+                                if i > 0 {
+                                    self.set_mode(ListCursorMode::Select);
+                                    self.pxev();
 
-                            if i > 0 {
-                                self.set_mode(ListCursorMode::Select);
-                                self.pxev();
+                                    for _x in 1..depth {
+                                        self.dn();
+                                        self.goto_end();
+                                    }
 
-                                for _x in 1..depth {
                                     self.dn();
-                                    self.goto_end();
+                                    self.set_leaf_mode(cur_mode);
+                                    //self.goto_home();
+                                    return TreeNavResult::Continue;
                                 }
-
-                                self.set_leaf_mode(cur_mode);
-                                self.dn();
-                                self.goto_home();
-                                return TreeNavResult::Continue;
                             }
                         }
-
-                        TreeNavResult::Exit
-                    }
-                    TreeNavResult::Continue => TreeNavResult::Continue,
+                        TreeNavResult::Continue => { return TreeNavResult::Continue; }
+                    };
                 }
+
+                self.cursor.set(ListCursor::default());
+                TreeNavResult::Exit
             }
         }
     }
@@ -279,34 +281,42 @@ where
                     TreeNavResult::Continue => {}
                 }
 
-                return TreeNavResult::Continue;
+                TreeNavResult::Continue
+            } else {
+                TreeNavResult::Exit
             }
+        } else {
+            self.cursor.set(ListCursor {
+                mode: cur.mode,
+                idx: None,
+            });
+            TreeNavResult::Exit
         }
-
-        self.cursor.set(ListCursor {
-            mode: cur.mode,
-            idx: None,
-        });
-        TreeNavResult::Exit
     }
 
     fn dn(&mut self) -> TreeNavResult {
-        let cur = self.cursor.get();
-        match cur.mode {
-            ListCursorMode::Insert | ListCursorMode::Select => {
-                if let Some(i) = cur.idx {
-                    if i < self.data.len() {
-                        self.set_mode(ListCursorMode::Modify);
-                        self.data.get_mut(i).write().unwrap().goto(TreeCursor {
-                            leaf_mode: cur.mode,
-                            tree_addr: vec![],
-                        });
-                        *self.cur_dist.write().unwrap() += 1;
+        let mut cur = self.cursor.get();
+
+        if cur.idx.is_none() {
+            self.goto_home()
+        } else {
+            match cur.mode {
+                ListCursorMode::Insert | ListCursorMode::Select => {
+                    if let Some(i) = cur.idx {
+                        if i < self.data.len() {
+                            self.set_mode(ListCursorMode::Modify);
+                            self.data.get_mut(i).write().unwrap().goto(TreeCursor {
+                                leaf_mode: cur.mode,
+                                tree_addr: vec![],
+                            });
+                            self.data.get_mut(i).write().unwrap().dn();
+                            *self.cur_dist.write().unwrap() += 1;
+                        }
                     }
+                    TreeNavResult::Continue
                 }
-                TreeNavResult::Continue
+                ListCursorMode::Modify => self.get_item().unwrap().write().unwrap().dn(),
             }
-            ListCursorMode::Modify => self.get_item().unwrap().write().unwrap().dn(),
         }
     }
 
@@ -397,7 +407,7 @@ where
                         TreeNavResult::Exit => {
                             drop(cur_edit);
                             drop(ce);
-                            self.up();
+                            //self.up();
 
                             if i + 1 < self.data.len() {
                                 self.set_mode(ListCursorMode::Select);
@@ -405,14 +415,14 @@ where
 
                                 for _x in 1..depth {
                                     self.dn();
-                                    self.goto_home();
                                 }
 
                                 self.set_leaf_mode(cur_mode);
                                 self.dn();
-                                self.goto_home();
+
                                 TreeNavResult::Continue
                             } else {
+                                self.cursor.set(ListCursor::default());
                                 TreeNavResult::Exit
                             }
                         }
@@ -435,6 +445,7 @@ where
         match self.style {
             ListEditorStyle::HorizontalSexpr => self.horizontal_sexpr_view(),
             ListEditorStyle::VerticalSexpr => self.vertical_sexpr_view(),
+            ListEditorStyle::Tuple(depth) => self.tuple_view(depth),
             ListEditorStyle::Path => self.path_view(),
             ListEditorStyle::String => self.string_view(),
             ListEditorStyle::Clist => self.clist_view(),
@@ -474,10 +485,10 @@ where
                     _ => {
                         let new_edit = (self.make_item_editor)();
                         self.data.insert(idx, new_edit.clone());
-                        self.dn();
-                        self.goto_home();
+                        self.set_mode(ListCursorMode::Modify);
+                        let mut ne = new_edit.write().unwrap();
 
-                        match new_edit.write().unwrap().handle_terminal_event(event) {
+                        match ne.handle_terminal_event(event) {
                             TerminalEditorResult::Exit => {
                                 self.cursor.set(ListCursor {
                                     mode: ListCursorMode::Insert,
@@ -551,6 +562,12 @@ where
         }
     }
 }
+
+impl<ItemEditor, FnMakeItemEditor> TerminalTreeEditor for ListEditor<ItemEditor, FnMakeItemEditor>
+where
+    ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static,
+    FnMakeItemEditor: Fn() -> Arc<RwLock<ItemEditor>> + Send + Sync,
+{}
 
 impl<ItemEditor, FnMakeItemEditor> ListEditor<ItemEditor, FnMakeItemEditor>
 where
@@ -629,6 +646,13 @@ where
     pub fn clist_view(&self) -> OuterViewPort<dyn TerminalView> {
         self.get_seg_seq_view()
             .decorate("{", "}", ", ", 1)
+            .to_grid_horizontal()
+            .flatten()
+    }
+
+    pub fn tuple_view(&self, depth: usize) -> OuterViewPort<dyn TerminalView> {
+        self.get_seg_seq_view()
+            .decorate("(", ")", ", ", depth)
             .to_grid_horizontal()
             .flatten()
     }
@@ -738,3 +762,4 @@ where
         self.goto(c);
     }
 }
+

@@ -6,11 +6,13 @@ pub mod projection;
 pub mod grid;
 pub mod index;
 pub mod integer;
+pub mod product;
 pub mod list;
 pub mod sequence;
 pub mod singleton;
 pub mod terminal;
 pub mod vec;
+pub mod make_editor;
 
 pub mod tree_nav;
 

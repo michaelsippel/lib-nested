@@ -82,10 +82,10 @@ where
 {
     fn reset(&mut self, view: Option<Arc<SrcView>>) {
         self.src_view = view;
-        self.cast.notify(&IndexArea::Full);
+        self.cast.notify(&IndexArea::Set(vec![ () ]));
     }
 
     fn notify(&mut self, _: &()) {
-        self.cast.notify(&IndexArea::Full);
+        self.cast.notify(&IndexArea::Set(vec![ () ]));
     }
 }

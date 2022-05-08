@@ -3,7 +3,7 @@ pub mod vec2bin;
 pub mod vec2json;
 pub mod vec2seq;
 
-pub use buffer::VecBuffer;
+pub use buffer::{VecBuffer, MutableVecAccess};
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 

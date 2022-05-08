@@ -12,6 +12,6 @@ pub use {
     port::{
         AnyInnerViewPort, AnyOuterViewPort, AnyViewPort, InnerViewPort, OuterViewPort, ViewPort,
     },
-    type_term::{TypeDict, TypeID, TypeTerm},
+    type_term::{TypeDict, TypeID, TypeTerm, TypeLadder},
     view::View,
 };

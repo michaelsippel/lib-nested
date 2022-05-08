@@ -3,6 +3,7 @@ use {crate::bimap::Bimap, std::collections::HashMap};
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub type TypeID = u64;
+pub type TypeLadder = Vec<TypeTerm>;
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
@@ -105,7 +106,7 @@ impl TypeTerm {
     pub fn to_str(&self, names: &HashMap<u64, String>) -> String {
         match self {
             TypeTerm::Type { id, args } => format!(
-                "( {} {})",
+                "« {} {}»",
                 names[id],
                 if args.len() > 0 {
                     args.iter().fold(String::new(), |str, term| {
@@ -139,6 +140,14 @@ impl TypeDict {
     pub fn add_typename(&mut self, tn: String) {
         self.typenames.insert(tn, self.type_id_counter);
         self.type_id_counter += 1;
+    }
+
+    pub fn get_typeid(&self, tn: &String) -> Option<TypeID> {
+        if let Some(id) = self.typenames.mλ.get(tn) {
+            Some(*id)
+        } else {
+            None
+        }
     }
 
     pub fn type_term_from_str(&self, typename: &str) -> Option<TypeTerm> {

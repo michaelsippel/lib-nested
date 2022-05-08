@@ -198,11 +198,11 @@ where
         let old_limit = self.limit;
         self.limit = Point2::new(
             (0..=top_range.end().x as usize)
-                .map(|x| col_widths[x])
+                .map(|x| col_widths.get(x).unwrap_or(&0))
                 .sum::<i16>()
                 - 1,
             (0..=top_range.end().y as usize)
-                .map(|y| row_heights[y])
+                .map(|y| row_heights.get(y).unwrap_or(&0))
                 .sum::<i16>()
                 - 1,
         );

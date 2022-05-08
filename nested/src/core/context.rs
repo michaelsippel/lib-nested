@@ -1,7 +1,12 @@
 use {
-    crate::core::{
-        type_term::{TypeDict, TypeTerm},
-        AnyOuterViewPort, OuterViewPort, View,
+    crate::{
+        core::{
+            type_term::{TypeDict, TypeTerm, TypeID},
+            AnyOuterViewPort, OuterViewPort, View,
+        },
+        tree_nav::{
+            TerminalTreeEditor
+        }
     },
     std::{
         collections::HashMap,
@@ -232,10 +237,20 @@ pub struct MorphismType {
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub struct Context {
+    /// assigns a name to every type
     type_dict: TypeDict,
+    
+    /// objects
+    objects: HashMap<String, Object>,
+
+    /// editors
+    editor_ctors: HashMap<TypeID, Box<dyn Fn(&Self, TypeTerm) -> Option<Arc<RwLock<dyn TerminalTreeEditor>>> + Send + Sync>>,
+
+    /// morphisms
     default_constructors: HashMap<TypeTerm, Box<dyn Fn() -> Object + Send + Sync>>,
     morphism_constructors: HashMap<MorphismType, Box<dyn Fn(Object) -> Object + Send + Sync>>,
-    objects: HashMap<String, Object>,
+
+    /// recursion
     parent: Option<Arc<RwLock<Context>>>,
 }
 
@@ -243,6 +258,7 @@ impl Context {
     pub fn with_parent(parent: Option<Arc<RwLock<Context>>>) -> Self {
         Context {
             type_dict: TypeDict::new(),
+            editor_ctors: HashMap::new(),
             default_constructors: HashMap::new(),
             morphism_constructors: HashMap::new(),
             objects: HashMap::new(),
@@ -261,7 +277,27 @@ impl Context {
     pub fn type_term_from_str(&self, tn: &str) -> Option<TypeTerm> {
         self.type_dict.type_term_from_str(&tn)
     }
+    pub fn type_term_to_str(&self, t: &TypeTerm) -> String {
+        self.type_dict.type_term_to_str(&t)
+    }
 
+    pub fn add_editor_ctor(&mut self, tn: &str, mk_editor: Box<dyn Fn(&Self, TypeTerm) -> Option<Arc<RwLock<dyn TerminalTreeEditor>>> + Send + Sync>) {
+        if let Some(tid) = self.type_dict.get_typeid(&tn.into()) {
+            self.editor_ctors.insert(tid, mk_editor);
+        } else {
+            println!("invalid type name");
+        }
+    }
+
+    pub fn make_editor(&self, type_term: TypeTerm) -> Option<Arc<RwLock<dyn TerminalTreeEditor>>> {
+        if let TypeTerm::Type{ id, args } = type_term.clone() {
+            let mk_editor = self.editor_ctors.get(&id)?;
+            mk_editor(self, type_term)
+        } else {
+            None
+        }
+    }
+    
     pub fn add_morphism(
         &mut self,
         morph_type: MorphismType,
