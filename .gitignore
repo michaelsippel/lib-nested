@@ -1,3 +1,5 @@
+.pijul
 Cargo.lock
 /target
 *~
+\#*\#
