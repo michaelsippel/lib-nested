@@ -28,10 +28,10 @@ pub fn read_ansi_from<R: Read + Unpin>(
     let offset_port = ViewPort::<dyn SingletonView<Item = Vector2<i16>>>::new();
 
     let mut performer = PerfAtom {
-        buf: IndexBuffer::new(buf_port.inner()),
-        size: SingletonBuffer::new(max_size, size_port.inner()),
-        offset: SingletonBuffer::new(Vector2::new(0, 0), offset_port.inner()),
-        cursor: SingletonBuffer::new(Point2::new(0, 0), cursor_port.inner()),
+        buf: IndexBuffer::with_port(buf_port.inner()),
+        size: SingletonBuffer::with_port(max_size, size_port.inner()),
+        offset: SingletonBuffer::with_port(Vector2::new(0, 0), offset_port.inner()),
+        cursor: SingletonBuffer::with_port(Point2::new(0, 0), cursor_port.inner()),
         cursty: TerminalStyle::default(),
         curinv: false,
         cursav: Point2::new(0, 0),

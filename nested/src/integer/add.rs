@@ -51,7 +51,7 @@ impl Add {
             radix,
             a: proj_helper.new_sequence_arg(0, a, |s: &mut Self, _digit_idx| s.update()),
             b: proj_helper.new_sequence_arg(1, b, |s: &mut Self, _digit_idx| s.update()),
-            c: VecBuffer::new(c),
+            c: VecBuffer::with_port(c),
             _proj_helper: proj_helper,
         }));
         add

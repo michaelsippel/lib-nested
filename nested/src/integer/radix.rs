@@ -26,7 +26,7 @@ impl RadixProjection {
             src_radix,
             dst_radix,
             src_digits: None,
-            dst_digits: RwLock::new(VecBuffer::new(dst_digits)),
+            dst_digits: RwLock::new(VecBuffer::with_port(dst_digits)),
         }));
         src_digits.add_observer(proj.clone());
         proj

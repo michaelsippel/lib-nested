@@ -1,6 +1,6 @@
 use {
     crate::{
-        core::{InnerViewPort, Observer, ObserverBroadcast, View},
+        core::{InnerViewPort, OuterViewPort, Observer, ObserverBroadcast, View, ViewPort},
         vec::VecDiff,
     },
     std::sync::RwLock,
@@ -27,7 +27,7 @@ where
     T: Clone + Send + Sync + 'static,
 {
     data: Arc<RwLock<Vec<T>>>,
-    cast: Arc<RwLock<ObserverBroadcast<RwLock<Vec<T>>>>>,
+    port: InnerViewPort<RwLock<Vec<T>>>
 }
 
 impl<T> VecBuffer<T>
@@ -35,21 +35,29 @@ where
     T: Clone + Send + Sync + 'static,
 {
     pub fn with_data(data: Vec<T>, port: InnerViewPort<RwLock<Vec<T>>>) -> Self {
-        let mut b = VecBuffer::new(port);
-        for x in data.into_iter() {
-            b.push(x);
-        }
-
-        b
-    }
-
-    pub fn new(port: InnerViewPort<RwLock<Vec<T>>>) -> Self {
-        let data = Arc::new(RwLock::new(Vec::new()));
+        let data = Arc::new(RwLock::new(data));
         port.set_view(Some(data.clone()));
+
+        for x in data.read().unwrap().iter().cloned() {
+            port.notify(&VecDiff::Push(x));
+        }
+            
         VecBuffer {
             data,
-            cast: port.get_broadcast(),
+            port
         }
+    }
+
+    pub fn with_port(port: InnerViewPort<RwLock<Vec<T>>>) -> Self {
+        VecBuffer::with_data(vec![], port)
+    }
+
+    pub fn new() -> Self {
+        VecBuffer::with_port(ViewPort::new().into_inner())
+    }
+    
+    pub fn get_port(&self) -> OuterViewPort<RwLock<Vec<T>>> {
+        self.port.0.outer()
     }
 
     pub fn apply_diff(&mut self, diff: VecDiff<T>) {
@@ -73,7 +81,7 @@ where
         }
         drop(data);
 
-        self.cast.notify(&diff);
+        self.port.notify(&diff);
     }
 
     pub fn len(&self) -> usize {

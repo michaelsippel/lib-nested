@@ -1,8 +1,8 @@
 use {
     crate::{
         core::{OuterViewPort, ViewPort},
-        list::{sexpr::ListDecoration, ListEditor},
-        sequence::{SequenceView, SequenceViewExt},
+        list::{PTYListEditor},
+        sequence::{SequenceView, SequenceViewExt, decorator::{PTYSeqDecorate, SeqDecorStyle}},
         singleton::{SingletonBuffer, SingletonView},
         terminal::{
             TerminalAtom, TerminalEditor, TerminalEditorResult, TerminalEvent, TerminalStyle,
@@ -13,29 +13,27 @@ use {
     std::sync::Arc,
     std::sync::RwLock,
     termion::event::{Event, Key},
+    cgmath::Vector2
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub struct DigitEditor {
     radix: u32,
-    data: SingletonBuffer<Option<char>>,
-    data_port: ViewPort<dyn SingletonView<Item = Option<char>>>,
+    data: SingletonBuffer<Option<char>>
 }
 
 impl DigitEditor {
     pub fn new(radix: u32) -> Self {
-        let data_port = ViewPort::new();
         DigitEditor {
             radix,
-            data: SingletonBuffer::new(None, data_port.inner()),
-            data_port,
+            data: SingletonBuffer::new(None),
         }
     }
 
     pub fn get_data_port(&self) -> OuterViewPort<dyn SingletonView<Item = Option<u32>>> {
         let radix = self.radix;
-        self.data_port.outer().map(move |c| c?.to_digit(radix))
+        self.data.get_port().map(move |c| c?.to_digit(radix))
     }
 }
 
@@ -43,8 +41,8 @@ impl TreeNav for DigitEditor {}
 impl TerminalEditor for DigitEditor {
     fn get_term_view(&self) -> OuterViewPort<dyn TerminalView> {
         let radix = self.radix;
-        self.data_port
-            .outer()
+        self.data
+            .get_port()
             .map(move |c| {
                 TerminalAtom::new(
                     c.unwrap_or('?'),
@@ -81,24 +79,24 @@ impl TerminalTreeEditor for DigitEditor {}
 
 pub struct PosIntEditor {
     radix: u32,
-    digits_editor:
-        ListEditor<DigitEditor, Box<dyn Fn() -> Arc<RwLock<DigitEditor>> + Send + Sync + 'static>>,
+    digits_editor: PTYListEditor<DigitEditor>
 }
 
 impl PosIntEditor {
     pub fn new(radix: u32) -> Self {
         PosIntEditor {
             radix,
-            digits_editor: ListEditor::new(
+            digits_editor: PTYListEditor::new(
                 Box::new(move || Arc::new(RwLock::new(DigitEditor::new(radix)))),
-                crate::list::ListEditorStyle::Hex,
+                SeqDecorStyle::Hex,
+                0
             ),
         }
     }
 
     pub fn get_data_port(&self) -> OuterViewPort<dyn SequenceView<Item = u32>> {
         let radix = self.radix;
-        self.digits_editor
+        self.digits_editor.editor
             .get_data_port()
             .filter_map(move |digit_editor| {
                 digit_editor.read().unwrap().data.get()?.to_digit(radix)
@@ -132,44 +130,17 @@ impl TreeNav for PosIntEditor {
     fn goto(&mut self, cur: TreeCursor) -> TreeNavResult {
         self.digits_editor.goto(cur)
     }
-    fn goto_home(&mut self) -> TreeNavResult {
-        self.digits_editor.goto_home()
+    fn goby(&mut self, cur: Vector2<isize>) -> TreeNavResult {
+        self.digits_editor.goby(cur)
     }
-    fn goto_end(&mut self) -> TreeNavResult {
-        self.digits_editor.goto_end()
-    }
-    fn pxev(&mut self) -> TreeNavResult {
-        self.digits_editor.pxev()
-    }
-    fn nexd(&mut self) -> TreeNavResult {
-        self.digits_editor.nexd()
-    }
-    fn up(&mut self) -> TreeNavResult {
-        self.digits_editor.up()
-    }
-    fn dn(&mut self) -> TreeNavResult {
-        self.digits_editor.dn()
-    }
+
 }
 
 impl TerminalEditor for PosIntEditor {
     fn get_term_view(&self) -> OuterViewPort<dyn TerminalView> {
-        self.digits_editor
+        self.digits_editor.editor
             .get_seg_seq_view()
-            .decorate(
-                match self.radix {
-                    2 => "0b",
-                    8 => "0o",
-                    10 => "0d",
-                    16 => "0x",
-                    _ => "",
-                },
-                "",
-                "",
-                0,
-            )
-            .to_grid_horizontal()
-            .flatten()
+            .pty_decorate(SeqDecorStyle::Hex, 0)
     }
 
     fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {

@@ -1,6 +1,6 @@
 use {
     crate::{
-        core::{InnerViewPort, Observer, ObserverBroadcast, View},
+        core::{InnerViewPort, ViewPort, Observer, ObserverBroadcast, View},
         index::{IndexArea, IndexView},
     },
     std::sync::RwLock,
@@ -42,7 +42,7 @@ where
     Item: Clone + Send + Sync + 'static,
 {
     data: Arc<RwLock<HashMap<Key, Item>>>,
-    cast: Arc<RwLock<ObserverBroadcast<dyn IndexView<Key, Item = Item>>>>,
+    port: InnerViewPort<dyn IndexView<Key, Item = Item>>,
 }
 
 impl<Key, Item> IndexBuffer<Key, Item>
@@ -50,19 +50,23 @@ where
     Key: Clone + Hash + Eq + Send + Sync + 'static,
     Item: Clone + Send + Sync + 'static,
 {
-    pub fn new(port: InnerViewPort<dyn IndexView<Key, Item = Item>>) -> Self {
+    pub fn with_port(port: InnerViewPort<dyn IndexView<Key, Item = Item>>) -> Self {
         let data = Arc::new(RwLock::new(HashMap::<Key, Item>::new()));
         port.set_view(Some(Arc::new(IndexBufferView(data.clone()))));
 
         IndexBuffer {
             data,
-            cast: port.get_broadcast(),
+            port
         }
+    }
+
+    pub fn new() -> Self {
+        IndexBuffer::with_port(ViewPort::new().into_inner())
     }
 
     pub fn insert(&mut self, key: Key, item: Item) {
         self.data.write().unwrap().insert(key.clone(), item);
-        self.cast.notify(&IndexArea::Set(vec![key]));
+        self.port.notify(&IndexArea::Set(vec![key]));
     }
 
     pub fn insert_iter<T>(&mut self, iter: T)
@@ -76,6 +80,6 @@ where
 
     pub fn remove(&mut self, key: Key) {
         self.data.write().unwrap().remove(&key);
-        self.cast.notify(&IndexArea::Set(vec![key]));
+        self.port.notify(&IndexArea::Set(vec![key]));
     }
 }

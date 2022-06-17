@@ -1,6 +1,6 @@
 use {
     crate::{
-        core::{InnerViewPort, Observer, ObserverBroadcast, View},
+        core::{InnerViewPort, OuterViewPort, Observer, ObserverBroadcast, View, ViewPort},
         singleton::SingletonView,
     },
     std::sync::RwLock,
@@ -40,23 +40,31 @@ where
     T: Clone + Send + Sync + 'static,
 {
     value: Arc<RwLock<T>>,
-    cast: Arc<RwLock<ObserverBroadcast<dyn SingletonView<Item = T>>>>,
+    port: InnerViewPort<dyn SingletonView<Item = T>>
 }
 
 impl<T> SingletonBuffer<T>
 where
     T: Clone + Send + Sync + 'static,
 {
-    pub fn new(value: T, port: InnerViewPort<dyn SingletonView<Item = T>>) -> Self {
+    pub fn with_port(value: T, port: InnerViewPort<dyn SingletonView<Item = T>>) -> Self {
         let value = Arc::new(RwLock::new(value));
         port.set_view(Some(Arc::new(SingletonBufferView(value.clone()))));
 
         SingletonBuffer {
             value,
-            cast: port.get_broadcast(),
+            port
         }
     }
 
+    pub fn new(value: T) -> Self {
+        SingletonBuffer::with_port(value, ViewPort::new().into_inner())
+    }
+
+    pub fn get_port(&self) -> OuterViewPort<dyn SingletonView<Item = T>> {
+        self.port.0.outer()
+    }
+    
     pub fn get(&self) -> T {
         self.value.read().unwrap().clone()
     }
@@ -72,7 +80,7 @@ where
         let mut v = self.value.write().unwrap();
         *v = new_value;
         drop(v);
-        self.cast.notify(&());
+        self.port.notify(&());
     }
 }
 
