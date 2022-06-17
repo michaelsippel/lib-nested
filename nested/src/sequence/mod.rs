@@ -1,7 +1,8 @@
 pub mod filter;
-pub mod flatten;
 pub mod map;
 pub mod seq2idx;
+pub mod flatten;
+pub mod decorator;
 
 pub use seq2idx::Sequence2Index;
 
