@@ -1,33 +1,34 @@
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum ListCursorMode {
     Insert,
-    Select,
-    Modify,
+    Select
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct ListCursor {
     pub mode: ListCursorMode,
-    pub idx: Option<usize>,
+    pub idx: Option<isize>,
+}
+
+impl ListCursor {
+    pub fn home() -> Self {
+        ListCursor {
+            mode: ListCursorMode::Insert,
+            idx: Some(0)
+        }
+    }
+
+    pub fn none() -> Self {
+        ListCursor {
+            mode: ListCursorMode::Insert,
+            idx: None,
+        }        
+    }
 }
 
 impl Default for ListCursor {
     fn default() -> Self {
-        ListCursor {
-            mode: ListCursorMode::Select,
-            idx: None,
-        }
+        ListCursor::none()
     }
 }
 
-/*
-pub trait ListNav {
-    fn pxev(&mut self) -> ListNavResult;
-    fn nexd(&mut self) -> ListNavResult;
-    fn pua(&mut self) -> ListNavResult;
-    fn end(&mut self) -> ListNavResult;
-
-    fn set_cursor(&mut self, new_cursor: Option<ListCursor>) -> ListNavResult;
-    fn get_cursor(&self) -> Option<ListCursor>;
-}
-*/

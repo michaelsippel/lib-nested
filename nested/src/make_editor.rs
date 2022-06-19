@@ -1,24 +1,17 @@
 
 use {
     crate::{
-        core::{ViewPort, OuterViewPort, Observer, port::UpdateTask, TypeTerm, TypeLadder, Context},
-        terminal::{
-            Terminal, TerminalAtom, TerminalCompositor, TerminalEditor,
-            TerminalEditorResult, TerminalEvent, TerminalStyle, TerminalView,
-            make_label
-        },
-        sequence::{SequenceView},
-        tree_nav::{TreeNav, TerminalTreeEditor, TreeCursor, TreeNavResult},
-        vec::{VecBuffer, MutableVecAccess},
-        index::buffer::IndexBuffer,
+        core::{TypeLadder, Context},
+        terminal::{TerminalView},
+        tree_nav::{TerminalTreeEditor},
         integer::PosIntEditor,
-        string_editor::{StringEditor, CharEditor},
-        list::{ListEditor, ListCursorMode, ListEditorStyle},
-        product::editor::ProductEditor
+        list::{ListEditor, PTYListEditor},
+        sequence::{decorator::{SeqDecorStyle}},
+        product::editor::ProductEditor,
+        char_editor::CharEditor
     },
-    cgmath::{Point2, Vector2},
-    std::{sync::{Arc, RwLock}, ops::{Deref, DerefMut}},
-    termion::event::{Event, Key},
+    cgmath::Vector2,
+    std::sync::{Arc, RwLock},
 };
 
 pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>> {
@@ -30,44 +23,70 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
         Arc::new(RwLock::new(PosIntEditor::new(10))) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
 
     } else if t[0] == c.type_term_from_str("( String )").unwrap() {
-        Arc::new(RwLock::new(StringEditor::new())) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+        Arc::new(RwLock::new(
+            PTYListEditor::new(
+                Box::new(|| {
+                    Arc::new(RwLock::new(CharEditor::new()))
+                }),
+                SeqDecorStyle::DoubleQuote,
+                depth
+            )
+        ))
 
     } else if t[0] == c.type_term_from_str("( List Char )").unwrap() {
-        Arc::new(RwLock::new(ListEditor::new(
-            || { Arc::new(RwLock::new(CharEditor::new())) },
-            ListEditorStyle::Plain
-        ))) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+        Arc::new(RwLock::new(
+            PTYListEditor::new(
+                Box::new(
+                    || { Arc::new(RwLock::new(CharEditor::new())) }
+                ),
+                SeqDecorStyle::Plain,
+                depth
+            )
+        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
 
     } else if t[0] == c.type_term_from_str("( List ℕ )").unwrap() {
-        Arc::new(RwLock::new(ListEditor::new(
-            || {
-                Arc::new(RwLock::new(PosIntEditor::new(16)))
-            },
-            ListEditorStyle::HorizontalSexpr
-        ))) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+        Arc::new(RwLock::new(
+            PTYListEditor::new(
+                Box::new(|| {
+                    Arc::new(RwLock::new(PosIntEditor::new(16)))
+                }),
+                SeqDecorStyle::EnumSet,
+                depth
+            )
+        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
 
     } else if t[0] == c.type_term_from_str("( Path )").unwrap() {
-        Arc::new(RwLock::new(ListEditor::new(
-            || {
-                Arc::new(RwLock::new(ListEditor::new(
-                    || {
-                        Arc::new(RwLock::new(CharEditor::new()))
-                    },
-                    ListEditorStyle::Plain
-                )))
-            },
-            ListEditorStyle::Path
+        let d = depth + 1;
+        Arc::new(RwLock::new(PTYListEditor::new(
+            Box::new({
+                let d= depth +1;
+                move || {
+                    Arc::new(RwLock::new(PTYListEditor::new(
+                        Box::new(|| {
+                            Arc::new(RwLock::new(CharEditor::new()))
+                        }),
+                        SeqDecorStyle::Plain,
+                        d
+                    )))
+            }}),
+            SeqDecorStyle::Path,
+            depth
         ))) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
 
     } else if t[0] == c.type_term_from_str("( List RGB )").unwrap() {
-        Arc::new(RwLock::new(ListEditor::new({
-            let ctx = ctx.clone();
-            move || {
-                make_editor(ctx.clone(), &vec![ ctx.read().unwrap().type_term_from_str("( RGB )").unwrap() ], depth+1)
-            }
-        },
-            ListEditorStyle::VerticalSexpr
-        ))) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+        Arc::new(RwLock::new(
+            PTYListEditor::<dyn TerminalTreeEditor + Send +Sync>::new(
+                Box::new({
+                    let d = depth+1;
+                    let ctx = ctx.clone();
+                    move || {
+                        make_editor(ctx.clone(), &vec![ ctx.read().unwrap().type_term_from_str("( RGB )").unwrap() ], d)
+                    }
+                }),
+                SeqDecorStyle::VerticalSexpr,
+                depth
+            )
+        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
 
     } else if t[0] == c.type_term_from_str("( RGB )").unwrap() {
         Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
@@ -92,14 +111,18 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
         )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
 
     } else if t[0] == c.type_term_from_str("( List Term )").unwrap() {
-        Arc::new(RwLock::new(ListEditor::new({
-            let ctx = ctx.clone();
-            move || {
-                make_editor(ctx.clone(), &vec![ ctx.read().unwrap().type_term_from_str("( Term )").unwrap() ], depth+1)
-            }
-        },
-            ListEditorStyle::Tuple(depth)
-        ))) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+        Arc::new(RwLock::new(
+            PTYListEditor::<dyn TerminalTreeEditor + Send + Sync>::new(
+                Box::new({
+                    let ctx = ctx.clone();
+                    move || {
+                        make_editor(ctx.clone(), &vec![ ctx.read().unwrap().type_term_from_str("( Term )").unwrap() ], depth+1)
+                    }
+                }),
+                SeqDecorStyle::Tuple,
+                depth
+            )
+        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
 
     } else { // else: term
         Arc::new(RwLock::new(

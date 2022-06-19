@@ -127,6 +127,9 @@ impl TreeNav for PosIntEditor {
     fn get_cursor(&self) -> TreeCursor {
         self.digits_editor.get_cursor()
     }
+    fn get_cursor_warp(&self) -> TreeCursor {
+        self.digits_editor.get_cursor_warp()
+    }
     fn goto(&mut self, cur: TreeCursor) -> TreeNavResult {
         self.digits_editor.goto(cur)
     }

@@ -1,24 +1,34 @@
 #![feature(trait_alias)]
 
+// general
 pub mod core;
 pub mod projection;
+pub mod bimap;
+pub mod modulo;
+pub use modulo::modulo;
 
-pub mod grid;
+// semantics
+pub mod singleton;
+pub mod sequence;
 pub mod index;
-pub mod integer;
+pub mod grid;
+
+// implementation
+pub mod vec;
+
+// editors
+pub mod tree_nav;
 pub mod product;
 pub mod list;
-pub mod sequence;
-pub mod singleton;
-pub mod terminal;
-pub mod vec;
+
+// high-level types
+pub mod char_editor;
+pub mod integer;
 pub mod make_editor;
 
-pub mod tree_nav;
-
-pub mod string_editor;
-
-pub mod bimap;
+// display
+pub mod color;
+pub mod terminal;
 
 pub fn magic_header() {
     eprintln!("<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>");

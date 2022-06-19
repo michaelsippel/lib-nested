@@ -1,24 +1,19 @@
-
 use {
     crate::{
-        core::{ViewPort, OuterViewPort, Observer, port::UpdateTask, TypeTerm, TypeLadder, Context},
+        core::{ViewPort, OuterViewPort, TypeLadder, Context},
         terminal::{
-            Terminal, TerminalAtom, TerminalCompositor, TerminalEditor,
-            TerminalEditorResult, TerminalEvent, TerminalStyle, TerminalView,
-            make_label
+            TerminalEditor, TerminalEditorResult,
+            TerminalEvent, TerminalView
         },
         sequence::{SequenceView},
-        tree_nav::{TreeNav, TerminalTreeEditor, TreeCursor, TreeNavResult},
+        tree_nav::{TreeNav, TerminalTreeEditor, TreeNavResult},
         vec::{VecBuffer, MutableVecAccess},
-        index::buffer::IndexBuffer,
-        integer::PosIntEditor,
-        string_editor::{StringEditor, CharEditor},
-        list::{ListEditor, ListCursorMode, ListEditorStyle},
+        list::ListCursorMode,
         product::{element::ProductEditorElement},
         make_editor::make_editor
     },
-    cgmath::{Point2, Vector2},
-    std::{sync::{Arc, RwLock}, ops::{Deref, DerefMut}},
+    cgmath::Vector2,
+    std::sync::{Arc, RwLock},
     termion::event::{Event, Key},
 };
 
@@ -31,8 +26,8 @@ pub struct ProductEditor {
 
     pub(super) ctx: Arc<RwLock<Context>>,
     
-    pub(super) cursor: Option<usize>,
-    pub(super) depth: usize
+    pub(super) cursor: Option<isize>,
+    pub(super) depth: usize,
 }
 
 impl ProductEditor {
@@ -46,7 +41,7 @@ impl ProductEditor {
         });
 
         ProductEditor {
-            elements: VecBuffer::new(port.inner()),
+            elements: VecBuffer::with_port(port.inner()),
             el_port,
             el_view_port,
             n_indices: Vec::new(),
@@ -57,9 +52,9 @@ impl ProductEditor {
             depth
         }
     }
-
+    
     pub fn with_t(mut self, t: &str) -> Self {
-        self.elements.push(ProductEditorElement::T(t.to_string()));
+        self.elements.push(ProductEditorElement::T(t.to_string(), self.depth));
         self
     }
 
@@ -68,22 +63,24 @@ impl ProductEditor {
         self.elements.push(ProductEditorElement::N{
             t: n,
             editor: None,
-            select: false
+            cur_depth: 0
         });
         self.n_indices.push(elem_idx);
         self
     }
 
-    pub fn get_editor_element(&self, idx: usize) -> Option<ProductEditorElement> {
-        if let Some(i) = self.n_indices.get(idx) {
+    pub fn get_editor_element(&self, mut idx: isize) -> Option<ProductEditorElement> {
+        idx = crate::modulo(idx, self.n_indices.len() as isize);
+        if let Some(i) = self.n_indices.get(idx as usize) {
             Some(self.elements.get(*i))
         } else {
             None
         }
     }
 
-    pub fn get_editor_element_mut(&mut self, idx: usize) -> Option<MutableVecAccess<ProductEditorElement>> {
-        if let Some(i) = self.n_indices.get(idx) {
+    pub fn get_editor_element_mut(&mut self, mut idx: isize) -> Option<MutableVecAccess<ProductEditorElement>> {
+        idx = crate::modulo(idx, self.n_indices.len() as isize);
+        if let Some(i) = self.n_indices.get(idx as usize) {
             Some(self.elements.get_mut(*i))
         } else {
             None
@@ -98,14 +95,14 @@ impl ProductEditor {
         self.get_editor_element_mut(self.cursor?)
     }
 
-    pub fn get_editor(&self, idx: usize) -> Option<Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>> {
-        if let Some(ProductEditorElement::N{ t: _, editor, select: _ }) = self.get_editor_element(idx) {
+    pub fn get_editor(&self, idx: isize) -> Option<Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>> {
+        if let Some(ProductEditorElement::N{ t: _, editor, cur_depth: _ }) = self.get_editor_element(idx) {
             editor
         } else {
             None
         }
     }
-    
+
     pub fn get_cur_editor(&self) -> Option<Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>> {
         self.get_editor(self.cursor?)
     }
@@ -123,14 +120,15 @@ impl TerminalEditor for ProductEditor {
     }
 
     fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
-        if let Some(ProductEditorElement::N{ t, editor, select }) = self.get_cur_element_mut().as_deref_mut() {
-            *select = true;
+        if let Some(ProductEditorElement::N{ t, editor, cur_depth }) = self.get_cur_element_mut().as_deref_mut() {
+            *cur_depth = self.get_cursor().tree_addr.len();
             if let Some(e) = editor.clone() {
                 match e.clone().write().unwrap().handle_terminal_event(event) {
                     TerminalEditorResult::Exit =>
                         match event {
                             TerminalEvent::Input(Event::Key(Key::Backspace)) => {
                                 *editor = None;
+                                *cur_depth -= 1;
                                 TerminalEditorResult::Continue
                             }
                             _ => {
@@ -149,6 +147,7 @@ impl TerminalEditor for ProductEditor {
                 *editor = Some(e.clone());
                 e.write().unwrap().dn();
                 let x = e.write().unwrap().handle_terminal_event(event);
+                *cur_depth = self.get_cursor().tree_addr.len();
                 x
             }
         } else {

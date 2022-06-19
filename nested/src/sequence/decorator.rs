@@ -228,13 +228,13 @@ impl PTYSeqDecorate for OuterViewPort<dyn SequenceView<Item = OuterViewPort<dyn 
              */
 
             SeqDecorStyle::Tuple =>  self
-                .separate(make_label(","))
+                .separate(make_label(", "))
                 .wrap(make_label("("), make_label(")"))
                 .to_grid_horizontal()
                 .flatten(),
 
             SeqDecorStyle::EnumSet => self
-                .separate(make_label(","))
+                .separate(make_label(", "))
                 .wrap(make_label("{"), make_label("}"))
                 .to_grid_horizontal()
                 .flatten(),
@@ -246,7 +246,7 @@ impl PTYSeqDecorate for OuterViewPort<dyn SequenceView<Item = OuterViewPort<dyn 
                 .flatten(),
 
             SeqDecorStyle::Hex => self
-                .wrap(make_label("0"), make_label(""))
+                .wrap(make_label("0x"), make_label(""))
                 .to_grid_horizontal()
                 .flatten(),
         }

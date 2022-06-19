@@ -2,10 +2,10 @@ use {
     crate::pty::{PTYStatus, PTY},
     nested::{
         core::{OuterViewPort, ViewPort},
-        list::{sexpr::ListDecoration, ListCursorMode, ListEditor, ListEditorStyle},
-        sequence::{SequenceView, SequenceViewExt},
+        list::{ListCursorMode, PTYListEditor},
+        sequence::{SequenceView, SequenceViewExt, decorator::{SeqDecorStyle, Separate, Wrap}},
         singleton::SingletonView,
-        string_editor::CharEditor,
+        char_editor::CharEditor,
         terminal::{
             TerminalAtom, TerminalEditor, TerminalEditorResult, TerminalEvent, TerminalStyle,
             TerminalView,
@@ -15,13 +15,14 @@ use {
     std::sync::Arc,
     std::sync::RwLock,
     termion::event::{Event, Key},
+    cgmath::Vector2
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub struct ProcessArg {
     editor:
-        ListEditor<CharEditor, Box<dyn Fn() -> Arc<RwLock<CharEditor>> + Send + Sync + 'static>>,
+        PTYListEditor<CharEditor>,
 }
 
 impl ProcessArg {
@@ -30,7 +31,7 @@ impl ProcessArg {
             char_editor
                 .read()
                 .unwrap()
-                .get_data_port()
+                .get_port()
                 .get_view()
                 .unwrap()
                 .get()
@@ -41,10 +42,7 @@ impl ProcessArg {
 
 impl TerminalEditor for ProcessArg {
     fn get_term_view(&self) -> OuterViewPort<dyn TerminalView> {
-        self.editor
-            .get_seg_seq_view()
-            .to_grid_horizontal()
-            .flatten()
+        self.editor.get_term_view()
     }
 
     fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
@@ -64,32 +62,21 @@ impl TreeNav for ProcessArg {
     fn get_cursor(&self) -> TreeCursor {
         self.editor.get_cursor()
     }
+    fn get_cursor_warp(&self) -> TreeCursor {
+        self.editor.get_cursor_warp()
+    }
     fn goto(&mut self, cur: TreeCursor) -> TreeNavResult {
         self.editor.goto(cur)
     }
-    fn goto_home(&mut self) -> TreeNavResult {
-        self.editor.goto_home()
-    }
-    fn goto_end(&mut self) -> TreeNavResult {
-        self.editor.goto_end()
-    }
-    fn pxev(&mut self) -> TreeNavResult {
-        self.editor.pxev()
-    }
-    fn nexd(&mut self) -> TreeNavResult {
-        self.editor.nexd()
-    }
-    fn up(&mut self) -> TreeNavResult {
-        self.editor.up()
-    }
-    fn dn(&mut self) -> TreeNavResult {
-        self.editor.dn()
+    fn goby(&mut self, dir: Vector2<isize>) -> TreeNavResult {
+        self.editor.goby(dir)
     }
 }
 
+impl TerminalTreeEditor for ProcessArg {}
+
 pub struct ProcessLauncher {
-    cmd_editor:
-        ListEditor<ProcessArg, Box<dyn Fn() -> Arc<RwLock<ProcessArg>> + Send + Sync + 'static>>,
+    cmd_editor: PTYListEditor<ProcessArg>,
     pty: Option<crate::pty::PTY>,
     _ptybox: Arc<RwLock<crate::ascii_box::AsciiBox>>,
     suspended: bool,
@@ -109,16 +96,18 @@ impl ProcessLauncher {
         let box_port = ViewPort::<dyn TerminalView>::new();
         let compositor = nested::terminal::TerminalCompositor::new(comp_port.inner());
 
-        let cmd_editor = ListEditor::new(
+        let cmd_editor = PTYListEditor::new(
             Box::new(|| {
                 Arc::new(RwLock::new(ProcessArg {
-                    editor: ListEditor::new(
+                    editor: PTYListEditor::new(
                         Box::new(|| Arc::new(RwLock::new(CharEditor::new()))),
-                        ListEditorStyle::Plain,
+                        SeqDecorStyle::Plain,
+                        1
                     ),
                 }))
             }) as Box<dyn Fn() -> Arc<RwLock<ProcessArg>> + Send + Sync>,
-            ListEditorStyle::Plain,
+            SeqDecorStyle::HorizontalSexpr,
+            0
         );
 
         compositor.write().unwrap().push(
@@ -127,11 +116,7 @@ impl ProcessLauncher {
                 .map_item(|_idx, x| x.add_style_back(TerminalStyle::fg_color((90, 120, 100)))),
         );
         compositor.write().unwrap().push(
-            cmd_editor
-                .get_seg_seq_view()
-                .decorate("$(", ")", " ", 0)
-                .to_grid_horizontal()
-                .flatten(),
+            cmd_editor.get_term_view()
         );
 
         ProcessLauncher {
@@ -251,6 +236,9 @@ impl TreeNav for ProcessLauncher {
     fn get_cursor(&self) -> TreeCursor {
         self.cmd_editor.get_cursor()
     }
+    fn get_cursor_warp(&self) -> TreeCursor {
+        self.cmd_editor.get_cursor_warp()
+    }
 
     fn goto(&mut self, cur: TreeCursor) -> TreeNavResult {
         self.suspended = false;
@@ -269,27 +257,10 @@ impl TreeNav for ProcessLauncher {
         }
     }
 
-    fn goto_home(&mut self) -> TreeNavResult {
-        self.cmd_editor.goto_home()
+    fn goby(&mut self, dir: Vector2<isize>) -> TreeNavResult {
+        self.cmd_editor.goby(dir)
     }
 
-    fn goto_end(&mut self) -> TreeNavResult {
-        self.cmd_editor.goto_end()
-    }
-
-    fn pxev(&mut self) -> TreeNavResult {
-        self.cmd_editor.pxev()
-    }
-
-    fn nexd(&mut self) -> TreeNavResult {
-        self.cmd_editor.nexd()
-    }
-
-    fn up(&mut self) -> TreeNavResult {
-        self.cmd_editor.up()
-    }
-
-    fn dn(&mut self) -> TreeNavResult {
-        self.cmd_editor.dn()
-    }
 }
+
+impl TerminalTreeEditor for ProcessLauncher {}

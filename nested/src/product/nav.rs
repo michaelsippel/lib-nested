@@ -1,20 +1,8 @@
 use {
     crate::{
-        core::{ViewPort, OuterViewPort, Observer, port::UpdateTask, TypeTerm, TypeLadder, Context},
-        terminal::{
-            Terminal, TerminalAtom, TerminalCompositor, TerminalEditor,
-            TerminalEditorResult, TerminalEvent, TerminalStyle, TerminalView,
-            make_label
-        },
-        sequence::{SequenceView},
-        tree_nav::{TreeNav, TerminalTreeEditor, TreeCursor, TreeNavResult},
-        vec::{VecBuffer, MutableVecAccess},
-        index::buffer::IndexBuffer,
-        integer::PosIntEditor,
-        string_editor::{StringEditor, CharEditor},
-        list::{ListEditor, ListCursorMode, ListEditorStyle},
-        product::{element::ProductEditorElement, ProductEditor},
-        make_editor::make_editor
+        list::ListCursorMode,
+        tree_nav::{TreeNav, TreeNavResult, TreeCursor, TerminalTreeEditor},
+        product::{element::ProductEditorElement, ProductEditor}
     },
     cgmath::{Point2, Vector2},
     std::{sync::{Arc, RwLock}, ops::{Deref, DerefMut}},
@@ -44,23 +32,23 @@ impl TreeNav for ProductEditor {
 
     fn goto(&mut self, mut c: TreeCursor) -> TreeNavResult {
         if let Some(mut element) = self.get_cur_element_mut() {
-            if let ProductEditorElement::N{ t, editor, select } = element.deref_mut() {
+            if let ProductEditorElement::N{ t, editor, cur_depth } = element.deref_mut() {
                 if let Some(e) = editor {
                     e.write().unwrap().goto(TreeCursor::default());
                 }
-                *select = false;
+                *cur_depth = self.get_cursor().tree_addr.len();
             }
         }
 
         if c.tree_addr.len() > 0 {
-            self.cursor = Some(c.tree_addr.remove(0));
+            self.cursor = Some(c.clone().tree_addr.remove(0));
 
             if let Some(mut element) = self.get_cur_element_mut() {
-                if let ProductEditorElement::N{ t, editor, select } = element.deref_mut() {
+                if let ProductEditorElement::N{ t, editor, cur_depth } = element.deref_mut() {
                     if let Some(e) = editor {
-                        e.write().unwrap().goto(c);
+                        e.write().unwrap().goto(c.clone());
                     }
-                    *select = true;
+                    *cur_depth = c.tree_addr.len() + 1;
                 }
             }
 
@@ -71,9 +59,13 @@ impl TreeNav for ProductEditor {
         }
     }
 
+    fn goby(&mut self, direction: Vector2<isize>) -> TreeNavResult {
+        TreeNavResult::Exit
+    }
+/*
     fn goto_home(&mut self) -> TreeNavResult {
         if let Some(c) = self.cursor {
-            if let Some(ProductEditorElement::N{ t, editor, select }) = self.get_cur_element_mut().as_deref_mut() {
+            if let Some(ProductEditorElement::N{ t, editor, cur_depth }) = self.get_cur_element_mut().as_deref_mut() {
                 if let Some(e) = editor {
                     let mut ce = e.write().unwrap();
 
@@ -84,7 +76,7 @@ impl TreeNav for ProductEditor {
                         return match ce.goto_home() {
                             TreeNavResult::Exit => {
                                 drop(ce);
-                                *select = false;
+                                *cur_depth = 0;
 
                                 match self.pxev() {
                                     TreeNavResult::Exit => TreeNavResult::Exit,
@@ -105,11 +97,11 @@ impl TreeNav for ProductEditor {
                     }
                 }
 
-                *select = false;
+                *cur_depth = 0;
                 if c != 0 {
                     self.cursor = Some(0);
-                    if let Some(ProductEditorElement::N{ t, editor, select }) = self.get_cur_element_mut().as_deref_mut() {
-                        *select = true;
+                    if let Some(ProductEditorElement::N{ t, editor, cur_depth }) = self.get_cur_element_mut().as_deref_mut() {
+                        *cur_depth = self.get_cursor().tree_addr.len() + 1;
                     }
                     return TreeNavResult::Continue;
                 }
@@ -121,7 +113,7 @@ impl TreeNav for ProductEditor {
 
     fn goto_end(&mut self) -> TreeNavResult {
         if let Some(c) = self.cursor {
-            if let Some(ProductEditorElement::N{ t, editor, select }) = self.get_cur_element_mut().as_deref_mut() {
+            if let Some(ProductEditorElement::N{ t, editor, cur_depth }) = self.get_cur_element_mut().as_deref_mut() {
                 if let Some(e) = editor {
                     let mut ce = e.write().unwrap();
 
@@ -132,7 +124,7 @@ impl TreeNav for ProductEditor {
                         match ce.goto_end() {
                             TreeNavResult::Exit => {
                                 drop(ce);
-                                *select = false;
+                                *cur_depth = 0;
 
                                 if c+1 < self.n_indices.len() {
                                     match self.nexd() {
@@ -158,11 +150,11 @@ impl TreeNav for ProductEditor {
                     }
                 }
 
-                *select = false;
+                *cur_depth = 0;
                 if c < self.n_indices.len()-1 {
                     self.cursor = Some(self.n_indices.len()-1);
-                    if let Some(ProductEditorElement::N{ t, editor, select }) = self.get_cur_element_mut().as_deref_mut() {
-                        *select = true;
+                    if let Some(ProductEditorElement::N{ t, editor, cur_depth }) = self.get_cur_element_mut().as_deref_mut() {
+                        *cur_depth = self.get_cursor().tree_addr.len();
                     }
                     return TreeNavResult::Continue;
                 }
@@ -174,7 +166,7 @@ impl TreeNav for ProductEditor {
 
     fn pxev(&mut self) -> TreeNavResult {
         if let Some(c) = self.cursor {
-            if let Some(ProductEditorElement::N{ t, editor, select }) = self.get_editor_element_mut(c).as_deref_mut() {
+            if let Some(ProductEditorElement::N{ t, editor, cur_depth }) = self.get_editor_element_mut(c).as_deref_mut() {
                 if let Some(e) = editor {
                     let mut ce = e.write().unwrap();
 
@@ -185,12 +177,12 @@ impl TreeNav for ProductEditor {
                         return match ce.pxev() {
                             TreeNavResult::Exit => {
                                 drop(ce);
-                                *select = false;
+                                *cur_depth = 0;
 
                                 if c > 0 {
                                     self.cursor = Some(c-1);
-                                    if let Some(ProductEditorElement::N{ t, editor, select }) = self.get_cur_element_mut().as_deref_mut() {
-                                        *select = true;
+                                    if let Some(ProductEditorElement::N{ t, editor, cur_depth }) = self.get_cur_element_mut().as_deref_mut() {
+                                        *cur_depth = self.get_cursor().tree_addr.len();
                                     }
 
                                     for _x in 1..depth {
@@ -212,11 +204,11 @@ impl TreeNav for ProductEditor {
                     }
                 }
 
-                *select = false;
+                *cur_depth = 0;
                 if c > 0 {
                     self.cursor = Some(c-1);
-                    if let Some(ProductEditorElement::N{ t, editor, select }) = self.get_cur_element_mut().as_deref_mut() {
-                        *select = true;
+                    if let Some(ProductEditorElement::N{ t, editor, cur_depth }) = self.get_cur_element_mut().as_deref_mut() {
+                        *cur_depth = self.get_cursor().tree_addr.len();
                     }
                     return TreeNavResult::Continue;
                 }
@@ -229,7 +221,7 @@ impl TreeNav for ProductEditor {
 
     fn nexd(&mut self) -> TreeNavResult {
         if let Some(c) = self.cursor.clone() {
-            if let Some(ProductEditorElement::N{ t, editor, select }) = self.get_editor_element_mut(c).as_deref_mut() {
+            if let Some(ProductEditorElement::N{ t, editor, cur_depth }) = self.get_editor_element_mut(c).as_deref_mut() {
                 if let Some(e) = editor {
                     let mut ce = e.write().unwrap();
 
@@ -240,16 +232,17 @@ impl TreeNav for ProductEditor {
                         return match ce.nexd() {
                             TreeNavResult::Exit => {
                                 drop(ce);
-                                *select = false;
+                                *cur_depth = 0;
 
                                 if c+1 < self.n_indices.len() {
                                     self.cursor = Some(c+1);
-                                    if let Some(ProductEditorElement::N{ t, editor, select }) = self.get_cur_element_mut().as_deref_mut() {
-                                        *select = true;
+                                    if let Some(ProductEditorElement::N{ t, editor, cur_depth }) = self.get_cur_element_mut().as_deref_mut() {
+                                        *cur_depth = self.get_cursor().tree_addr.len();
                                     }
 
                                     for _x in 1..depth {
                                         self.dn();
+                                        self.goto_home();
                                     }
 
                                     self.dn();
@@ -266,11 +259,11 @@ impl TreeNav for ProductEditor {
                     }
                 }
 
-                *select = false;
+                *cur_depth = 0;
                 if c+1 < self.n_indices.len() {
                     self.cursor = Some(c+1);
-                    if let Some(ProductEditorElement::N{ t, editor, select }) = self.get_cur_element_mut().as_deref_mut() {
-                        *select = true;
+                    if let Some(ProductEditorElement::N{ t, editor, cur_depth }) = self.get_cur_element_mut().as_deref_mut() {
+                        *cur_depth = self.get_cursor().tree_addr.len();
                     }
 
                     return TreeNavResult::Continue;
@@ -283,15 +276,16 @@ impl TreeNav for ProductEditor {
     }
 
     fn up(&mut self) -> TreeNavResult {
-        if let Some(ProductEditorElement::N{ t, editor, select }) = self.get_cur_element_mut().as_deref_mut() {
+        if let Some(ProductEditorElement::N{ t, editor, cur_depth }) = self.get_cur_element_mut().as_deref_mut() {
             if let Some(e) = editor {
                 let mut ce = e.write().unwrap();
+                *cur_depth = ce.get_cursor().tree_addr.len();
                 if ce.get_cursor().tree_addr.len() > 0 {
                     ce.up();
                     return TreeNavResult::Continue;
                 }
             }
-            *select = false;
+            *cur_depth = 0;
         }
 
         self.cursor = None;
@@ -300,24 +294,26 @@ impl TreeNav for ProductEditor {
 
     fn dn(&mut self) -> TreeNavResult {
         if let Some(c) = self.cursor {
-            if let Some(ProductEditorElement::N{ t, editor, select }) = self.get_editor_element_mut(c).as_deref_mut() {
+            if let Some(ProductEditorElement::N{ t, editor, cur_depth }) = self.get_editor_element_mut(c).as_deref_mut() {
                 if let Some(e) = editor {
                     e.write().unwrap().dn();
                 } else {
                     let e = make_editor(self.ctx.clone(), t, self.depth+1);
-                    e.write().unwrap().goto_home();
+                    e.write().unwrap().dn();
                     *editor = Some(e);
                 }
+                *cur_depth = self.get_cursor().tree_addr.len();
             }
         } else {
             self.cursor = Some(0);
-            if let Some(ProductEditorElement::N{ t, editor, select }) = self.get_cur_element_mut().as_deref_mut() {
-                *select = true;
+            if let Some(ProductEditorElement::N{ t, editor, cur_depth }) = self.get_cur_element_mut().as_deref_mut() {
+                *cur_depth = self.get_cursor().tree_addr.len();
             }
         }
 
         TreeNavResult::Continue
-    }
+}
+    */
 }
 
 impl TerminalTreeEditor for ProductEditor {}

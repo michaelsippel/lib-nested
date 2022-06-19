@@ -1,8 +1,12 @@
+
 pub mod cursor;
+pub mod segment;
 pub mod editor;
-pub mod editor_view;
-pub mod sexpr;
+pub mod nav;
+pub mod pty_editor;
 
 pub use cursor::{ListCursor, ListCursorMode};
-pub use editor::{ListEditor, ListEditorStyle};
-pub use sexpr::{ListDecoration, SExprView};
+pub use segment::{ListSegment, ListSegmentSequence};
+pub use editor::ListEditor;
+pub use pty_editor::PTYListEditor;
+

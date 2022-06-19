@@ -57,7 +57,7 @@ impl PTY {
 
         if let Ok(child) = pair.slave.spawn_command(cmd) {
             let mut reader = pair.master.try_clone_reader().unwrap();
-            let mut status_buf = SingletonBuffer::new(
+            let mut status_buf = SingletonBuffer::with_port(
                 PTYStatus::Running {
                     pid: child.process_id().expect(""),
                 },

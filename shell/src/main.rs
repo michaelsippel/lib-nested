@@ -13,12 +13,13 @@ use {
     nested::{
         core::{port::UpdateTask, Observer, OuterViewPort, ViewPort},
         index::IndexArea,
-        list::{ListCursorMode, ListEditor, ListEditorStyle},
+        list::{ListCursorMode, PTYListEditor},
+        sequence::{decorator::{SeqDecorStyle}},
         terminal::{
             make_label, Terminal, TerminalAtom, TerminalCompositor, TerminalEditor,
             TerminalEditorResult, TerminalEvent, TerminalStyle, TerminalView,
         },
-        tree_nav::{TerminalTreeEditor, TreeCursor, TreeNavResult},
+        tree_nav::{TreeNav, TerminalTreeEditor, TreeCursor, TreeNavResult},
         vec::VecBuffer,
     },
     std::sync::{Arc, RwLock},
@@ -34,9 +35,7 @@ async fn main() {
     let term_writer = term.get_writer();
 
     async_std::task::spawn(async move {
-        let table_port =
-            ViewPort::<dyn nested::grid::GridView<Item = OuterViewPort<dyn TerminalView>>>::new();
-        let mut table_buf = nested::index::buffer::IndexBuffer::new(table_port.inner());
+        let mut table = nested::index::buffer::IndexBuffer::new();
 
         let magic =
             make_label("<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>").map_item(|pos, atom| {
@@ -47,21 +46,17 @@ async fn main() {
                 )))
             });
 
-        let cur_size_port = ViewPort::new();
-        let mut cur_size =
-            nested::singleton::SingletonBuffer::new(Vector2::new(10, 10), cur_size_port.inner());
+        let mut cur_size = nested::singleton::SingletonBuffer::new(Vector2::new(10, 10));
+        let mut status_chars = VecBuffer::new();
 
-        let status_chars_port = ViewPort::new();
-        let mut status_chars = VecBuffer::new(status_chars_port.inner());
-
-        let mut process_list_editor = ListEditor::new(
+        let mut process_list_editor = PTYListEditor::new(
             Box::new(|| Arc::new(RwLock::new(ProcessLauncher::new()))),
-            ListEditorStyle::VerticalSexpr,
+            SeqDecorStyle::VerticalSexpr,
+            0
         );
 
-        let plist_vec_port = ViewPort::new();
-        let mut plist = VecBuffer::new(plist_vec_port.inner());
-
+        let mut plist = VecBuffer::new();
+        let mut plist_port = plist.get_port();
         async_std::task::spawn(async move {
             let (w, _h) = termion::terminal_size().unwrap();
             let mut x: usize = 0;
@@ -89,13 +84,13 @@ async fn main() {
         });
 
         let plot_port = ViewPort::new();
-        let _plot = crate::plot::Plot::new(plist_vec_port.outer().to_sequence(), plot_port.inner());
+        let _plot = crate::plot::Plot::new(plist_port.to_sequence(), plot_port.inner());
 
-        table_buf.insert_iter(vec![
+        table.insert_iter(vec![
             (Point2::new(0, 0), magic.clone()),
             (
                 Point2::new(0, 1),
-                status_chars_port.outer().to_sequence().to_grid_horizontal(),
+                status_chars.get_port().to_sequence().to_grid_horizontal(),
             ),
             (Point2::new(0, 2), magic.clone()),
             (Point2::new(0, 3), process_list_editor.get_term_view()),
@@ -104,8 +99,7 @@ async fn main() {
         let (w, h) = termion::terminal_size().unwrap();
 
         compositor.write().unwrap().push(
-            plot_port
-                .outer()
+            plot_port.outer()
                 .map_item(|pt, a| {
                     a.add_style_back(TerminalStyle::fg_color((
                         255 - pt.y as u8 * 8,
@@ -124,7 +118,7 @@ async fn main() {
         compositor
             .write()
             .unwrap()
-            .push(table_port.outer().flatten().offset(Vector2::new(3, 0)));
+            .push(table.get_port().flatten().offset(Vector2::new(3, 0)));
 
         process_list_editor.goto(TreeCursor {
             leaf_mode: ListCursorMode::Insert,
@@ -165,8 +159,7 @@ async fn main() {
                 ));
                 for c in match cur.leaf_mode {
                     ListCursorMode::Insert => "INSERT",
-                    ListCursorMode::Select => "SELECT",
-                    ListCursorMode::Modify => "MODIFY",
+                    ListCursorMode::Select => "SELECT"
                 }
                 .chars()
                 {
@@ -226,19 +219,19 @@ async fn main() {
                 TerminalEvent::Input(Event::Key(Key::Up)) => {
                     if process_list_editor.up() == TreeNavResult::Exit {
                         process_list_editor.dn();
-                        process_list_editor.goto_home();
                     }
                 }
                 TerminalEvent::Input(Event::Key(Key::Down)) => {
-                    if process_list_editor.dn() == TreeNavResult::Continue {
-                        process_list_editor.goto_home();
-                    }
+                    process_list_editor.dn();
+                    // == TreeNavResult::Continue {
+                        //process_list_editor.goto_home();
+                    //}
                 }
                 TerminalEvent::Input(Event::Key(Key::Home)) => {
-                    process_list_editor.goto_home();
+                    process_list_editor.qpxev();
                 }
                 TerminalEvent::Input(Event::Key(Key::End)) => {
-                    process_list_editor.goto_end();
+                    process_list_editor.qnexd();
                 }
                 ev => {
                     if process_list_editor.get_cursor().leaf_mode == ListCursorMode::Select {
@@ -256,10 +249,10 @@ async fn main() {
                                 process_list_editor.nexd();
                             }
                             TerminalEvent::Input(Event::Key(Key::Char('u'))) => {
-                                process_list_editor.goto_home();
+                                process_list_editor.qpxev();
                             }
                             TerminalEvent::Input(Event::Key(Key::Char('o'))) => {
-                                process_list_editor.goto_end();
+                                process_list_editor.qnexd();
                             }
                             _ => {
                                 process_list_editor.handle_terminal_event(&ev);

@@ -1,6 +1,6 @@
 use {
     crate::{
-        core::{InnerViewPort, ViewPort, Observer, ObserverBroadcast, View},
+        core::{InnerViewPort, OuterViewPort, ViewPort, Observer, ObserverBroadcast, View},
         index::{IndexArea, IndexView},
     },
     std::sync::RwLock,
@@ -62,6 +62,10 @@ where
 
     pub fn new() -> Self {
         IndexBuffer::with_port(ViewPort::new().into_inner())
+    }
+
+    pub fn get_port(&self) -> OuterViewPort<dyn IndexView<Key, Item = Item>> {
+        self.port.0.outer()
     }
 
     pub fn insert(&mut self, key: Key, item: Item) {
