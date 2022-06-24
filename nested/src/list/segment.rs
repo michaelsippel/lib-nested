@@ -138,6 +138,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
         let proj = Arc::new(RwLock::new(ListSegmentSequence {
             cur_cursor: cursor_port.get_view().get(),
             depth,
+
             cursor: proj_helper.new_singleton_arg(0, cursor_port, |s: &mut Self, _msg| {
                 let _old_cursor = s.cur_cursor;
                 s.cur_cursor = s.cursor.get();

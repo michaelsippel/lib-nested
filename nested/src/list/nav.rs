@@ -165,7 +165,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
                     // up
 
                     self.cursor.set(ListCursor::none());
-                    TreeNavResult::Exit                    
+                    TreeNavResult::Exit
                 } else {
                     // horizontal
 

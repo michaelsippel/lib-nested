@@ -13,7 +13,7 @@ use {
 };
 
 #[derive(Clone)]
-pub enum ProductEditorElement {
+pub enum ProductEditorSegment {
     T( String, usize ),
     N {
         t: TypeLadder,
@@ -22,10 +22,10 @@ pub enum ProductEditorElement {
     }
 }
 
-impl ProductEditorElement {
+impl ProductEditorSegment {
     pub fn get_view(&self, ctx: Arc<RwLock<Context>>) -> OuterViewPort<dyn TerminalView> {
         match self {
-            ProductEditorElement::T(t, depth) =>
+            ProductEditorSegment::T(t, depth) =>
                 make_label(t.as_str())
                 .map_item({
                     let depth = *depth;
@@ -34,7 +34,7 @@ impl ProductEditorElement {
                 }
             ),
 
-            ProductEditorElement::N { t: _, editor: Some(e), cur_depth } =>
+            ProductEditorSegment::N { t: _, editor: Some(e), cur_depth } =>
                 e.read().unwrap()
                 .get_term_view()
                 .map_item({ let cur_depth = *cur_depth;//e.read().unwrap().get_cursor().tree_addr.len()+1;
@@ -43,7 +43,7 @@ impl ProductEditorElement {
                             .add_style_back(bg_style_from_depth(cur_depth))
                 }),
 
-            ProductEditorElement::N{ t, editor: None, cur_depth } =>
+            ProductEditorSegment::N{ t, editor: None, cur_depth } =>
                 make_label(&ctx.read().unwrap().type_term_to_str(&t[0]))
                 .map_item({
                     let cur_depth = *cur_depth;
