@@ -8,19 +8,21 @@ use {
         sequence::{SequenceView},
         tree_nav::{TreeNav, TerminalTreeEditor, TreeNavResult},
         vec::{VecBuffer, MutableVecAccess},
+        index::{buffer::{IndexBuffer, MutableIndexAccess}, IndexView},
         list::ListCursorMode,
         product::{segment::ProductEditorSegment},
         make_editor::make_editor
     },
-    cgmath::Vector2,
+    cgmath::{Vector2, Point2},
     std::sync::{Arc, RwLock},
     termion::event::{Event, Key},
+    std::ops::{Deref, DerefMut}
 };
 
 pub struct ProductEditor {
-    segments: VecBuffer<ProductEditorSegment>,
-    pub(super) n_indices: Vec<usize>,
-    
+    segments: IndexBuffer<Point2<i16>, ProductEditorSegment>,
+    pub(super) n_indices: Vec<Point2<i16>>,
+
     pub(super) ctx: Arc<RwLock<Context>>,    
     pub(super) cursor: Option<isize>,
     pub(super) depth: usize,
@@ -29,7 +31,7 @@ pub struct ProductEditor {
 impl ProductEditor {
     pub fn new(depth: usize, ctx: Arc<RwLock<Context>>) -> Self {
         ProductEditor {
-            segments: VecBuffer::new(),
+            segments: IndexBuffer::new(),
             n_indices: Vec::new(),
             ctx,
             cursor: None,
@@ -37,53 +39,52 @@ impl ProductEditor {
         }
     }
     
-    pub fn with_t(mut self, t: &str) -> Self {
-        self.segments.push(ProductEditorSegment::T(t.to_string(), self.depth));
+    pub fn with_t(mut self, pos: Point2<i16>, t: &str) -> Self {
+        self.segments.insert(pos, ProductEditorSegment::T(t.to_string(), self.depth));
         self
     }
 
-    pub fn with_n(mut self, n: TypeLadder) -> Self {
-        let elem_idx = self.segments.len();
-        self.segments.push(ProductEditorSegment::N{
+    pub fn with_n(mut self, pos: Point2<i16>, n: TypeLadder) -> Self {
+        self.segments.insert(pos, ProductEditorSegment::N{
             t: n,
             editor: None,
             cur_depth: 0
         });
-        self.n_indices.push(elem_idx);
+        self.n_indices.push(pos);
         self
     }
 
-    pub fn get_editor_element(&self, mut idx: isize) -> Option<ProductEditorSegment> {
+    pub fn get_editor_segment(&self, mut idx: isize) -> ProductEditorSegment {
         idx = crate::modulo(idx, self.n_indices.len() as isize);
-        if let Some(i) = self.n_indices.get(idx as usize) {
-            Some(self.segments.get(*i))
+        if let Some(pos) = self.n_indices.get(idx as usize) {
+            self.segments.get(pos).unwrap()
         } else {
-            None
+            unreachable!()
         }
     }
 
-    pub fn get_editor_element_mut(&mut self, mut idx: isize) -> Option<MutableVecAccess<ProductEditorSegment>> {
+    pub fn get_editor_segment_mut(&mut self, mut idx: isize) -> MutableIndexAccess<Point2<i16>, ProductEditorSegment> {
         idx = crate::modulo(idx, self.n_indices.len() as isize);
-        if let Some(i) = self.n_indices.get(idx as usize) {
-            Some(self.segments.get_mut(*i))
+        if let Some(pos) = self.n_indices.get(idx as usize) {
+            self.segments.get_mut(pos)
         } else {
-            None
+            unreachable!()
         }
     }
 
-    pub fn get_cur_element(&self) -> Option<ProductEditorSegment> {
-        self.get_editor_element(self.cursor?)
+    pub fn get_cur_segment(&self) -> Option<ProductEditorSegment> {
+        Some(self.get_editor_segment(self.cursor?))
     }
 
-    pub fn get_cur_element_mut(&mut self) -> Option<MutableVecAccess<ProductEditorSegment>> {
-        self.get_editor_element_mut(self.cursor?)
+    pub fn get_cur_segment_mut(&mut self) -> Option<MutableIndexAccess<Point2<i16>, ProductEditorSegment>> {
+        Some(self.get_editor_segment_mut(self.cursor?))
     }
 
     pub fn get_editor(&self, idx: isize) -> Option<Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>> {
-        if let Some(ProductEditorSegment::N{ t: _, editor, cur_depth: _ }) = self.get_editor_element(idx) {
+        if let ProductEditorSegment::N{ t: _, editor, cur_depth: _ } = self.get_editor_segment(idx) {
             editor
         } else {
-            None
+            unreachable!()
         }
     }
 
@@ -103,14 +104,13 @@ impl TerminalEditor for ProductEditor {
         let ctx = self.ctx.clone();
         self.segments
             .get_port()
-            .to_sequence()
-            .map(move |e: &ProductEditorSegment| { e.get_view(ctx.clone()) })
-            .to_grid_horizontal()
+            .map_item(move |_pos, e: &ProductEditorSegment| { e.get_view(ctx.clone()) })
             .flatten()
     }
 
     fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
-        if let Some(ProductEditorSegment::N{ t, editor, cur_depth }) = self.get_cur_element_mut().as_deref_mut() {
+        if let Some(mut segment) = self.get_cur_segment_mut().as_deref_mut() {
+            if let Some(ProductEditorSegment::N{ t, editor, cur_depth }) = segment.deref_mut() {
             *cur_depth = self.get_cursor().tree_addr.len();
             if let Some(e) = editor.clone() {
                 let mut ce = e.write().unwrap();
@@ -140,6 +140,9 @@ impl TerminalEditor for ProductEditor {
                 let x = e.write().unwrap().handle_terminal_event(event);
                 *cur_depth = self.get_cursor().tree_addr.len()+1;
                 x
+            }
+            } else {
+                unreachable!()
             }
         } else {
             TerminalEditorResult::Exit

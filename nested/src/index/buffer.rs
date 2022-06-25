@@ -4,7 +4,7 @@ use {
         index::{IndexArea, IndexView},
     },
     std::sync::RwLock,
-    std::{collections::HashMap, hash::Hash, sync::Arc},
+    std::{collections::HashMap, hash::Hash, sync::Arc, ops::{Deref, DerefMut}},
 };
 
 pub struct IndexBufferView<Key, Item>(Arc<RwLock<HashMap<Key, Item>>>)
@@ -36,6 +36,7 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct IndexBuffer<Key, Item>
 where
     Key: Clone + Hash + Eq + Send + Sync + 'static,
@@ -68,6 +69,27 @@ where
         self.port.0.outer()
     }
 
+    pub fn get(&self, key: &Key) -> Option<Item> {
+        self.data.read().unwrap().get(key).cloned()
+    }
+
+    pub fn get_mut(&mut self, key: &Key) -> MutableIndexAccess<Key, Item> {
+        MutableIndexAccess {
+            buf: self.clone(),
+            key: key.clone(),
+            val: self.get(key)
+        }
+    }
+
+    pub fn update(&mut self, key: Key, item: Option<Item>) {
+        if let Some(item) = item {
+            self.data.write().unwrap().insert(key.clone(), item);
+        } else {
+            self.data.write().unwrap().remove(&key);
+        }
+        self.port.notify(&IndexArea::Set(vec![key]));        
+    }
+    
     pub fn insert(&mut self, key: Key, item: Item) {
         self.data.write().unwrap().insert(key.clone(), item);
         self.port.notify(&IndexArea::Set(vec![key]));
@@ -87,3 +109,48 @@ where
         self.port.notify(&IndexArea::Set(vec![key]));
     }
 }
+
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+
+pub struct MutableIndexAccess<Key, Item>
+where
+    Key: Clone + Hash + Eq + Send + Sync + 'static,
+    Item: Clone + Send + Sync + 'static,
+{
+    buf: IndexBuffer<Key, Item>,
+    key: Key,
+    val: Option<Item>,
+}
+
+impl<Key, Item> Deref for MutableIndexAccess<Key, Item>
+where
+    Key: Clone + Hash + Eq + Send + Sync + 'static,
+    Item: Clone + Send + Sync + 'static,
+{
+    type Target = Option<Item>;
+
+    fn deref(&self) -> &Option<Item> {
+        &self.val
+    }
+}
+
+impl<Key, Item> DerefMut for MutableIndexAccess<Key, Item>
+where
+    Key: Clone + Hash + Eq + Send + Sync + 'static,
+    Item: Clone + Send + Sync + 'static,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.val
+    }
+}
+
+impl<Key, Item> Drop for MutableIndexAccess<Key, Item>
+where
+    Key: Clone + Hash + Eq + Send + Sync + 'static,
+    Item: Clone + Send + Sync + 'static,
+{
+    fn drop(&mut self) {
+        self.buf.update(self.key.clone(), self.val.clone());
+    }
+}
+

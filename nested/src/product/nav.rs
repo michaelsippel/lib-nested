@@ -52,8 +52,8 @@ impl TreeNav for ProductEditor {
     }
 
     fn goto(&mut self, mut c: TreeCursor) -> TreeNavResult {
-        if let Some(mut element) = self.get_cur_element_mut() {
-            if let ProductEditorSegment::N{ t: _t, editor, cur_depth } = element.deref_mut() {
+        if let Some(mut segment) = self.get_cur_segment_mut() {
+            if let Some(ProductEditorSegment::N{ t: _t, editor, cur_depth }) = segment.deref_mut() {
                 if let Some(e) = editor {
                     let mut e = e.write().unwrap();
                     e.goto(TreeCursor::none());
@@ -65,8 +65,8 @@ impl TreeNav for ProductEditor {
         if c.tree_addr.len() > 0 {
             self.cursor = Some(crate::modulo(c.tree_addr.remove(0), self.n_indices.len() as isize));
 
-            if let Some(mut element) = self.get_cur_element_mut() {
-                if let ProductEditorSegment::N{ t: _t, editor, cur_depth } = element.deref_mut() {
+            if let Some(mut element) = self.get_cur_segment_mut() {
+                if let Some(ProductEditorSegment::N{ t: _t, editor, cur_depth }) = element.deref_mut() {
                     if let Some(e) = editor {
                         e.write().unwrap().goto(c.clone());
                     }
@@ -89,8 +89,8 @@ impl TreeNav for ProductEditor {
                 if direction.y > 0 {
                     self.cursor = Some(0);
 
-                    if let Some(mut element) = self.get_cur_element_mut() {
-                        if let ProductEditorSegment::N{ t, editor, cur_depth } = element.deref_mut() {
+                    if let Some(mut element) = self.get_cur_segment_mut() {
+                        if let Some(ProductEditorSegment::N{ t, editor, cur_depth }) = element.deref_mut() {
                             *cur_depth = 1;
                         }
                     }
@@ -106,8 +106,8 @@ impl TreeNav for ProductEditor {
             1 => {
                 if direction.y > 0 {
                     // dn
-                    if let Some(mut element) = self.get_cur_element_mut() {
-                        if let ProductEditorSegment::N{ t, editor, cur_depth } = element.deref_mut() {
+                    if let Some(mut element) = self.get_cur_segment_mut() {
+                        if let Some(ProductEditorSegment::N{ t, editor, cur_depth }) = element.deref_mut() {
                             if let Some(e) = editor {
                                 let mut e = e.write().unwrap();
                                 e.goby(direction);
@@ -125,8 +125,8 @@ impl TreeNav for ProductEditor {
                     TreeNavResult::Continue
                 } else if direction.y < 0 {
                     // up
-                    if let Some(mut element) = self.get_cur_element_mut() {
-                        if let ProductEditorSegment::N{ t, editor, cur_depth } = element.deref_mut() {
+                    if let Some(mut element) = self.get_cur_segment_mut() {
+                        if let Some(ProductEditorSegment::N{ t, editor, cur_depth }) = element.deref_mut() {
                             *cur_depth = 0;
                         }
                     }
@@ -137,14 +137,14 @@ impl TreeNav for ProductEditor {
                     if (cur.tree_addr[0]+direction.x >= 0) &&
                         (cur.tree_addr[0]+direction.x < self.n_indices.len() as isize)
                     {
-                        if let Some(mut element) = self.get_cur_element_mut() {
-                            if let ProductEditorSegment::N{ t, editor, cur_depth } = element.deref_mut() {
+                        if let Some(mut element) = self.get_cur_segment_mut() {
+                            if let Some(ProductEditorSegment::N{ t, editor, cur_depth }) = element.deref_mut() {
                                 *cur_depth = 0;
                             }
                         }
                         self.cursor = Some(cur.tree_addr[0] + direction.x);
-                        if let Some(mut element) = self.get_cur_element_mut() {
-                            if let ProductEditorSegment::N{ t, editor, cur_depth } = element.deref_mut() {
+                        if let Some(mut element) = self.get_cur_segment_mut() {
+                            if let Some(ProductEditorSegment::N{ t, editor, cur_depth }) = element.deref_mut() {
                                 *cur_depth = 1;
                             }
                         }
@@ -156,8 +156,8 @@ impl TreeNav for ProductEditor {
                 }
             }
             depth => {
-                if let Some(mut element) = self.get_cur_element_mut() {
-                    if let ProductEditorSegment::N{ t, editor, cur_depth } = element.deref_mut() {
+                if let Some(mut element) = self.get_cur_segment_mut() {
+                    if let Some(ProductEditorSegment::N{ t, editor, cur_depth }) = element.deref_mut() {
                         if let Some(e) = editor {
                             let mut ce = e.write().unwrap();
                             //\\//\\//\\//\\
