@@ -37,16 +37,20 @@ impl ProductEditorSegment {
             ProductEditorSegment::N { t: _, editor: Some(e), cur_depth } =>
                 e.read().unwrap()
                 .get_term_view()
-                .map_item({ let cur_depth = *cur_depth;//e.read().unwrap().get_cursor().tree_addr.len()+1;
-                            move |i, x| x
+                .map_item({
+                    let e = e.clone();
+                    move |i, x| {
+                        let cur_depth = e.read().unwrap().get_cursor().tree_addr.len();
+                        x
                             .add_style_back(fg_style_from_depth(cur_depth))//fg_color((250,210,0)))
                             .add_style_back(bg_style_from_depth(cur_depth))
+                    }
                 }),
 
             ProductEditorSegment::N{ t, editor: None, cur_depth } =>
                 make_label(&ctx.read().unwrap().type_term_to_str(&t[0]))
                 .map_item({
-                    let cur_depth = *cur_depth;
+                    let cur_depth = 0;
                     move |i, x| x
                             .add_style_back(TerminalStyle::fg_color((130,90,40)))
                             .add_style_back(bg_style_from_depth(cur_depth))

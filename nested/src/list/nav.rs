@@ -133,6 +133,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
 
                 if direction.y < 0 {
                     // up
+                    self.cursor.set(ListCursor::none());
                     TreeNavResult::Exit
                 } else if direction.y > 0 {
                     // dn

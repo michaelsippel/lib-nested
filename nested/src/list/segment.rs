@@ -46,7 +46,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
                 editor.read().unwrap().get_term_view().map_item(move |_pt, atom| {
                     let cur_depth = e.read().unwrap().get_cursor().tree_addr.len();
                     atom.add_style_back(bg_style_from_depth(cur_depth))
-                        .add_style_back(fg_style_from_depth(d+cur_depth))
+                        .add_style_back(fg_style_from_depth(d))
                 })
             }
         }

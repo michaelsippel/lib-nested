@@ -36,7 +36,7 @@ impl<ItemEditor> PTYListEditor<ItemEditor>
 where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
 {
     pub fn new(
-        make_item_editor: Box<dyn Fn() -> Arc<RwLock<ItemEditor>> + Send + Sync>,
+        make_item_editor: impl Fn() -> Arc<RwLock<ItemEditor>> + Send + Sync + 'static,
         style: SeqDecorStyle,
         depth: usize
     ) -> Self {
@@ -47,6 +47,20 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
             depth,
             port
         }
+    }
+
+    pub fn from_editor(
+        editor: ListEditor<ItemEditor>,
+        style: SeqDecorStyle,
+        depth: usize
+    ) -> Self {
+        let port = ViewPort::new();
+        PTYListEditor {
+            editor,
+            style,
+            depth,
+            port
+        } 
     }
 
     pub fn get_data_port(&self) -> OuterViewPort<dyn SequenceView<Item = Arc<RwLock<ItemEditor>>>> {
@@ -205,4 +219,16 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
 impl<ItemEditor> TerminalTreeEditor for PTYListEditor<ItemEditor>
 where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
 {}
+
+
+use crate::{
+    char_editor::CharEditor,
+    sequence::SequenceViewExt
+};
+
+impl PTYListEditor<CharEditor> {
+    pub fn get_string(&self) -> String {
+        self.get_data_port().map(|ce| ce.read().unwrap().get()).get_view().unwrap().iter().collect::<String>()
+    }
+}
 

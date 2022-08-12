@@ -36,11 +36,11 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
 impl<ItemEditor> ListEditor<ItemEditor>
 where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
 {
-    pub fn new(make_item_editor: impl Into<Box<dyn Fn() -> Arc<RwLock<ItemEditor>> + Send + Sync>>, depth: usize) -> Self {
+    pub fn new(make_item_editor: impl Fn() -> Arc<RwLock<ItemEditor>> + Send + Sync + 'static, depth: usize) -> Self {
         ListEditor {
             cursor: SingletonBuffer::new(ListCursor::default()),
             data: VecBuffer::<Arc<RwLock<ItemEditor>>>::new(),
-            make_item_editor: make_item_editor.into(),
+            make_item_editor: Box::new(make_item_editor),
             depth,
             cur_dist: Arc::new(RwLock::new(0)),
         }
@@ -58,7 +58,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
         );
         segment_view_port.into_outer().map(move |segment| segment.pty_view())
     }
-
+    
     pub fn get_data_port(&self) -> OuterViewPort<dyn SequenceView<Item = Arc<RwLock<ItemEditor>>>> {
         self.data.get_port().to_sequence()
     }

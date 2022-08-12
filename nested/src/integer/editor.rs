@@ -87,7 +87,7 @@ impl PosIntEditor {
         PosIntEditor {
             radix,
             digits_editor: PTYListEditor::new(
-                Box::new(move || Arc::new(RwLock::new(DigitEditor::new(radix)))),
+                Box::new(move || Arc::new(RwLock::new(DigitEditor::new(radix)))) as Box<dyn Fn() -> Arc<RwLock<DigitEditor>> + Send + Sync>,
                 SeqDecorStyle::Hex,
                 0
             ),
@@ -136,7 +136,6 @@ impl TreeNav for PosIntEditor {
     fn goby(&mut self, cur: Vector2<isize>) -> TreeNavResult {
         self.digits_editor.goby(cur)
     }
-
 }
 
 impl TerminalEditor for PosIntEditor {

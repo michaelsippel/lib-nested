@@ -76,13 +76,13 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
     } else if t[0] == c.type_term_from_str("( List RGB )").unwrap() {
         Arc::new(RwLock::new(
             PTYListEditor::<dyn TerminalTreeEditor + Send +Sync>::new(
-                Box::new({
+                {
                     let d = depth+1;
                     let ctx = ctx.clone();
-                    move || {
+                    Box::new(move || {
                         make_editor(ctx.clone(), &vec![ ctx.read().unwrap().type_term_from_str("( RGB )").unwrap() ], d)
-                    }
-                }),
+                    })
+                },
                 SeqDecorStyle::VerticalSexpr,
                 depth
             )
@@ -97,7 +97,7 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
                              .with_n(Point2::new(2, 2), vec![ ctx.read().unwrap().type_term_from_str("( PosInt 16 BigEndian )").unwrap() ] )
                              .with_t(Point2::new(1, 3), "b: ")
                              .with_n(Point2::new(2, 3), vec![ ctx.read().unwrap().type_term_from_str("( PosInt 16 BigEndian )").unwrap() ] )
-                             .with_t(Point2::new(0, 4), " }")
+                             .with_t(Point2::new(0, 4), "}")
         )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
 
     } else if t[0] == c.type_term_from_str("( Vec3i )").unwrap() {
@@ -109,7 +109,7 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
                              .with_n(Point2::new(2, 2), vec![ ctx.read().unwrap().type_term_from_str("( PosInt 10 BigEndian )").unwrap() ] )
                              .with_t(Point2::new(1, 3), "z: ")
                              .with_n(Point2::new(2, 3), vec![ ctx.read().unwrap().type_term_from_str("( PosInt 10 BigEndian )").unwrap() ] )
-                             .with_t(Point2::new(0, 4), " }")
+                             .with_t(Point2::new(0, 4), "}")
         )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
 
     } else if t[0] == c.type_term_from_str("( Json )").unwrap() {
@@ -147,14 +147,13 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
     } else { // else: term
         Arc::new(RwLock::new(
             PTYListEditor::new(
-                Box::new(|| {
+                || {
                     Arc::new(RwLock::new(CharEditor::new()))
-                }),
+                },
                 SeqDecorStyle::DoubleQuote,
                 depth
             )
         ))
-
     }
 }
 

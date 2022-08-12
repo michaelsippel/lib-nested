@@ -24,6 +24,7 @@ use {
     },
 };
 
+#[derive(PartialEq, Eq)]
 pub enum TerminalEvent {
     Resize(Vector2<i16>),
     Input(termion::event::Event),

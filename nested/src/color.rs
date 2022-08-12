@@ -3,22 +3,23 @@ use {
 };
 
 pub fn bg_style_from_depth(depth: usize) -> TerminalStyle {
-    if depth == 0 {
-        TerminalStyle::default()
-    } else {
-        TerminalStyle::bg_color((
-            (30.0 / ( 0.90*depth as f64 )) as u8,
-            (30.0 / ( 0.93*depth as f64 )) as u8,
-            (50.0 / ( 0.95*depth as f64 )) as u8
-        ))
+    match depth {
+        0 => TerminalStyle::default(),
+        1 => TerminalStyle::bg_color((20,20,20)),
+        2 => TerminalStyle::default(),
+        3 => TerminalStyle::default(),
+        4 => TerminalStyle::default(),
+        5 => TerminalStyle::default(),
+        _ => TerminalStyle::bg_color((80,80,80))
     }
 }
 
 pub fn fg_style_from_depth(depth: usize) -> TerminalStyle {
     match depth % 3 {
         0 => TerminalStyle::fg_color((200, 200, 80)),
-        1 => TerminalStyle::fg_color((80, 200, 200)),
-        2 => TerminalStyle::fg_color((150, 150, 200)),
+        1 => TerminalStyle::fg_color((80, 200, 200)).add(TerminalStyle::bold(true)),
+        2 => TerminalStyle::fg_color((80, 80, 200)),
+        3 => TerminalStyle::fg_color((200, 80, 200)),
         _ => TerminalStyle::default()
     }
 }

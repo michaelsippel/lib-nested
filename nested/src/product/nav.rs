@@ -66,9 +66,15 @@ impl TreeNav for ProductEditor {
             self.cursor = Some(crate::modulo(c.tree_addr.remove(0), self.n_indices.len() as isize));
 
             if let Some(mut element) = self.get_cur_segment_mut() {
-                if let Some(ProductEditorSegment::N{ t: _t, editor, cur_depth }) = element.deref_mut() {
+                if let Some(ProductEditorSegment::N{ t, editor, cur_depth }) = element.deref_mut() {
                     if let Some(e) = editor {
                         e.write().unwrap().goto(c.clone());
+                    } else if c.tree_addr.len() > 0 {
+                        // create editor
+                        let e = make_editor(self.ctx.clone(), t, self.depth+1);
+                        *editor = Some(e.clone());
+                        let mut e = e.write().unwrap();
+                        e.goto(c.clone());
                     }
                     *cur_depth = c.tree_addr.len();
                 }
@@ -111,7 +117,7 @@ impl TreeNav for ProductEditor {
                             if let Some(e) = editor {
                                 let mut e = e.write().unwrap();
                                 e.goby(direction);
-                                *cur_depth = e.get_cursor().tree_addr.len();
+                                *cur_depth = e.get_cursor().tree_addr.len() + 1;
                             } else {
                                 // create editor
                                 let e = make_editor(self.ctx.clone(), t, self.depth+1);
@@ -133,6 +139,12 @@ impl TreeNav for ProductEditor {
                     self.cursor = None;
                     TreeNavResult::Exit
                 } else {
+                    if let Some(mut element) = self.get_cur_segment_mut() {
+                        if let Some(ProductEditorSegment::N{ t, editor, cur_depth }) = element.deref_mut() {
+                            *cur_depth = 0;
+                        }
+                    }
+
                     // horizontal
                     if (cur.tree_addr[0]+direction.x >= 0) &&
                         (cur.tree_addr[0]+direction.x < self.n_indices.len() as isize)
@@ -142,6 +154,7 @@ impl TreeNav for ProductEditor {
                                 *cur_depth = 0;
                             }
                         }
+
                         self.cursor = Some(cur.tree_addr[0] + direction.x);
                         if let Some(mut element) = self.get_cur_segment_mut() {
                             if let Some(ProductEditorSegment::N{ t, editor, cur_depth }) = element.deref_mut() {
@@ -165,21 +178,31 @@ impl TreeNav for ProductEditor {
                             //\\//\\//\\//\\
                             match ce.goby(direction) {
                                 TreeNavResult::Exit => {
-                                    *cur_depth = 0;
+                                    *cur_depth = 1;
                                     drop(ce);
                                     drop(e);
+
                                     if direction.y < 0 {
                                         if depth <= (1-direction.y) as usize {
                                             // up
-                                            TreeNavResult::Exit
+                                            *cur_depth = 1;
+                                            TreeNavResult::Continue
                                         } else {
+                                            panic!("unplausible direction.y on exit");
                                             TreeNavResult::Continue
                                         }
                                     } else if direction.y > 0 {
                                         // dn
+                                        *cur_depth = depth + direction.y as usize;
+
                                         TreeNavResult::Continue
                                     } else if direction.y == 0 {
                                         // horizontal
+
+                                        if direction.x != 0 {
+                                            *cur_depth = 0;
+                                        }
+
                                         if (cur.tree_addr[0]+direction.x >= 0) &&
                                             (cur.tree_addr[0]+direction.x < self.n_indices.len() as isize)
                                         {
@@ -205,9 +228,7 @@ impl TreeNav for ProductEditor {
                                     }
                                 }
                                 TreeNavResult::Continue => {
-                                    if direction.y > 0 {
-                                        *cur_depth = depth + direction.y as usize - 1;
-                                    }
+                                    *cur_depth = (depth as isize + direction.y - 1) as usize;
                                     TreeNavResult::Continue
                                 }
                             }

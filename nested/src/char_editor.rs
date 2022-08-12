@@ -30,6 +30,10 @@ impl CharEditor {
     pub fn get_port(&self) -> OuterViewPort<dyn SingletonView<Item = Option<char>>> {
         self.data.get_port()
     }
+
+    pub fn get(&self) -> char {
+        self.get_port().get_view().unwrap().get().unwrap_or('?')
+    }
 }
 
 impl TreeNav for CharEditor {}

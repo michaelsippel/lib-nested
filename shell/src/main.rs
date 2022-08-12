@@ -4,14 +4,17 @@ mod ascii_box;
 mod monstera;
 mod process;
 mod pty;
-
+mod command;
 mod plot;
 
 use {
-    crate::process::ProcessLauncher,
+    crate::{
+        process::ProcessLauncher,
+        command::Commander
+    },
     cgmath::{Point2, Vector2},
     nested::{
-        core::{port::UpdateTask, Observer, OuterViewPort, ViewPort},
+        core::{port::UpdateTask, Observer, OuterViewPort, ViewPort, Context, TypeTerm},
         index::IndexArea,
         list::{ListCursorMode, PTYListEditor},
         sequence::{decorator::{SeqDecorStyle}},
@@ -34,9 +37,28 @@ async fn main() {
     let mut term = Terminal::new(term_port.outer());
     let term_writer = term.get_writer();
 
+    // Update Loop //
+    let tp = term_port.clone();
+    async_std::task::spawn(async move {
+        loop {
+            tp.update();
+            async_std::task::sleep(std::time::Duration::from_millis(20)).await;
+        }
+    });
+    
     async_std::task::spawn(async move {
         let mut table = nested::index::buffer::IndexBuffer::new();
 
+        // Type Context //
+        let mut ctx = Arc::new(RwLock::new(Context::new()));
+        for tn in vec![
+            "MachineWord", "MachineInt", "MachineSyllab", "Bits",
+            "Vec", "Stream", "Json",
+            "Sequence", "AsciiString", "UTF-8-String", "Char", "String",
+            "PosInt", "Digit", "LittleEndian", "BigEndian",
+            "DiffStream", "ℕ", "List", "Path", "Term", "RGB", "Vec3i"
+        ] { ctx.write().unwrap().add_typename(tn.into()); }
+        
         let magic =
             make_label("<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>").map_item(|pos, atom| {
                 atom.add_style_back(TerminalStyle::fg_color((
@@ -50,7 +72,7 @@ async fn main() {
         let mut status_chars = VecBuffer::new();
 
         let mut process_list_editor = PTYListEditor::new(
-            Box::new(|| Arc::new(RwLock::new(ProcessLauncher::new()))),
+            Box::new({let ctx = ctx.clone(); move || Arc::new(RwLock::new(Commander::new(ctx.clone())))}),
             SeqDecorStyle::VerticalSexpr,
             0
         );
@@ -85,7 +107,7 @@ async fn main() {
 
         let plot_port = ViewPort::new();
         let _plot = crate::plot::Plot::new(plist_port.to_sequence(), plot_port.inner());
-
+        
         table.insert_iter(vec![
             (Point2::new(0, 0), magic.clone()),
             (
@@ -93,7 +115,8 @@ async fn main() {
                 status_chars.get_port().to_sequence().to_grid_horizontal(),
             ),
             (Point2::new(0, 2), magic.clone()),
-            (Point2::new(0, 3), process_list_editor.get_term_view()),
+
+            (Point2::new(0, 4), process_list_editor.get_term_view()),
         ]);
 
         let (w, h) = termion::terminal_size().unwrap();
@@ -124,15 +147,7 @@ async fn main() {
             leaf_mode: ListCursorMode::Insert,
             tree_addr: vec![0],
         });
-
-        let tp = term_port.clone();
-        async_std::task::spawn(async move {
-            loop {
-                tp.update();
-                async_std::task::sleep(std::time::Duration::from_millis(10)).await;
-            }
-        });
-
+        
         loop {
             status_chars.clear();
             let cur = process_list_editor.get_cursor();
@@ -191,6 +206,7 @@ async fn main() {
 
             if let Some(process_editor) = process_list_editor.get_item() {
                 let mut pe = process_editor.write().unwrap();
+                /*
                 if pe.is_captured() {
                     if let TerminalEditorResult::Exit = pe.handle_terminal_event(&ev) {
                         drop(pe);
@@ -198,7 +214,8 @@ async fn main() {
                         process_list_editor.nexd();
                     }
                     continue;
-                }
+            }
+                */
             }
 
             match ev {

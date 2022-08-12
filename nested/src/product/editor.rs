@@ -119,10 +119,11 @@ impl TerminalEditor for ProductEditor {
                         match event {
                             TerminalEvent::Input(Event::Key(Key::Backspace)) => {
                                 *editor = None;
-                                *cur_depth -= 1;
+                                *cur_depth = 1;
                                 TerminalEditorResult::Continue
                             }
                             _ => {
+                                *cur_depth = ce.get_cursor().tree_addr.len();
                                 drop(ce);
                                 match self.nexd() {
                                     TreeNavResult::Continue => TerminalEditorResult::Continue,
@@ -130,15 +131,17 @@ impl TerminalEditor for ProductEditor {
                                 }
                             }
                         },
-                    TerminalEditorResult::Continue =>
-                    TerminalEditorResult::Continue
+                    TerminalEditorResult::Continue => {
+                        *cur_depth = ce.get_cursor().tree_addr.len();
+                        TerminalEditorResult::Continue
+                    }
                 }
             } else {
                 let e = make_editor(self.ctx.clone(), t, self.depth+1);
                 *editor = Some(e.clone());
                 e.write().unwrap().dn();
                 let x = e.write().unwrap().handle_terminal_event(event);
-                *cur_depth = self.get_cursor().tree_addr.len()+1;
+                *cur_depth = e.write().unwrap().get_cursor().tree_addr.len();
                 x
             }
             } else {
