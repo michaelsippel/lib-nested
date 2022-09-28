@@ -106,20 +106,24 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
                 TreeNavResult::Continue
             }
             _ => {
-                let idx = crate::modulo(new_cur.tree_addr[0], self.data.len() as isize);
+                if self.data.len() > 0 {
+                    let idx = crate::modulo(new_cur.tree_addr[0], self.data.len() as isize);
 
-                self.cursor.set(ListCursor {
-                    mode: ListCursorMode::Select,
-                    idx: Some(idx),
-                });
+                    self.cursor.set(ListCursor {
+                        mode: ListCursorMode::Select,
+                        idx: Some(idx),
+                    });
 
-                let item = self.data.get_mut(idx as usize);
-                let mut item_edit = item.write().unwrap();
+                    let item = self.data.get_mut(idx as usize);
+                    let mut item_edit = item.write().unwrap();
 
-                item_edit.goto(TreeCursor {
-                    leaf_mode: new_cur.leaf_mode,
-                    tree_addr: new_cur.tree_addr[1..].iter().cloned().collect(),
-                });
+                    item_edit.goto(TreeCursor {
+                        leaf_mode: new_cur.leaf_mode,
+                        tree_addr: new_cur.tree_addr[1..].iter().cloned().collect(),
+                    });
+                } else {
+                    self.cursor.set(ListCursor::home());
+                }
 
                 TreeNavResult::Continue                
             }
@@ -176,7 +180,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
                          + if cur.leaf_mode == ListCursorMode::Insert { 1 } else { 0 })
                     {
                         self.cursor.set(ListCursor {
-                            mode: cur.leaf_mode,
+                            mode: if self.data.len() == 0 { ListCursorMode::Insert } else { cur.leaf_mode },
                             idx: Some(cur.tree_addr[0] + direction.x)
                         });
                         TreeNavResult::Continue
@@ -189,51 +193,63 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
             depth => {
                 // nested
 
-                let item = self.data.get_mut(cur.tree_addr[0] as usize);
-                let mut item_edit = item.write().unwrap();
+                if cur.tree_addr[0] < self.data.len() as isize {
+                    let item = self.data.get_mut(cur.tree_addr[0] as usize);
+                    let mut item_edit = item.write().unwrap();
 
-                match item_edit.goby(direction) {
-                    TreeNavResult::Exit => {
-                        if direction.y < 0 {
-                            // up
-                            self.cursor.set(ListCursor {
-                                mode: cur.leaf_mode,
-                                idx: Some(cur.tree_addr[0])
-                            });
+                    match item_edit.goby(direction) {
+                        TreeNavResult::Exit => {
+                            if direction.y < 0 {
+                                // up
+                                self.cursor.set(ListCursor {
+                                    mode: cur.leaf_mode,
+                                    idx: Some(cur.tree_addr[0])
+                                });
 
-                            TreeNavResult::Continue
-                        } else if direction.y > 0 {
-                            // dn
+                                TreeNavResult::Continue
+                            } else if direction.y > 0 {
+                                // dn
 
-                            TreeNavResult::Continue
-                        } else {
-                            // horizontal
-                            drop(item_edit);
-
-                            if (cur.tree_addr[0]+direction.x >= 0) &&
-                                (cur.tree_addr[0]+direction.x < self.data.len() as isize)
-                            {
-                                if direction.x < 0 {
-                                    cur.tree_addr[0] -= 1;
-                                    for i in 1..depth {
-                                        cur.tree_addr[i] = -1;
-                                    }
-                                } else {
-                                    cur.tree_addr[0] += 1;
-                                    for i in 1..depth {
-                                        cur.tree_addr[i] = 0;
-                                    }
-                                }
-
-                                self.goto(cur)                                
+                                TreeNavResult::Continue
                             } else {
-                                self.cursor.set(ListCursor::none());
-                                TreeNavResult::Exit
+                                // horizontal
+                                drop(item_edit);
+
+                                if (cur.tree_addr[0]+direction.x >= 0) &&
+                                    (cur.tree_addr[0]+direction.x < self.data.len() as isize)
+                                {
+                                    if direction.x < 0 {
+                                        cur.tree_addr[0] -= 1;
+                                        for i in 1..depth {
+                                            cur.tree_addr[i] = -1;
+                                        }
+                                    } else {
+                                        cur.tree_addr[0] += 1;
+                                        for i in 1..depth {
+                                            cur.tree_addr[i] = 0;
+                                        }
+                                    }
+
+                                    self.goto(cur)                    
+                                } else {
+                                    self.cursor.set(ListCursor::none());
+                                    TreeNavResult::Exit
+                                }
                             }
                         }
+                        TreeNavResult::Continue => TreeNavResult::Continue
                     }
-                    TreeNavResult::Continue => TreeNavResult::Continue
-                }                
+
+
+                } else {
+                    self.cursor.set(
+                        ListCursor {
+                            mode: ListCursorMode::Insert,
+                            idx: Some(0)
+                        }
+                    );
+                    TreeNavResult::Continue
+                }
             }
         }
     }
