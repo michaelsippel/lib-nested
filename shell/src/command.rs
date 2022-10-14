@@ -29,22 +29,35 @@ trait Action {
 pub struct ActCd {}
 impl Action for ActCd {
     fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>> {
-        make_editor(
-            ctx.clone(),
-            &vec![ctx.read().unwrap().type_term_from_str("( Path )").unwrap()],
-            1
-        )
+        let depth = 1;
+        Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
+                             .with_n(Point2::new(0, 0), vec![ ctx.read().unwrap().type_term_from_str("( Path )").unwrap() ] )
+        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+    }
+}
+
+pub struct ActLs {}
+impl Action for ActLs {
+    fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>> {
+        let depth = 1;
+        Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
+                             .with_t(Point2::new(1, 0), " Files")
+                             .with_n(Point2::new(0, 0), vec![ ctx.read().unwrap().type_term_from_str("( List Path )").unwrap() ] )
+                             .with_t(Point2::new(1, 1), " Options")
+                             .with_n(Point2::new(0, 1), vec![ ctx.read().unwrap().type_term_from_str("( List String )").unwrap() ] )
+
+        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
     }
 }
 
 pub struct ActEcho {}
 impl Action for ActEcho {
     fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>> {
-        make_editor(
-            ctx.clone(),
-            &vec![ctx.read().unwrap().type_term_from_str("( String )").unwrap()],
-            2
-        )
+        let depth = 1;
+        Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
+                             .with_n(Point2::new(0, 0), vec![ ctx.read().unwrap().type_term_from_str("( String )").unwrap() ] )
+
+        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
     }
 }
 
@@ -53,12 +66,12 @@ impl Action for ActCp {
     fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>> {
         let depth = 1;
         Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
-                             .with_t(Point2::new(0, 0), "Source ")
-                             .with_n(Point2::new(1, 0), vec![ ctx.read().unwrap().type_term_from_str("( Path )").unwrap() ] )
-                             .with_t(Point2::new(0, 1), "Destination ")
-                             .with_n(Point2::new(1, 1), vec![ ctx.read().unwrap().type_term_from_str("( Path )").unwrap() ] )
-                             .with_t(Point2::new(0, 2), "Options ")
-                             .with_n(Point2::new(1, 2), vec![ ctx.read().unwrap().type_term_from_str("( List String )").unwrap() ] )
+                             .with_t(Point2::new(1, 1), " Source")
+                             .with_n(Point2::new(0, 1), vec![ ctx.read().unwrap().type_term_from_str("( Path )").unwrap() ] )
+                             .with_t(Point2::new(1, 2), " Destination")
+                             .with_n(Point2::new(0, 2), vec![ ctx.read().unwrap().type_term_from_str("( Path )").unwrap() ] )
+                             .with_t(Point2::new(1, 3), " Options")
+                             .with_n(Point2::new(0, 3), vec![ ctx.read().unwrap().type_term_from_str("( List String )").unwrap() ] )
         )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
     }
 }
@@ -67,6 +80,8 @@ pub struct Commander {
     ctx: Arc<RwLock<Context>>,
     cmds: HashMap<String, Arc<dyn Action + Send + Sync>>,
 
+    valid: Arc<RwLock<bool>>,
+    confirmed: bool,
     symbol_editor: PTYListEditor<CharEditor>,
     cmd_editor: Option<Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>>,
 
@@ -87,17 +102,33 @@ impl Commander {
             0
         );
 
-        view_elements.push(symbol_editor.get_term_view());
+        let valid = Arc::new(RwLock::new(false));
+        view_elements.push(symbol_editor
+                           .get_term_view()
+                           .map_item({
+                               let valid = valid.clone();
+                               move
+                               |pos, mut a| {
+                                   if *valid.read().unwrap() {
+                                       a.add_style_front(TerminalStyle::fg_color((0,255,0)))
+                                   } else {
+                                       a.add_style_front(TerminalStyle::fg_color((255,0,0)))
+                                   }
+                               }
+                           }));
 
         let mut cmds = HashMap::new();
+
         cmds.insert("cd".into(), Arc::new(ActCd{}) as Arc<dyn Action + Send + Sync>);
         cmds.insert("echo".into(), Arc::new(ActEcho{}) as Arc<dyn Action + Send + Sync>);
-        cmds.insert("ls".into(), Arc::new(ActCd{}) as Arc<dyn Action + Send + Sync>);
+        cmds.insert("ls".into(), Arc::new(ActLs{}) as Arc<dyn Action + Send + Sync>);
         cmds.insert("cp".into(), Arc::new(ActCp{}) as Arc<dyn Action + Send + Sync>);
 
         let mut c = Commander {
             ctx,
             cmds,
+            valid,
+            confirmed: false,
             symbol_editor,
             cmd_editor: None,
             view_elements,
@@ -118,7 +149,7 @@ impl TerminalEditor for Commander {
     }
 
     fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
-        if let Some(cmd_editor) = self.cmd_editor.as_ref() {
+        if let (Some(cmd_editor), true) = (self.cmd_editor.as_ref(), self.confirmed) {
             match event {
                 TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {
                     // run
@@ -133,16 +164,12 @@ impl TerminalEditor for Commander {
             match event {
                 TerminalEvent::Input(Event::Key(Key::Char(' '))) |
                 TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {
-                    let symbol = self.symbol_editor.get_string();
-
-                    if let Some(action) = self.cmds.get(&symbol) {
-                        let editor = action.make_editor(self.ctx.clone());
-
+                    if let Some(editor) = &self.cmd_editor {
+                        self.confirmed = true;
                         self.symbol_editor.up();
-                        self.view_elements.push(editor.read().unwrap().get_term_view());
-
                         editor.write().unwrap().qpxev();
-                        self.cmd_editor = Some(editor);
+
+                        *self.view_elements.get_mut(1) = editor.read().unwrap().get_term_view();
 
                         if *event == TerminalEvent::Input(Event::Key(Key::Char('\n'))) {
                             return self.handle_terminal_event(event);
@@ -155,7 +182,31 @@ impl TerminalEditor for Commander {
                 }
 
                 event => {
-                    self.symbol_editor.handle_terminal_event(event)
+                    let res = self.symbol_editor.handle_terminal_event(event);
+
+                    let symbol = self.symbol_editor.get_string();
+                    
+                    if let Some(action) = self.cmds.get(&symbol) {
+                        let editor = action.make_editor(self.ctx.clone());
+
+                        if self.view_elements.len() == 1 {
+                            self.view_elements.push(editor.read().unwrap().get_term_view().map_item(|p,a| a.add_style_front(TerminalStyle::fg_color((80,80,80)))));
+                        } else {
+                            *self.view_elements.get_mut(1) = editor.read().unwrap().get_term_view().map_item(|p,a| a.add_style_front(TerminalStyle::fg_color((80,80,80))));
+                        }
+
+                        self.cmd_editor = Some(editor);
+                        *self.valid.write().unwrap() = true;
+                    } else {
+                        self.cmd_editor = None;
+                        *self.valid.write().unwrap() = false;
+
+                        if self.view_elements.len() > 1 {
+                            self.view_elements.remove(1);
+                        }
+                    }
+
+                    res
                 }
             }        
         }
@@ -164,28 +215,28 @@ impl TerminalEditor for Commander {
 
 impl TreeNav for Commander {
     fn get_cursor(&self) -> TreeCursor {
-        if let Some(cmd_editor) = self.cmd_editor.as_ref() {
+        if let (Some(cmd_editor), true) = (self.cmd_editor.as_ref(), self.confirmed) {
             cmd_editor.write().unwrap().get_cursor()
         } else {
             self.symbol_editor.get_cursor()
         }
     }
     fn get_cursor_warp(&self) -> TreeCursor {
-        if let Some(cmd_editor) = self.cmd_editor.as_ref() {
+        if let (Some(cmd_editor), true) = (self.cmd_editor.as_ref(), self.confirmed) {
             cmd_editor.write().unwrap().get_cursor_warp()
         } else {
             self.symbol_editor.get_cursor_warp()
         }
     }
     fn goby(&mut self, dir: Vector2<isize>) -> TreeNavResult {
-        if let Some(cmd_editor) = self.cmd_editor.as_ref() {
+        if let (Some(cmd_editor), true) = (self.cmd_editor.as_ref(), self.confirmed) {
             cmd_editor.write().unwrap().goby(dir)
         } else {
             self.symbol_editor.goby(dir)
         }
     }
     fn goto(&mut self, cur: TreeCursor) -> TreeNavResult {
-        if let Some(cmd_editor) = self.cmd_editor.as_ref() {
+        if let (Some(cmd_editor), true) = (self.cmd_editor.as_ref(), self.confirmed) {
             cmd_editor.write().unwrap().goto(cur)
         } else {
             self.symbol_editor.goto(cur)

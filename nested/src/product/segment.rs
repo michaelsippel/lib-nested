@@ -5,6 +5,7 @@ use {
             TerminalEditor, TerminalStyle, TerminalView,
             make_label
         },
+        list::{ListCursorMode},
         tree_nav::{TerminalTreeEditor},
         color::{bg_style_from_depth, fg_style_from_depth}
     },
@@ -18,7 +19,9 @@ pub enum ProductEditorSegment {
     N {
         t: TypeLadder,
         editor: Option<Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>>,
-        cur_depth: usize
+        ed_depth: usize,
+        cur_depth: usize,
+        cur_dist: isize
     }
 }
 
@@ -30,30 +33,47 @@ impl ProductEditorSegment {
                 .map_item({
                     let depth = *depth;
                     move |i, x|
-                    x.add_style_back(fg_style_from_depth(depth))
+                    x.add_style_back(fg_style_from_depth(depth)).add_style_back(TerminalStyle::italic(true))
                 }
             ),
 
-            ProductEditorSegment::N { t: _, editor: Some(e), cur_depth } =>
+            ProductEditorSegment::N { t: _, editor: Some(e), ed_depth, cur_depth, cur_dist } =>
                 e.read().unwrap()
                 .get_term_view()
                 .map_item({
                     let e = e.clone();
+                    let d = *ed_depth;
+                    let cur_dist = *cur_dist;
+
                     move |i, x| {
-                        let cur_depth = e.read().unwrap().get_cursor().tree_addr.len();
-                        x
-                            .add_style_back(fg_style_from_depth(cur_depth))//fg_color((250,210,0)))
-                            .add_style_back(bg_style_from_depth(cur_depth))
+                        let c = e.read().unwrap().get_cursor();
+                        let cur_depth = c.tree_addr.len();
+                        let select =
+                            cur_dist == 0 &&
+                            if c.leaf_mode == ListCursorMode::Select {
+                                cur_depth == 0
+                            } else {
+                                cur_depth == 1
+                            };
+
+                        return x
+                            .add_style_back(bg_style_from_depth(if select { 1 } else { 0 }))
+                            .add_style_back(TerminalStyle::bold(select))
+                            .add_style_back(fg_style_from_depth(d));
                     }
                 }),
 
-            ProductEditorSegment::N{ t, editor: None, cur_depth } =>
+            ProductEditorSegment::N{ t, editor: None, ed_depth, cur_depth, cur_dist } =>
                 make_label(&ctx.read().unwrap().type_term_to_str(&t[0]))
                 .map_item({
-                    let cur_depth = 0;
-                    move |i, x| x
-                            .add_style_back(TerminalStyle::fg_color((130,90,40)))
-                            .add_style_back(bg_style_from_depth(cur_depth))
+                    let cur_depth = *cur_depth;
+                    let ed_depth = *ed_depth;
+                    let cur_dist = *cur_dist;
+
+                    move |i, x|
+                    x.add_style_back(TerminalStyle::fg_color((130,90,40)))
+                        .add_style_back(bg_style_from_depth(if cur_dist == 0 { 1 } else { 0 }))
+                        .add_style_back(TerminalStyle::bold(cur_dist == 0))
                 })
         }        
     }

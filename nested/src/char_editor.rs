@@ -42,9 +42,8 @@ impl TerminalEditor for CharEditor {
         self.data
             .get_port()
             .map(move |c| {                
-                TerminalAtom::new(
-                    c.unwrap_or('?'),
-                    TerminalStyle::fg_color((100, 140, 100)),
+                TerminalAtom::from(
+                    c.unwrap_or('?')
                 )
             })
             .to_grid()

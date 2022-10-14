@@ -33,6 +33,25 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
             )
         ))
 
+    } else if t[0] == c.type_term_from_str("( List String )").unwrap() {
+        Arc::new(RwLock::new(
+            PTYListEditor::new(
+                Box::new({
+                    let d = depth + 1;
+                    let ctx = ctx.clone();
+                    move || {
+                        make_editor(
+                            ctx.clone(),
+                            &vec![ctx.read().unwrap().type_term_from_str("( String )").unwrap()],
+                            d
+                        )
+                    }
+                }),
+                SeqDecorStyle::EnumSet,
+                depth
+            )
+        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+
     } else if t[0] == c.type_term_from_str("( List Char )").unwrap() {
         Arc::new(RwLock::new(
             PTYListEditor::new(
@@ -40,7 +59,7 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
                     || { Arc::new(RwLock::new(CharEditor::new())) }
                 ),
                 SeqDecorStyle::Plain,
-                depth
+                depth+1
             )
         )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
 
@@ -56,10 +75,9 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
         )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
 
     } else if t[0] == c.type_term_from_str("( Path )").unwrap() {
-        let d = depth + 1;
         Arc::new(RwLock::new(PTYListEditor::new(
             Box::new({
-                let d= depth +1;
+                let d= depth+1;
                 move || {
                     Arc::new(RwLock::new(PTYListEditor::new(
                         Box::new(|| {
@@ -72,6 +90,25 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
             SeqDecorStyle::Path,
             depth
         ))) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+
+    } else if t[0] == c.type_term_from_str("( List Path )").unwrap() {
+        Arc::new(RwLock::new(
+            PTYListEditor::new(
+                Box::new({
+                    let d = depth + 1;
+                    let ctx = ctx.clone();
+                    move || {
+                        make_editor(
+                            ctx.clone(),
+                            &vec![ctx.read().unwrap().type_term_from_str("( Path )").unwrap()],
+                            d
+                        )
+                    }
+                }),
+                SeqDecorStyle::EnumSet,
+                depth
+            )
+        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
 
     } else if t[0] == c.type_term_from_str("( List RGB )").unwrap() {
         Arc::new(RwLock::new(

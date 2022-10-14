@@ -38,7 +38,7 @@ impl ProductEditor {
             depth
         }
     }
-    
+
     pub fn with_t(mut self, pos: Point2<i16>, t: &str) -> Self {
         self.segments.insert(pos, ProductEditorSegment::T(t.to_string(), self.depth));
         self
@@ -48,7 +48,9 @@ impl ProductEditor {
         self.segments.insert(pos, ProductEditorSegment::N{
             t: n,
             editor: None,
-            cur_depth: 0
+            ed_depth: self.depth + 1,
+            cur_depth: 0,
+            cur_dist: isize::MAX
         });
         self.n_indices.push(pos);
         self
@@ -81,7 +83,7 @@ impl ProductEditor {
     }
 
     pub fn get_editor(&self, idx: isize) -> Option<Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>> {
-        if let ProductEditorSegment::N{ t: _, editor, cur_depth: _ } = self.get_editor_segment(idx) {
+        if let ProductEditorSegment::N{ t: _, editor, ed_depth: _, cur_depth: _, cur_dist: _ } = self.get_editor_segment(idx) {
             editor
         } else {
             unreachable!()
@@ -97,6 +99,30 @@ impl ProductEditor {
         c.leaf_mode = mode;
         self.goto(c);
     }
+
+    pub fn update_segment(&mut self, idx: isize) {
+        if let Some(ProductEditorSegment::N{ t: _, editor, ed_depth: _, cur_depth, cur_dist }) = self.get_editor_segment_mut(idx).deref_mut() {
+            let cur = self.get_cursor();
+
+            if cur.tree_addr.len() > 0 {
+                if cur.tree_addr[0] == idx {
+                    *cur_depth = cur.tree_addr.len();
+                }
+
+                *cur_dist = cur.tree_addr[0] - idx
+            } else {
+                *cur_dist = isize::MAX;
+            };
+        } else {
+            unreachable!()
+        }
+    }
+
+    pub fn update_cur_segment(&mut self) {
+        if let Some(c) = self.cursor {
+            self.update_segment(c);
+        }
+    }
 }
 
 impl TerminalEditor for ProductEditor {
@@ -110,40 +136,41 @@ impl TerminalEditor for ProductEditor {
 
     fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
         if let Some(mut segment) = self.get_cur_segment_mut().as_deref_mut() {
-            if let Some(ProductEditorSegment::N{ t, editor, cur_depth }) = segment.deref_mut() {
-            *cur_depth = self.get_cursor().tree_addr.len();
-            if let Some(e) = editor.clone() {
-                let mut ce = e.write().unwrap();
-                match ce.handle_terminal_event(event) {
-                    TerminalEditorResult::Exit =>
-                        match event {
-                            TerminalEvent::Input(Event::Key(Key::Backspace)) => {
-                                *editor = None;
-                                *cur_depth = 1;
-                                TerminalEditorResult::Continue
-                            }
-                            _ => {
-                                *cur_depth = ce.get_cursor().tree_addr.len();
-                                drop(ce);
-                                match self.nexd() {
-                                    TreeNavResult::Continue => TerminalEditorResult::Continue,
-                                    TreeNavResult::Exit => TerminalEditorResult::Exit
+            if let Some(ProductEditorSegment::N{ t, editor, ed_depth, cur_depth, cur_dist }) = segment.deref_mut() {
+                *cur_depth = self.get_cursor().tree_addr.len();
+
+                if let Some(e) = editor.clone() {
+                    let mut ce = e.write().unwrap();
+                    match ce.handle_terminal_event(event) {
+                        TerminalEditorResult::Exit =>
+                            match event {
+                                TerminalEvent::Input(Event::Key(Key::Backspace)) => {
+                                    *editor = None;
+                                    *cur_depth = 1;
+                                    TerminalEditorResult::Continue
                                 }
-                            }
-                        },
-                    TerminalEditorResult::Continue => {
-                        *cur_depth = ce.get_cursor().tree_addr.len();
-                        TerminalEditorResult::Continue
+                                _ => {
+                                    *cur_depth = ce.get_cursor().tree_addr.len();
+                                    drop(ce);
+                                    match self.nexd() {
+                                        TreeNavResult::Continue => TerminalEditorResult::Continue,
+                                        TreeNavResult::Exit => TerminalEditorResult::Exit
+                                    }
+                                }
+                            },
+                        TerminalEditorResult::Continue => {
+                            *cur_depth = ce.get_cursor().tree_addr.len();
+                            TerminalEditorResult::Continue
+                        }
                     }
+                } else {
+                    let e = make_editor(self.ctx.clone(), t, *ed_depth+1);
+                    *editor = Some(e.clone());
+                    e.write().unwrap().dn();
+                    let x = e.write().unwrap().handle_terminal_event(event);
+                    *cur_depth = e.write().unwrap().get_cursor().tree_addr.len();
+                    x
                 }
-            } else {
-                let e = make_editor(self.ctx.clone(), t, self.depth+1);
-                *editor = Some(e.clone());
-                e.write().unwrap().dn();
-                let x = e.write().unwrap().handle_terminal_event(event);
-                *cur_depth = e.write().unwrap().get_cursor().tree_addr.len();
-                x
-            }
             } else {
                 unreachable!()
             }

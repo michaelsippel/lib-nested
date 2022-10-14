@@ -17,7 +17,7 @@ use {
         core::{port::UpdateTask, Observer, OuterViewPort, ViewPort, Context, TypeTerm},
         index::IndexArea,
         list::{ListCursorMode, PTYListEditor},
-        sequence::{decorator::{SeqDecorStyle}},
+        sequence::{decorator::{SeqDecorStyle, Separate}},
         terminal::{
             make_label, Terminal, TerminalAtom, TerminalCompositor, TerminalEditor,
             TerminalEditorResult, TerminalEvent, TerminalStyle, TerminalView,
@@ -42,22 +42,37 @@ async fn main() {
     async_std::task::spawn(async move {
         loop {
             tp.update();
-            async_std::task::sleep(std::time::Duration::from_millis(20)).await;
+            async_std::task::sleep(std::time::Duration::from_millis(30)).await;
         }
     });
+
+    // Type Context //
+    let mut ctx = Arc::new(RwLock::new(Context::new()));
+    for tn in vec![
+        "MachineWord", "MachineInt", "MachineSyllab", "Bits",
+        "Vec", "Stream", "Json",
+        "Sequence", "AsciiString", "UTF-8-String", "Char", "String",
+        "PosInt", "Digit", "LittleEndian", "BigEndian",
+        "DiffStream", "ℕ", "List", "Path", "Term", "RGB", "Vec3i"
+    ] { ctx.write().unwrap().add_typename(tn.into()); }
+
+    let mut process_list_editor = PTYListEditor::new(
+            Box::new({let ctx = ctx.clone(); move || Arc::new(RwLock::new(Commander::new(ctx.clone())))}),
+/*
+        Box::new({
+            let ctx = ctx.clone();
+            move || nested::make_editor::make_editor(
+                ctx.clone(),
+                &vec![ctx.read().unwrap().type_term_from_str("( List String )").unwrap()],
+                1
+            )}),
+*/
+        SeqDecorStyle::VerticalSexpr,
+        0
+    );
     
     async_std::task::spawn(async move {
         let mut table = nested::index::buffer::IndexBuffer::new();
-
-        // Type Context //
-        let mut ctx = Arc::new(RwLock::new(Context::new()));
-        for tn in vec![
-            "MachineWord", "MachineInt", "MachineSyllab", "Bits",
-            "Vec", "Stream", "Json",
-            "Sequence", "AsciiString", "UTF-8-String", "Char", "String",
-            "PosInt", "Digit", "LittleEndian", "BigEndian",
-            "DiffStream", "ℕ", "List", "Path", "Term", "RGB", "Vec3i"
-        ] { ctx.write().unwrap().add_typename(tn.into()); }
         
         let magic =
             make_label("<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>").map_item(|pos, atom| {
@@ -71,11 +86,6 @@ async fn main() {
         let mut cur_size = nested::singleton::SingletonBuffer::new(Vector2::new(10, 10));
         let mut status_chars = VecBuffer::new();
 
-        let mut process_list_editor = PTYListEditor::new(
-            Box::new({let ctx = ctx.clone(); move || Arc::new(RwLock::new(Commander::new(ctx.clone())))}),
-            SeqDecorStyle::VerticalSexpr,
-            0
-        );
 
         let mut plist = VecBuffer::new();
         let mut plist_port = plist.get_port();
@@ -115,12 +125,18 @@ async fn main() {
                 status_chars.get_port().to_sequence().to_grid_horizontal(),
             ),
             (Point2::new(0, 2), magic.clone()),
-
-            (Point2::new(0, 4), process_list_editor.get_term_view()),
+            (Point2::new(0, 3), make_label(" ")),
+            (Point2::new(0, 4),
+             process_list_editor
+             .editor
+             .get_seg_seq_view()
+             .separate(make_label(" ~~  ~~  ~~  ~~  ~~  ~~  ~~  ~~  ~~  ~~").map_item(|p,a| a.add_style_front(TerminalStyle::fg_color((40,40,40)))))
+             .to_grid_vertical()
+             .flatten()),
         ]);
 
         let (w, h) = termion::terminal_size().unwrap();
-
+/*
         compositor.write().unwrap().push(
             plot_port.outer()
                 .map_item(|pt, a| {
@@ -137,7 +153,7 @@ async fn main() {
             .write()
             .unwrap()
             .push(monstera::make_monstera().offset(Vector2::new(w as i16 - 38, 0)));
-
+*/
         compositor
             .write()
             .unwrap()
@@ -250,37 +266,19 @@ async fn main() {
                 TerminalEvent::Input(Event::Key(Key::End)) => {
                     process_list_editor.qnexd();
                 }
+                TerminalEvent::Input(Event::Key(Key::Char('\t'))) => {
+                    let mut c = process_list_editor.get_cursor();
+                    c.leaf_mode = match c.leaf_mode {
+                        ListCursorMode::Select => ListCursorMode::Insert,
+                        ListCursorMode::Insert => ListCursorMode::Select
+                    };
+                    process_list_editor.goto(c);
+                }
                 ev => {
-                    if process_list_editor.get_cursor().leaf_mode == ListCursorMode::Select {
-                        match ev {
-                            TerminalEvent::Input(Event::Key(Key::Char('l'))) => {
-                                process_list_editor.up();
-                            }
-                            TerminalEvent::Input(Event::Key(Key::Char('a'))) => {
-                                process_list_editor.dn();
-                            }
-                            TerminalEvent::Input(Event::Key(Key::Char('i'))) => {
-                                process_list_editor.pxev();
-                            }
-                            TerminalEvent::Input(Event::Key(Key::Char('e'))) => {
-                                process_list_editor.nexd();
-                            }
-                            TerminalEvent::Input(Event::Key(Key::Char('u'))) => {
-                                process_list_editor.qpxev();
-                            }
-                            TerminalEvent::Input(Event::Key(Key::Char('o'))) => {
-                                process_list_editor.qnexd();
-                            }
-                            _ => {
-                                process_list_editor.handle_terminal_event(&ev);
-                            }
-                        }
-                    } else {
-                        if let TerminalEditorResult::Exit =
-                            process_list_editor.handle_terminal_event(&ev)
-                        {
-                            process_list_editor.nexd();
-                        }
+                    if let TerminalEditorResult::Exit =
+                        process_list_editor.handle_terminal_event(&ev)
+                    {
+                        //process_list_editor.nexd();
                     }
                 }
             }

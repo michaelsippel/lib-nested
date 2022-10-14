@@ -36,16 +36,27 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
             ListSegment::InsertCursor => {
                 make_label("|")
                     .map_item(move |_pt, atom| {
-                    atom.add_style_back(bg_style_from_depth(0))
-                        .add_style_back(TerminalStyle::bold(true))
+                     atom.add_style_front(TerminalStyle::fg_color((150,80,230)))
+                        .add_style_front(TerminalStyle::bold(true))
                     })
             }
             ListSegment::Item{ editor, depth, cur_dist } => {
                 let e = editor.clone();
                 let d = *depth;
+                let cur_dist = *cur_dist;
                 editor.read().unwrap().get_term_view().map_item(move |_pt, atom| {
-                    let cur_depth = e.read().unwrap().get_cursor().tree_addr.len();
-                    atom.add_style_back(bg_style_from_depth(cur_depth))
+                    let c = e.read().unwrap().get_cursor();
+                    let cur_depth = c.tree_addr.len();
+                    let select =
+                        cur_dist == 0 &&
+                        if c.leaf_mode == ListCursorMode::Select {
+                            cur_depth == 0
+                        } else {
+                            cur_depth == 1
+                        };
+                    atom
+                        .add_style_back(bg_style_from_depth(if select { 1 } else { 0 }))
+                        .add_style_back(TerminalStyle::bold(select))
                         .add_style_back(fg_style_from_depth(d))
                 })
             }
@@ -110,7 +121,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
                         ListSegment::Item {
                             editor: self.data.get(&(*idx - 1))?,
                             depth: self.depth,
-                            cur_dist: cur - (*idx as isize - 1)
+                            cur_dist: cur - *idx as isize
                         }
                     }
                 }

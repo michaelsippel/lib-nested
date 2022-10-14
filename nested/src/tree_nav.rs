@@ -36,7 +36,7 @@ impl TreeCursor {
 
     pub fn none() -> Self {
         TreeCursor {
-            leaf_mode: ListCursorMode::Insert,
+            leaf_mode: ListCursorMode::Select,
             tree_addr: vec![],
         }
     }
