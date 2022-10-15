@@ -118,7 +118,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
                     idx: Some(idx),
                 });
 
-                if new_cur.leaf_mode == ListCursorMode::Select {
+                if new_cur.leaf_mode == ListCursorMode::Select && self.data.len() > 0 {
                     let item = self.data.get_mut(idx as usize);
                     let mut item_edit = item.write().unwrap();
                     item_edit.goto(TreeCursor {
