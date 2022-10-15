@@ -160,10 +160,13 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
 
                 if direction.y < 0 {
                     // up
+                    /*
                     self.cursor.set(ListCursor {
                         mode: cur.leaf_mode,
                         idx: None
-                    });
+                });
+                     */
+                    self.cursor.set(ListCursor::none());
                     TreeNavResult::Exit
                 } else if direction.y > 0 {
                     // dn
@@ -232,6 +235,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
                             mode: cur.leaf_mode,
                             idx: None
                         });
+                        self.cursor.set(ListCursor::none());
                         TreeNavResult::Exit
                     }
                 }
@@ -282,6 +286,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
                                         mode: cur.leaf_mode,
                                         idx: None
                                     });
+                                    self.cursor.set(ListCursor::none());
                                     TreeNavResult::Exit
                                 }
                             }

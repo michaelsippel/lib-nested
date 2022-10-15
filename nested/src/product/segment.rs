@@ -49,16 +49,15 @@ impl ProductEditorSegment {
                         let c = e.read().unwrap().get_cursor();
                         let cur_depth = c.tree_addr.len();
                         let select =
-                            cur_dist == 0 &&
-                            if c.leaf_mode == ListCursorMode::Select {
-                                cur_depth == 0
+                            if cur_dist == 0 {
+                                cur_depth
                             } else {
-                                cur_depth == 1
+                                usize::MAX
                             };
 
                         return x
-                            .add_style_back(bg_style_from_depth(if select { 1 } else { 0 }))
-                            .add_style_back(TerminalStyle::bold(select))
+                            .add_style_back(bg_style_from_depth(select))
+                            .add_style_back(TerminalStyle::bold(select==1))
                             .add_style_back(fg_style_from_depth(d));
                     }
                 }),
@@ -71,8 +70,8 @@ impl ProductEditorSegment {
                     let cur_dist = *cur_dist;
 
                     move |i, x|
-                    x.add_style_back(TerminalStyle::fg_color((130,90,40)))
-                        .add_style_back(bg_style_from_depth(if cur_dist == 0 { 1 } else { 0 }))
+                    x.add_style_back(TerminalStyle::fg_color((215,140,95)))
+                        .add_style_back(bg_style_from_depth(if cur_dist == 0 { 0 } else { usize::MAX }))
                         .add_style_back(TerminalStyle::bold(cur_dist == 0))
                 })
         }        

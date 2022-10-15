@@ -178,7 +178,7 @@ impl TreeNav for ProductEditor {
                                 //\\//\\//\\//\\
                                 match ce.goby(direction) {
                                     TreeNavResult::Exit => {
-                                        *cur_depth = 1;
+                                       // *cur_depth = 1;
                                         drop(ce);
                                         drop(e);
 
@@ -195,7 +195,6 @@ impl TreeNav for ProductEditor {
                                             TreeNavResult::Continue
                                         } else if direction.y == 0 {
                                             // horizontal
-
                                             if direction.x != 0 {
                                                 *cur_depth = 0;
                                             }

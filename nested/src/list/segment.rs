@@ -48,15 +48,14 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
                     let c = e.read().unwrap().get_cursor();
                     let cur_depth = c.tree_addr.len();
                     let select =
-                        cur_dist == 0 &&
-                        if c.leaf_mode == ListCursorMode::Select {
-                            cur_depth == 0
+                        if cur_dist == 0 {
+                            cur_depth
                         } else {
-                            cur_depth == 1
+                            usize::MAX
                         };
                     atom
-                        .add_style_back(bg_style_from_depth(if select { 1 } else { 0 }))
-                        .add_style_back(TerminalStyle::bold(select))
+                        .add_style_back(bg_style_from_depth(select))
+                        .add_style_back(TerminalStyle::bold(select==1))
                         .add_style_back(fg_style_from_depth(d))
                 })
             }

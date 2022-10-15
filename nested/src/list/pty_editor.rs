@@ -220,7 +220,6 @@ impl<ItemEditor> TerminalTreeEditor for PTYListEditor<ItemEditor>
 where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
 {}
 
-
 use crate::{
     char_editor::CharEditor,
     sequence::SequenceViewExt
