@@ -80,6 +80,20 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
         }
     }
 
+    /// split the list off at the current cursor position and return the second half
+    /*
+    pub fn split(&mut self) -> ListEditor<ItemEditor> {
+        let mut le = ListEditor::new(self.make_item_editor.clone());
+        let p = self.cursor.get();
+        for i in p.idx .. self.data.len() {
+            le.data.push( self.data[p.idx] );
+            self.data.remove(p.idx);
+        }
+        le.goto(TreeCursor::home());
+        le
+    }
+     */
+
     pub fn clear(&mut self) {
         self.data.clear();
     }

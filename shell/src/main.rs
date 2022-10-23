@@ -80,6 +80,7 @@ async fn main() {
             )}),
 */
         SeqDecorStyle::VerticalSexpr,
+        '\n',
         0
     );
 
@@ -153,6 +154,8 @@ async fn main() {
                     for x in entry.addr.iter() {
                         b.push(
                             make_label(&format!("{}", x))
+                                .map_item(|p,a| a
+                                          .add_style_back(TerminalStyle::fg_color((0, 100, 20))))
                         );
                         b.push(
                             make_label(".")
@@ -206,7 +209,7 @@ async fn main() {
             if cur.tree_addr.len() > 0 {
                 status_chars.push(TerminalAtom::new(
                     '@',
-                    TerminalStyle::fg_color((120, 80, 80)).add(TerminalStyle::bold(true)),
+                    TerminalStyle::fg_color((150, 80,230)).add(TerminalStyle::bold(true)),
                 ));
                 for x in cur.tree_addr {
                     for c in format!("{}", x).chars() {
@@ -215,13 +218,13 @@ async fn main() {
                     }
                     status_chars.push(TerminalAtom::new(
                         '.',
-                        TerminalStyle::fg_color((120, 80, 80)),
+                        TerminalStyle::fg_color((150, 80,230))
                     ));
                 }
 
                 status_chars.push(TerminalAtom::new(
                     ':',
-                    TerminalStyle::fg_color((120, 80, 80)).add(TerminalStyle::bold(true)),
+                    TerminalStyle::fg_color((150, 80,230)).add(TerminalStyle::bold(true)),
                 ));
                 for c in match cur.leaf_mode {
                     ListCursorMode::Insert => "INSERT",
@@ -236,7 +239,7 @@ async fn main() {
                 }
                 status_chars.push(TerminalAtom::new(
                     ':',
-                    TerminalStyle::fg_color((120, 80, 80)).add(TerminalStyle::bold(true)),
+                    TerminalStyle::fg_color((150, 80,230)).add(TerminalStyle::bold(true)),
                 ));
             } else {
                 for c in "Press <DN> to enter".chars() {

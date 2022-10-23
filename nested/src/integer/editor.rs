@@ -115,6 +115,7 @@ impl PosIntEditor {
             digits_editor: PTYListEditor::new(
                 Box::new(move || Arc::new(RwLock::new(DigitEditor::new(radix)))) as Box<dyn Fn() -> Arc<RwLock<DigitEditor>> + Send + Sync>,
                 SeqDecorStyle::Hex,
+                ' ',
                 0
             ),
         }

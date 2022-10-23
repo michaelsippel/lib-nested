@@ -29,6 +29,7 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
                     Arc::new(RwLock::new(CharEditor::new()))
                 }),
                 SeqDecorStyle::DoubleQuote,
+                '"',
                 depth
             )
         ))
@@ -48,6 +49,7 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
                     }
                 }),
                 SeqDecorStyle::EnumSet,
+                '"',
                 depth
             )
         )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
@@ -59,6 +61,7 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
                     || { Arc::new(RwLock::new(CharEditor::new())) }
                 ),
                 SeqDecorStyle::Plain,
+                '\n',
                 depth+1
             )
         )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
@@ -70,6 +73,7 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
                     Arc::new(RwLock::new(PosIntEditor::new(16)))
                 }),
                 SeqDecorStyle::EnumSet,
+                ',',
                 depth
             )
         )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
@@ -84,10 +88,12 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
                             Arc::new(RwLock::new(CharEditor::new()))
                         }),
                         SeqDecorStyle::Plain,
+                        '\n',
                         d
                     )))
             }}),
             SeqDecorStyle::Path,
+            '/',
             depth
         ))) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
 
@@ -106,6 +112,7 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
                     }
                 }),
                 SeqDecorStyle::EnumSet,
+                ',',
                 depth
             )
         )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
@@ -121,20 +128,21 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
                     })
                 },
                 SeqDecorStyle::VerticalSexpr,
+                ',',
                 depth
             )
         )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
 
     } else if t[0] == c.type_term_from_str("( RGB )").unwrap() {
         Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
-                             .with_t(Point2::new(0, 0), "{")
+                             .with_t(Point2::new(0, 0), "{   ")
                              .with_t(Point2::new(1, 1), "r: ")
                              .with_n(Point2::new(2, 1), vec![ ctx.read().unwrap().type_term_from_str("( PosInt 16 BigEndian )").unwrap() ] )
                              .with_t(Point2::new(1, 2), "g: ")
                              .with_n(Point2::new(2, 2), vec![ ctx.read().unwrap().type_term_from_str("( PosInt 16 BigEndian )").unwrap() ] )
                              .with_t(Point2::new(1, 3), "b: ")
                              .with_n(Point2::new(2, 3), vec![ ctx.read().unwrap().type_term_from_str("( PosInt 16 BigEndian )").unwrap() ] )
-                             .with_t(Point2::new(0, 4), "}")
+                             .with_t(Point2::new(0, 4), "}   ")
         )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
 
     } else if t[0] == c.type_term_from_str("( Vec3i )").unwrap() {
@@ -163,6 +171,7 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
                     }
                 }),
                 SeqDecorStyle::VerticalSexpr,
+                '\n',
                 depth
             )
         )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
@@ -177,6 +186,7 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
                     }
                 }),
                 SeqDecorStyle::Tuple,
+                '\n',
                 depth
             )
         )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
@@ -188,6 +198,7 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
                     Arc::new(RwLock::new(CharEditor::new()))
                 },
                 SeqDecorStyle::DoubleQuote,
+                ' ',
                 depth
             )
         ))

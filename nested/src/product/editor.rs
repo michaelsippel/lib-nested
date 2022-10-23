@@ -147,7 +147,7 @@ impl ProductEditor {
             } else {
                 let mut b = VecBuffer::new();
                 b.push(crate::diagnostics::make_todo(crate::terminal::make_label(&format!("complete {}", self.ctx.read().unwrap().type_term_to_str(&t[0])))));
-        
+
                 self.msg_buf.update(idx as usize, Some(b.get_port().to_sequence()));
             }
 

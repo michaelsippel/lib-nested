@@ -27,6 +27,8 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
 {
     pub editor: ListEditor<ItemEditor>,
 
+    split_char: char,
+
     style: SeqDecorStyle,
     depth: usize,
 
@@ -39,6 +41,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
     pub fn new(
         make_item_editor: impl Fn() -> Arc<RwLock<ItemEditor>> + Send + Sync + 'static,
         style: SeqDecorStyle,
+        split_char: char,
         depth: usize
     ) -> Self {
         let port = ViewPort::new();
@@ -46,6 +49,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
             editor: ListEditor::new(make_item_editor, depth),
             style,
             depth,
+            split_char,
             port
         }
     }
@@ -53,11 +57,13 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
     pub fn from_editor(
         editor: ListEditor<ItemEditor>,
         style: SeqDecorStyle,
+        split_char: char,
         depth: usize
     ) -> Self {
         let port = ViewPort::new();
         PTYListEditor {
             editor,
+            split_char,
             style,
             depth,
             port
@@ -158,6 +164,32 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
                                 self.editor.set_leaf_mode(ListCursorMode::Insert);
                                 TerminalEditorResult::Continue
                             }
+
+                        TerminalEvent::Input(Event::Key(Key::Char(c))) => {
+                            if *c == self.split_char {
+                                let c = self.editor.cursor.get();
+                                self.editor.goto(TreeCursor::none());
+                                self.editor.cursor.set(ListCursor {
+                                    mode: ListCursorMode::Insert,
+                                    idx: Some(1 + c.idx.unwrap_or(0))
+                                });
+                            } else {
+                                if let Some(e) = self.editor.get_item() {
+                                    match e.write().unwrap().handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Char(*c)))) {
+                                        TerminalEditorResult::Exit => {
+                                            self.editor.cursor.set(ListCursor {
+                                                mode: ListCursorMode::Insert,
+                                                idx: Some(idx as isize + 1),
+                                            });
+                                        }
+                                        TerminalEditorResult::Continue => {
+                                            
+                                        }
+                                    }
+                                }
+                            }
+                            TerminalEditorResult::Continue
+                        }
                         ev => {
                             if let Some(e) = self.editor.get_item() {
                                 match e.write().unwrap().handle_terminal_event(ev) {

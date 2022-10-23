@@ -106,11 +106,13 @@ impl ProcessLauncher {
                     editor: PTYListEditor::new(
                         Box::new(|| Arc::new(RwLock::new(CharEditor::new()))),
                         SeqDecorStyle::Plain,
+                        '\n',
                         1
                     ),
                 }))
             }) as Box<dyn Fn() -> Arc<RwLock<ProcessArg>> + Send + Sync>,
             SeqDecorStyle::HorizontalSexpr,
+            ' ',
             0
         );
 

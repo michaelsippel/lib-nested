@@ -93,6 +93,21 @@ impl Action for ActNum {
     }
 }
 
+pub struct ActColor {}
+impl Action for ActColor {
+    fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>> {
+        let depth = 1;
+        Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
+                             .with_t(Point2::new(1, 1), " RGB")
+                             .with_n(Point2::new(0, 1), vec![ ctx.read().unwrap().type_term_from_str("( RGB )").unwrap() ] )
+                             .with_t(Point2::new(1, 2), " HSV")
+                             .with_n(Point2::new(0, 2), vec![ ctx.read().unwrap().type_term_from_str("( RGB )").unwrap() ] )
+                             .with_t(Point2::new(1, 3), " HSL")
+                             .with_n(Point2::new(0, 3), vec![ ctx.read().unwrap().type_term_from_str("( RGB )").unwrap() ] )
+        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+    }
+}
+
 pub struct Commander {
     ctx: Arc<RwLock<Context>>,
     cmds: HashMap<String, Arc<dyn Action + Send + Sync>>,
@@ -119,6 +134,7 @@ impl Commander {
                 Arc::new(RwLock::new(CharEditor::new()))
             },
             SeqDecorStyle::Plain,
+            '\n',
             0
         );
 
@@ -144,6 +160,7 @@ impl Commander {
         cmds.insert("ls".into(), Arc::new(ActLs{}) as Arc<dyn Action + Send + Sync>);
         cmds.insert("cp".into(), Arc::new(ActCp{}) as Arc<dyn Action + Send + Sync>);
         cmds.insert("num".into(), Arc::new(ActNum{}) as Arc<dyn Action + Send + Sync>);
+        cmds.insert("color".into(), Arc::new(ActColor{}) as Arc<dyn Action + Send + Sync>);
 
         let m_buf = VecBuffer::new();
         let mut c = Commander {
