@@ -5,13 +5,15 @@ use {
             TerminalEditor, TerminalEditorResult,
             TerminalEvent, TerminalView
         },
-        sequence::{SequenceView},
-        tree_nav::{TreeNav, TerminalTreeEditor, TreeNavResult},
         vec::{VecBuffer, MutableVecAccess},
         index::{buffer::{IndexBuffer, MutableIndexAccess}, IndexView},
         list::ListCursorMode,
         product::{segment::ProductEditorSegment},
-        make_editor::make_editor
+        sequence::{SequenceView},
+        make_editor::make_editor,
+
+        tree_nav::{TreeNav, TerminalTreeEditor, TreeNavResult},
+        diagnostics::{Diagnostics, Message},
     },
     cgmath::{Vector2, Point2},
     std::sync::{Arc, RwLock},
@@ -20,6 +22,8 @@ use {
 };
 
 pub struct ProductEditor {
+    msg_buf: VecBuffer<Option<OuterViewPort<dyn SequenceView<Item = crate::diagnostics::Message>>>>,
+    msg_port:  OuterViewPort<dyn SequenceView<Item = crate::diagnostics::Message>>,
     segments: IndexBuffer<Point2<i16>, ProductEditorSegment>,
     pub(super) n_indices: Vec<Point2<i16>>,
 
@@ -30,8 +34,28 @@ pub struct ProductEditor {
 
 impl ProductEditor {
     pub fn new(depth: usize, ctx: Arc<RwLock<Context>>) -> Self {
+        let msg_buf = VecBuffer::new();
         ProductEditor {
             segments: IndexBuffer::new(),
+            msg_port: msg_buf.get_port()
+                .to_sequence()
+                .enumerate()
+                .filter_map(|(idx, msgs): &(usize, Option<OuterViewPort<dyn SequenceView<Item = crate::diagnostics::Message>>>)| {
+                    let idx = *idx;
+                    if let Some(msgs) = msgs {
+                        Some(msgs.map(
+                            move |msg| {
+                                let mut msg = msg.clone();
+                                msg.addr.insert(0, idx);
+                                msg
+                            }))
+                    } else {
+                        None
+                    }
+                })
+                .flatten(),
+            msg_buf,
+
             n_indices: Vec::new(),
             ctx,
             cursor: None,
@@ -42,17 +66,21 @@ impl ProductEditor {
     pub fn with_t(mut self, pos: Point2<i16>, t: &str) -> Self {
         self.segments.insert(pos, ProductEditorSegment::T(t.to_string(), self.depth));
         self
-    }
+    }   
 
     pub fn with_n(mut self, pos: Point2<i16>, n: TypeLadder) -> Self {
         self.segments.insert(pos, ProductEditorSegment::N{
-            t: n,
+            t: n.clone(),
             editor: None,
             ed_depth: self.depth + 1,
             cur_depth: 0,
             cur_dist: isize::MAX
         });
         self.n_indices.push(pos);
+
+        let mut b = VecBuffer::new();
+        b.push(crate::diagnostics::make_todo(crate::terminal::make_label(&format!("complete {}", self.ctx.read().unwrap().type_term_to_str(&n[0])))));
+        self.msg_buf.push(Some(b.get_port().to_sequence()));
         self
     }
 
@@ -101,7 +129,7 @@ impl ProductEditor {
     }
 
     pub fn update_segment(&mut self, idx: isize) {
-        if let Some(ProductEditorSegment::N{ t: _, editor, ed_depth: _, cur_depth, cur_dist }) = self.get_editor_segment_mut(idx).deref_mut() {
+        if let Some(ProductEditorSegment::N{ t, editor, ed_depth: _, cur_depth, cur_dist }) = self.get_editor_segment_mut(idx).deref_mut() {
             let cur = self.get_cursor();
 
             if cur.tree_addr.len() > 0 {
@@ -113,6 +141,16 @@ impl ProductEditor {
             } else {
                 *cur_dist = isize::MAX;
             };
+
+            if let Some(e) = editor {
+                self.msg_buf.update(idx as usize, Some(e.read().unwrap().get_msg_port()));
+            } else {
+                let mut b = VecBuffer::new();
+                b.push(crate::diagnostics::make_todo(crate::terminal::make_label(&format!("complete {}", self.ctx.read().unwrap().type_term_to_str(&t[0])))));
+        
+                self.msg_buf.update(idx as usize, Some(b.get_port().to_sequence()));
+            }
+
         } else {
             unreachable!()
         }
@@ -139,14 +177,13 @@ impl TerminalEditor for ProductEditor {
             if let Some(ProductEditorSegment::N{ t, editor, ed_depth, cur_depth, cur_dist }) = segment.deref_mut() {
                 *cur_depth = self.get_cursor().tree_addr.len();
 
-                if let Some(e) = editor.clone() {
+                let result = if let Some(e) = editor.clone() {
                     let mut ce = e.write().unwrap();
                     match ce.handle_terminal_event(event) {
                         TerminalEditorResult::Exit =>
                             match event {
                                 TerminalEvent::Input(Event::Key(Key::Backspace)) => {
                                     *editor = None;
-                                    *cur_depth = 1;
                                     TerminalEditorResult::Continue
                                 }
                                 _ => {
@@ -170,7 +207,10 @@ impl TerminalEditor for ProductEditor {
                     let x = e.write().unwrap().handle_terminal_event(event);
                     *cur_depth = e.write().unwrap().get_cursor().tree_addr.len();
                     x
-                }
+                };
+
+                self.update_cur_segment();
+                result
             } else {
                 unreachable!()
             }
@@ -179,4 +219,11 @@ impl TerminalEditor for ProductEditor {
         }
     }
 }
+
+impl Diagnostics for ProductEditor {
+    fn get_msg_port(&self) -> OuterViewPort<dyn SequenceView<Item = crate::diagnostics::Message>> {
+        self.msg_port.clone()
+    }
+}
+
 

@@ -8,7 +8,7 @@ use {
     nested::{
         vec::VecBuffer,
         list::{ListEditor, PTYListEditor},
-        sequence::decorator::{Separate, Wrap, SeqDecorStyle},
+        sequence::{SequenceView, decorator::{Separate, Wrap, SeqDecorStyle}},
         core::{TypeTerm, Context},
         core::{OuterViewPort, ViewPort},
         index::{IndexArea, IndexView},
@@ -17,6 +17,7 @@ use {
             TerminalAtom, TerminalEditor, TerminalEditorResult, TerminalEvent, TerminalStyle, TerminalView, make_label
         },
         tree_nav::{TreeCursor, TreeNav, TreeNavResult, TerminalTreeEditor},
+        diagnostics::{Diagnostics},
         make_editor::make_editor,
         product::ProductEditor
     }
@@ -76,6 +77,22 @@ impl Action for ActCp {
     }
 }
 
+pub struct ActNum {}
+impl Action for ActNum {
+    fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>> {
+        let depth = 1;
+        Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
+                             .with_t(Point2::new(1, 1), " Value")
+                             .with_n(Point2::new(0, 1), vec![ ctx.read().unwrap().type_term_from_str("( PosInt 16 BigEndian )").unwrap() ] )
+                             .with_t(Point2::new(1, 2), " Radix")
+                             .with_n(Point2::new(0, 2), vec![ ctx.read().unwrap().type_term_from_str("( PosInt 10 BigEndian )").unwrap() ] )
+
+    )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+
+//        Arc::new(RwLock::new(nested::integer::PosIntEditor::new(10)))
+    }
+}
+
 pub struct Commander {
     ctx: Arc<RwLock<Context>>,
     cmds: HashMap<String, Arc<dyn Action + Send + Sync>>,
@@ -87,6 +104,9 @@ pub struct Commander {
 
     view_elements: VecBuffer<OuterViewPort<dyn TerminalView>>,
     out_port: OuterViewPort<dyn TerminalView>,
+
+    m_buf: VecBuffer<OuterViewPort<dyn SequenceView<Item = nested::diagnostics::Message>>>,
+    msg_port: OuterViewPort<dyn SequenceView<Item = nested::diagnostics::Message>>
 }
 
 impl Commander {
@@ -123,7 +143,9 @@ impl Commander {
         cmds.insert("echo".into(), Arc::new(ActEcho{}) as Arc<dyn Action + Send + Sync>);
         cmds.insert("ls".into(), Arc::new(ActLs{}) as Arc<dyn Action + Send + Sync>);
         cmds.insert("cp".into(), Arc::new(ActCp{}) as Arc<dyn Action + Send + Sync>);
+        cmds.insert("num".into(), Arc::new(ActNum{}) as Arc<dyn Action + Send + Sync>);
 
+        let m_buf = VecBuffer::new();
         let mut c = Commander {
             ctx,
             cmds,
@@ -136,7 +158,12 @@ impl Commander {
                 .to_sequence()
                 .separate(make_label(" "))
                 .to_grid_horizontal()
-                .flatten()
+                .flatten(),
+
+            msg_port: m_buf.get_port()
+                .to_sequence()
+                .flatten(),
+            m_buf
         };
 
         c
@@ -154,6 +181,8 @@ impl TerminalEditor for Commander {
                 TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {
                     // run
                     cmd_editor.write().unwrap().goto(TreeCursor::none());
+                    
+
                     TerminalEditorResult::Exit
                 }
                 event => {
@@ -171,6 +200,8 @@ impl TerminalEditor for Commander {
 
                         *self.view_elements.get_mut(1) = editor.read().unwrap().get_term_view();
 
+                        self.m_buf.push(editor.read().unwrap().get_msg_port());
+                        
                         if *event == TerminalEvent::Input(Event::Key(Key::Char('\n'))) {
                             return self.handle_terminal_event(event);
                         }
@@ -194,7 +225,6 @@ impl TerminalEditor for Commander {
                         } else {
                             *self.view_elements.get_mut(1) = editor.read().unwrap().get_term_view().map_item(|p,a| a.add_style_front(TerminalStyle::fg_color((80,80,80))));
                         }
-
                         self.cmd_editor = Some(editor);
                         *self.valid.write().unwrap() = true;
                     } else {
@@ -210,6 +240,12 @@ impl TerminalEditor for Commander {
                 }
             }        
         }
+    }
+}
+
+impl Diagnostics for Commander {
+    fn get_msg_port(&self) -> OuterViewPort<dyn SequenceView<Item = nested::diagnostics::Message>> {
+        self.msg_port.clone()
     }
 }
 
@@ -242,7 +278,6 @@ impl TreeNav for Commander {
             self.symbol_editor.goto(cur)
         }
     }
-
 }
 
 impl TerminalTreeEditor for Commander {}

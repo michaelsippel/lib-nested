@@ -24,6 +24,8 @@ use {
         },
         tree_nav::{TreeNav, TerminalTreeEditor, TreeCursor, TreeNavResult},
         vec::VecBuffer,
+        integer::{PosIntEditor},
+        diagnostics::{Diagnostics}
     },
     std::sync::{Arc, RwLock},
     termion::event::{Event, Key},
@@ -55,7 +57,17 @@ async fn main() {
         "PosInt", "Digit", "LittleEndian", "BigEndian",
         "DiffStream", "ℕ", "List", "Path", "Term", "RGB", "Vec3i"
     ] { ctx.write().unwrap().add_typename(tn.into()); }
-
+/*
+    let mut process_list_editor = PTYListEditor::new(
+        Box::new(
+            move || {
+                Arc::new(RwLock::new(PosIntEditor::new(16)))
+            }
+        ),
+        SeqDecorStyle::VerticalSexpr,
+        0
+    );
+*/
     let mut process_list_editor = PTYListEditor::new(
             Box::new({let ctx = ctx.clone(); move || Arc::new(RwLock::new(Commander::new(ctx.clone())))}),
 /*
@@ -70,7 +82,7 @@ async fn main() {
         SeqDecorStyle::VerticalSexpr,
         0
     );
-    
+
     async_std::task::spawn(async move {
         let mut table = nested::index::buffer::IndexBuffer::new();
         
@@ -86,19 +98,12 @@ async fn main() {
         let mut cur_size = nested::singleton::SingletonBuffer::new(Vector2::new(10, 10));
         let mut status_chars = VecBuffer::new();
 
-
-        let mut plist = VecBuffer::new();
-        let mut plist_port = plist.get_port();
-        async_std::task::spawn(async move {
-            let (w, _h) = termion::terminal_size().unwrap();
-            let mut x: usize = 0;
-            loop {
-                let val = (5.0
-                    + (x as f32 / 3.0).sin() * 5.0
-                    + 2.0
-                    + ((7 + x) as f32 / 5.0).sin() * 2.0
-                    + 2.0
-                    + ((9 + x) as f32 / 10.0).cos() * 3.0) as usize;
+        let mut plist = VecBuffer::new(); let mut plist_port =
+        plist.get_port(); async_std::task::spawn(async move { let (w,
+        _h) = termion::terminal_size().unwrap(); let mut x: usize = 0;
+        loop { let val = (5.0 + (x as f32 / 3.0).sin() * 5.0 + 2.0 +
+        ((7 + x) as f32 / 5.0).sin() * 2.0 + 2.0 + ((9 + x) as f32 /
+        10.0).cos() * 3.0) as usize;
 
                 if x < w as usize {
                     plist.push(val);
@@ -133,6 +138,36 @@ async fn main() {
              .separate(make_label(" ~~  ~~  ~~  ~~  ~~  ~~  ~~  ~~  ~~  ~~").map_item(|p,a| a.add_style_front(TerminalStyle::fg_color((40,40,40)))))
              .to_grid_vertical()
              .flatten()),
+            (Point2::new(0, 5),  make_label(" ")),
+            (Point2::new(0, 6),  make_label("-~~--~~--~~--~~--~~--~~--~~--~~--~~--~~").map_item(|p,a| a.add_style_front(TerminalStyle::fg_color((200,200,200))))),
+            (Point2::new(0, 7),  process_list_editor.get_msg_port().map(
+                |entry| {
+                    let mut b = VecBuffer::new();
+                    b.push(
+                         make_label("@")
+                         .map_item(|p,a| a
+                                   .add_style_back(TerminalStyle::bold(true))
+                                   .add_style_back(TerminalStyle::fg_color((180,180,0))))
+                    );
+
+                    for x in entry.addr.iter() {
+                        b.push(
+                            make_label(&format!("{}", x))
+                        );
+                        b.push(
+                            make_label(".")
+                                .map_item(|p,a| a
+                                   .add_style_back(TerminalStyle::bold(true))
+                                   .add_style_back(TerminalStyle::fg_color((180,180,0))))                            
+                        );
+                    }
+
+                    b.push(entry.port.clone());
+
+                    b.get_port().to_sequence().to_grid_horizontal().flatten()
+                }
+            ).to_grid_vertical().flatten())
+
         ]);
 
         let (w, h) = termion::terminal_size().unwrap();
@@ -219,7 +254,7 @@ async fn main() {
                 term_port.inner().get_broadcast().notify(&IndexArea::Full);
                 continue;
             }
-
+/*
             if let Some(process_editor) = process_list_editor.get_item() {
                 let mut pe = process_editor.write().unwrap();
                 /*
@@ -233,7 +268,7 @@ async fn main() {
             }
                 */
             }
-
+*/
             match ev {
                 TerminalEvent::Input(Event::Key(Key::Ctrl('d'))) => break,
                 TerminalEvent::Input(Event::Key(Key::Ctrl('l'))) => {
@@ -241,7 +276,7 @@ async fn main() {
                         leaf_mode: ListCursorMode::Insert,
                         tree_addr: vec![0],
                     });
-                    process_list_editor.clear();
+                    //process_list_editor.clear();
                 }
                 TerminalEvent::Input(Event::Key(Key::Left)) => {
                     process_list_editor.pxev();

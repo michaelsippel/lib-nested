@@ -13,6 +13,7 @@ use {
             TerminalView,
         },
         tree_nav::{TerminalTreeEditor, TreeCursor, TreeNav, TreeNavResult},
+        diagnostics::{Diagnostics},
         vec::VecBuffer,
         color::{bg_style_from_depth, fg_style_from_depth}
     },
@@ -215,6 +216,30 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
     }
 }
 
+impl<ItemEditor> Diagnostics for PTYListEditor<ItemEditor>
+where ItemEditor: TerminalTreeEditor + Diagnostics + ?Sized + Send + Sync + 'static
+{
+    fn get_msg_port(&self) -> OuterViewPort<dyn SequenceView<Item = crate::diagnostics::Message>> {
+        self.editor
+            .get_data_port()
+            .enumerate()
+            .map(
+                |(idx, item_editor)| {
+                    let idx = *idx;
+                    item_editor.read().unwrap()
+                        .get_msg_port()
+                        .map(
+                            move |msg| {
+                                let mut msg = msg.clone();
+                                msg.addr.insert(0, idx);
+                                msg
+                            }
+                        )
+                }
+            )
+            .flatten()
+    }
+}
 
 impl<ItemEditor> TerminalTreeEditor for PTYListEditor<ItemEditor>
 where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static

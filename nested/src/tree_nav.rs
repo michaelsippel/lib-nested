@@ -150,6 +150,7 @@ pub trait TreeNav {
 }
 
 use crate::terminal::{TerminalEditor};
+use crate::diagnostics::{Diagnostics};
 
-pub trait TerminalTreeEditor : TerminalEditor + TreeNav + Send {}
+pub trait TerminalTreeEditor : TerminalEditor + TreeNav + Diagnostics + Send {}
 

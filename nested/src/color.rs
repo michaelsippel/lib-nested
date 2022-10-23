@@ -6,7 +6,7 @@ pub fn bg_style_from_depth(depth: usize) -> TerminalStyle {
     match depth {
         0 => TerminalStyle::bg_color((150,80,230)),
         1 => TerminalStyle::bg_color((35,35,35)),
-        2 => TerminalStyle::bg_color((10,10,10)),
+        2 => TerminalStyle::bg_color((20,20,20)),
         _ => TerminalStyle::default(),
     }
 }

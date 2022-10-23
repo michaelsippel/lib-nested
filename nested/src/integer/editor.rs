@@ -4,23 +4,27 @@ use {
         list::{PTYListEditor},
         sequence::{SequenceView, SequenceViewExt, decorator::{PTYSeqDecorate, SeqDecorStyle}},
         singleton::{SingletonBuffer, SingletonView},
+        vec::{VecBuffer},
+        index::{buffer::IndexBuffer},
         terminal::{
             TerminalAtom, TerminalEditor, TerminalEditorResult, TerminalEvent, TerminalStyle,
-            TerminalView,
+            TerminalView, make_label
         },
         tree_nav::{TerminalTreeEditor, TreeCursor, TreeNav, TreeNavResult},
+        diagnostics::{Diagnostics, Message}
     },
     std::sync::Arc,
     std::sync::RwLock,
     termion::event::{Event, Key},
-    cgmath::Vector2
+    cgmath::{Vector2, Point2}
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub struct DigitEditor {
     radix: u32,
-    data: SingletonBuffer<Option<char>>
+    data: SingletonBuffer<Option<char>>,
+    msg: VecBuffer<Message>,
 }
 
 impl DigitEditor {
@@ -28,6 +32,7 @@ impl DigitEditor {
         DigitEditor {
             radix,
             data: SingletonBuffer::new(None),
+            msg: VecBuffer::new(),
         }
     }
 
@@ -63,11 +68,26 @@ impl TerminalEditor for DigitEditor {
             | TerminalEvent::Input(Event::Key(Key::Char('\n'))) => TerminalEditorResult::Exit,
             TerminalEvent::Input(Event::Key(Key::Char(c))) => {
                 self.data.set(Some(*c));
+
+                self.msg.clear();
+                if c.to_digit(self.radix).is_none() {
+                    let mut mb = IndexBuffer::new();
+                    mb.insert_iter(vec![
+                        (Point2::new(1, 0), make_label("invalid digit '")),
+                        (Point2::new(2, 0), make_label(&format!("{}", *c))
+                         .map_item(|p,a| a.add_style_back(TerminalStyle::fg_color((140,140,250))))),
+                        (Point2::new(3, 0), make_label("'"))
+                    ]);
+                    self.msg.push(crate::diagnostics::make_error(mb.get_port().flatten()));
+                }
+
                 TerminalEditorResult::Exit
             }
             TerminalEvent::Input(Event::Key(Key::Backspace))
             | TerminalEvent::Input(Event::Key(Key::Delete)) => {
                 self.data.set(None);
+                self.msg.clear();
+                self.msg.push(crate::diagnostics::make_warn(make_label("empty digit")));
                 TerminalEditorResult::Exit
             }
             _ => TerminalEditorResult::Continue,
@@ -76,6 +96,12 @@ impl TerminalEditor for DigitEditor {
 }
 
 impl TerminalTreeEditor for DigitEditor {}
+
+impl Diagnostics for DigitEditor {
+    fn get_msg_port(&self) -> OuterViewPort<dyn SequenceView<Item = crate::diagnostics::Message>> {
+        self.msg.get_port().to_sequence()
+    }
+}
 
 pub struct PosIntEditor {
     radix: u32,
@@ -123,6 +149,12 @@ impl PosIntEditor {
     }
 }
 
+impl Diagnostics for PosIntEditor {
+    fn get_msg_port(&self) -> OuterViewPort<dyn SequenceView<Item = crate::diagnostics::Message>> {
+        self.digits_editor.get_msg_port()
+    }
+}
+
 impl TreeNav for PosIntEditor {
     fn get_cursor(&self) -> TreeCursor {
         self.digits_editor.get_cursor()
@@ -140,9 +172,23 @@ impl TreeNav for PosIntEditor {
 
 impl TerminalEditor for PosIntEditor {
     fn get_term_view(&self) -> OuterViewPort<dyn TerminalView> {
-        self.digits_editor.editor
-            .get_seg_seq_view()
-            .pty_decorate(SeqDecorStyle::Hex, 0)
+        match self.radix {
+            10 => {
+                self.digits_editor.editor
+                    .get_seg_seq_view()
+                    .pty_decorate(SeqDecorStyle::Plain, 0)
+            },
+            16 => {
+                self.digits_editor.editor
+                    .get_seg_seq_view()
+                    .pty_decorate(SeqDecorStyle::Hex, 0)
+            }
+            _ => {
+                self.digits_editor.editor
+                    .get_seg_seq_view()
+                    .pty_decorate(SeqDecorStyle::Plain, 0)
+            }
+        }
     }
 
     fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {

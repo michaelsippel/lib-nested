@@ -117,6 +117,9 @@ where
 
                                 s.cast.notify(&(idx + chunk_offset));
                                 s.cast.notify_each(dirty_idx);
+                            } else {
+                                let dirty_idx = s.update_all_offsets();
+                                s.cast.notify_each(dirty_idx);
                             }
                         },
                     ),
@@ -124,7 +127,6 @@ where
             );
 
             chunk_port.0.update();
-
             let dirty_idx = self.update_all_offsets();
             self.cast.notify_each(dirty_idx);
         } else {
@@ -161,8 +163,11 @@ where
 
         let old_length = self.length;
         self.length = cur_offset;
-
-        dirty_idx.extend(self.length..old_length);
+/* FIXXME: causes hangup
+        if self.length < old_length {
+            dirty_idx.extend(self.length..old_length);
+        }
+        */
         dirty_idx
     }
 

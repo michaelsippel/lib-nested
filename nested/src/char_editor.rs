@@ -9,6 +9,7 @@ use {
             TerminalView,
         },
         tree_nav::{TerminalTreeEditor, TreeCursor, TreeNav, TreeNavResult},
+        diagnostics::Diagnostics
     },
     std::sync::Arc,
     std::sync::RwLock,
@@ -37,6 +38,8 @@ impl CharEditor {
 }
 
 impl TreeNav for CharEditor {}
+impl Diagnostics for CharEditor {}
+
 impl TerminalEditor for CharEditor {
     fn get_term_view(&self) -> OuterViewPort<dyn TerminalView> {
         self.data

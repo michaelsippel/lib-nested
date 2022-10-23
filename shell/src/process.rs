@@ -11,6 +11,7 @@ use {
             TerminalView,
         },
         tree_nav::{TerminalTreeEditor, TreeCursor, TreeNav, TreeNavResult},
+        diagnostics::Diagnostics
     },
     std::sync::Arc,
     std::sync::RwLock,
@@ -71,6 +72,9 @@ impl TreeNav for ProcessArg {
     fn goby(&mut self, dir: Vector2<isize>) -> TreeNavResult {
         self.editor.goby(dir)
     }
+}
+
+impl Diagnostics for ProcessArg {    
 }
 
 impl TerminalTreeEditor for ProcessArg {}
@@ -263,4 +267,8 @@ impl TreeNav for ProcessLauncher {
 
 }
 
+impl Diagnostics for ProcessLauncher {
+}
+
 impl TerminalTreeEditor for ProcessLauncher {}
+

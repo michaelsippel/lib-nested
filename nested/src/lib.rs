@@ -17,9 +17,10 @@ pub mod grid;
 pub mod vec;
 
 // editors
-pub mod tree_nav;
 pub mod product;
 pub mod list;
+pub mod tree_nav;
+pub mod diagnostics;
 
 // high-level types
 pub mod char_editor;
