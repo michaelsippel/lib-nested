@@ -1,5 +1,6 @@
 pub mod filter;
 pub mod map;
+pub mod enumerate;
 pub mod seq2idx;
 pub mod flatten;
 pub mod decorator;
