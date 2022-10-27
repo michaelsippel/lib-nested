@@ -65,7 +65,6 @@ where
     }
 }
 
-/* TODO: remove unused projection args (bot-views) if they get replaced by a new viewport  */
 impl<Item> Flatten<Item>
 where
     Item: 'static,
@@ -163,11 +162,9 @@ where
 
         let old_length = self.length;
         self.length = cur_offset;
-/* FIXXME: causes hangup
-        if self.length < old_length {
-            dirty_idx.extend(self.length..old_length);
-        }
-        */
+
+        dirty_idx.extend(self.length..old_length);
+
         dirty_idx
     }
 
