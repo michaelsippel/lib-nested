@@ -13,7 +13,7 @@ pub fn bg_style_from_depth(depth: usize) -> TerminalStyle {
 
 pub fn fg_style_from_depth(depth: usize) -> TerminalStyle {
     match depth % 6 {
-        0 => TerminalStyle::fg_color((40, 180, 230)),
+        0 => TerminalStyle::fg_color((180, 180, 180)),
         1 => TerminalStyle::fg_color((120, 120, 120)),
         2 => TerminalStyle::fg_color((250, 165, 40)),
         3 => TerminalStyle::fg_color((80, 180, 200)),

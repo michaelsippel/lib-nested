@@ -14,6 +14,7 @@ use {
 
         tree_nav::{TreeNav, TerminalTreeEditor, TreeNavResult},
         diagnostics::{Diagnostics, Message},
+        terminal::{TerminalStyle}
     },
     cgmath::{Vector2, Point2},
     std::sync::{Arc, RwLock},
@@ -137,6 +138,7 @@ impl ProductEditor {
                     *cur_depth = cur.tree_addr.len();
                 }
 
+                
                 *cur_dist = cur.tree_addr[0] - idx
             } else {
                 *cur_dist = isize::MAX;
@@ -149,6 +151,19 @@ impl ProductEditor {
                 b.push(crate::diagnostics::make_todo(crate::terminal::make_label(&format!("complete {}", self.ctx.read().unwrap().type_term_to_str(&t[0])))));
 
                 self.msg_buf.update(idx as usize, Some(b.get_port().to_sequence()));
+
+                if cur.tree_addr.len() > 0 {
+                    if cur.tree_addr[0] == idx {
+                        self.msg_buf.update(idx as usize, Some(b.get_port().to_sequence().map(
+                            |msg| {
+                                let mut msg = msg.clone();
+                                msg.port = msg.port.map_item(|p,a| a.add_style_back(TerminalStyle::bg_color((40,40,40))));
+                                msg
+                            }
+                        )));
+
+                    }
+                }
             }
 
         } else {
@@ -173,17 +188,20 @@ impl TerminalEditor for ProductEditor {
     }
 
     fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
-        if let Some(mut segment) = self.get_cur_segment_mut().as_deref_mut() {
+        let mut update_segment = false;
+
+        let result = if let Some(mut segment) = self.get_cur_segment_mut().as_deref_mut() {
             if let Some(ProductEditorSegment::N{ t, editor, ed_depth, cur_depth, cur_dist }) = segment.deref_mut() {
                 *cur_depth = self.get_cursor().tree_addr.len();
 
-                let result = if let Some(e) = editor.clone() {
+                if let Some(e) = editor.clone() {
                     let mut ce = e.write().unwrap();
                     match ce.handle_terminal_event(event) {
                         TerminalEditorResult::Exit =>
                             match event {
                                 TerminalEvent::Input(Event::Key(Key::Backspace)) => {
                                     *editor = None;
+                                    update_segment = true;
                                     TerminalEditorResult::Continue
                                 }
                                 _ => {
@@ -203,20 +221,24 @@ impl TerminalEditor for ProductEditor {
                 } else {
                     let e = make_editor(self.ctx.clone(), t, *ed_depth+1);
                     *editor = Some(e.clone());
+                    update_segment = true;
+
                     e.write().unwrap().dn();
                     let x = e.write().unwrap().handle_terminal_event(event);
-                    *cur_depth = e.write().unwrap().get_cursor().tree_addr.len();
                     x
-                };
-
-                self.update_cur_segment();
-                result
+                }
             } else {
-                unreachable!()
+                unreachable!();
+                TerminalEditorResult::Exit
             }
         } else {
             TerminalEditorResult::Exit
+        };
+
+        if update_segment {
+            self.update_cur_segment();
         }
+        result
     }
 }
 
