@@ -33,12 +33,12 @@ impl IndexArea<Point2<i16>> {
             IndexArea::Full => panic!("range from full grid area"),
             IndexArea::Set(v) => {
                 Point2::new(
-                    v.iter().map(|p| p.x).min().unwrap_or(0),
-                    v.iter().map(|p| p.y).min().unwrap_or(0),
+                    v.iter().map(|p| p.x).min().unwrap_or(i16::MAX),
+                    v.iter().map(|p| p.y).min().unwrap_or(i16::MAX),
                 )
                     ..=Point2::new(
-                        v.iter().map(|p| p.x).max().unwrap_or(0),
-                        v.iter().map(|p| p.y).max().unwrap_or(0),
+                        v.iter().map(|p| p.x).max().unwrap_or(i16::MIN),
+                        v.iter().map(|p| p.y).max().unwrap_or(i16::MIN),
                     )
             }
             IndexArea::Range(r) => r.clone(),
