@@ -72,7 +72,7 @@ impl Action for ActCp {
                              .with_t(Point2::new(1, 2), " Destination")
                              .with_n(Point2::new(0, 2), vec![ ctx.read().unwrap().type_term_from_str("( Path )").unwrap() ] )
                              .with_t(Point2::new(1, 3), " Options")
-                             .with_n(Point2::new(0, 3), vec![ ctx.read().unwrap().type_term_from_str("( List String )").unwrap() ] )
+                             .with_n(Point2::new(0, 3), vec![ ctx.read().unwrap().type_term_from_str("( List Symbol )").unwrap() ] )
         )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
     }
 }
@@ -104,6 +104,18 @@ impl Action for ActColor {
                              .with_n(Point2::new(0, 2), vec![ ctx.read().unwrap().type_term_from_str("( RGB )").unwrap() ] )
                              .with_t(Point2::new(1, 3), " HSL")
                              .with_n(Point2::new(0, 3), vec![ ctx.read().unwrap().type_term_from_str("( RGB )").unwrap() ] )
+        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+    }
+}
+
+pub struct ActLet {}
+impl Action for ActLet {
+    fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>> {
+        let depth = 1;
+        Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
+                             .with_n(Point2::new(0, 0), vec![ ctx.read().unwrap().type_term_from_str("( Symbol )").unwrap() ] )
+                             .with_t(Point2::new(1, 0), " := ")
+                             .with_n(Point2::new(2, 0), vec![ ctx.read().unwrap().type_term_from_str("( PosInt 10 BigEndian )").unwrap() ] )
         )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
     }
 }
@@ -146,15 +158,16 @@ impl Commander {
                                move
                                |pos, mut a| {
                                    if *valid.read().unwrap() {
-                                       a.add_style_front(TerminalStyle::fg_color((0,255,0)))
+                                       a.add_style_back(TerminalStyle::fg_color((0,255,0)))
                                    } else {
-                                       a.add_style_front(TerminalStyle::fg_color((255,0,0)))
+                                       a.add_style_back(TerminalStyle::fg_color((255,0,0)))
                                    }
                                }
                            }));
 
         let mut cmds = HashMap::new();
 
+        cmds.insert("let".into(), Arc::new(ActLet{}) as Arc<dyn Action + Send + Sync>);
         cmds.insert("cd".into(), Arc::new(ActCd{}) as Arc<dyn Action + Send + Sync>);
         cmds.insert("echo".into(), Arc::new(ActEcho{}) as Arc<dyn Action + Send + Sync>);
         cmds.insert("ls".into(), Arc::new(ActLs{}) as Arc<dyn Action + Send + Sync>);
@@ -196,11 +209,14 @@ impl TerminalEditor for Commander {
         if let (Some(cmd_editor), true) = (self.cmd_editor.as_ref(), self.confirmed) {
             match event {
                 TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {
-                    // run
-                    cmd_editor.write().unwrap().goto(TreeCursor::none());
-                    
+                    if cmd_editor.write().unwrap().nexd() == TreeNavResult::Exit {
+                        // run
+                        cmd_editor.write().unwrap().goto(TreeCursor::none());
 
-                    TerminalEditorResult::Exit
+                        TerminalEditorResult::Exit
+                    } else {
+                        TerminalEditorResult::Continue
+                    }
                 }
                 event => {
                     cmd_editor.write().unwrap().handle_terminal_event(event)
@@ -224,16 +240,20 @@ impl TerminalEditor for Commander {
                         }
                     } else {
                         // undefined command
+                        let mut b = VecBuffer::new();
+                        b.push(nested::diagnostics::make_error(nested::terminal::make_label(&format!("invalid symbol {}", self.symbol_editor.get_string()))));
+                        self.m_buf.clear();
+                        self.m_buf.push(b.get_port().to_sequence());
                     }
 
                     TerminalEditorResult::Continue
                 }
 
                 event => {
+                    self.m_buf.clear();
                     let res = self.symbol_editor.handle_terminal_event(event);
-
                     let symbol = self.symbol_editor.get_string();
-                    
+
                     if let Some(action) = self.cmds.get(&symbol) {
                         let editor = action.make_editor(self.ctx.clone());
 
@@ -242,9 +262,15 @@ impl TerminalEditor for Commander {
                         } else {
                             *self.view_elements.get_mut(1) = editor.read().unwrap().get_term_view().map_item(|p,a| a.add_style_front(TerminalStyle::fg_color((80,80,80))));
                         }
+
                         self.cmd_editor = Some(editor);
                         *self.valid.write().unwrap() = true;
                     } else {
+                        /*
+                        let mut b = VecBuffer::new();
+                        b.push(nested::diagnostics::make_error(nested::terminal::make_label(&format!("invalid symbol {}", self.symbol_editor.get_string()))));
+                        self.m_buf.push(b.get_port().to_sequence());
+*/
                         self.cmd_editor = None;
                         *self.valid.write().unwrap() = false;
 

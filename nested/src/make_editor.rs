@@ -34,6 +34,18 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
             )
         ))
 
+    } else if t[0] == c.type_term_from_str("( Symbol )").unwrap() {
+        Arc::new(RwLock::new(
+            PTYListEditor::new(
+                Box::new(|| {
+                    Arc::new(RwLock::new(CharEditor::new()))
+                }),
+                SeqDecorStyle::Plain,
+                ' ',
+                depth
+            )
+        ))
+
     } else if t[0] == c.type_term_from_str("( List String )").unwrap() {
         Arc::new(RwLock::new(
             PTYListEditor::new(
@@ -50,6 +62,25 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
                 }),
                 SeqDecorStyle::EnumSet,
                 '"',
+                depth
+            )
+        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+    } else if t[0] == c.type_term_from_str("( List Symbol )").unwrap() {
+        Arc::new(RwLock::new(
+            PTYListEditor::new(
+                Box::new({
+                    let d = depth + 1;
+                    let ctx = ctx.clone();
+                    move || {
+                        make_editor(
+                            ctx.clone(),
+                            &vec![ctx.read().unwrap().type_term_from_str("( Symbol )").unwrap()],
+                            d
+                        )
+                    }
+                }),
+                SeqDecorStyle::EnumSet,
+                ' ',
                 depth
             )
         )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
