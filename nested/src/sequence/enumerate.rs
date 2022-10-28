@@ -14,13 +14,13 @@ impl<Item: 'static> OuterViewPort<dyn SequenceView<Item = Item>> {
         let port = ViewPort::new();
         port.add_update_hook(Arc::new(self.0.clone()));
 
-        let map = Arc::new(RwLock::new(EnumerateSequence {
+        let view = Arc::new(RwLock::new(EnumerateSequence {
             src_view: None,
             cast: port.inner().get_broadcast(),
         }));
 
-        self.add_observer(map.clone());
-        port.inner().set_view(Some(map));
+        self.add_observer(view.clone());
+        port.inner().set_view(Some(view));
         port.into_outer()
     }
 }
