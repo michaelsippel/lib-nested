@@ -18,6 +18,7 @@ pub mod vec;
 
 // editors
 pub mod product;
+pub mod sum;
 pub mod list;
 pub mod tree_nav;
 pub mod diagnostics;
