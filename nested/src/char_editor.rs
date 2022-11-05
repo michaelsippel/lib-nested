@@ -64,7 +64,7 @@ impl TerminalEditor for CharEditor {
                 self.data.set(None);
                 TerminalEditorResult::Exit
             }
-            _ => TerminalEditorResult::Exit,
+            _ => TerminalEditorResult::Continue,
         }
     }
 }
