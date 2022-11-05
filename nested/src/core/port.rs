@@ -47,7 +47,7 @@ where
     pub fn get_cast(&self) -> Arc<RwLock<ObserverBroadcast<V>>> {
         self.cast.clone()
     }
-    
+
     pub fn add_observer(&self, observer: Arc<RwLock<dyn Observer<V>>>) {
         self.update();
         self.cast
