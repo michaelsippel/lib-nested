@@ -6,7 +6,7 @@ use {
         sequence::SequenceView,
         singleton::SingletonView,
         terminal::{TerminalView, TerminalStyle, make_label},
-        tree_nav::TerminalTreeEditor,
+        Nested,
         color::{bg_style_from_depth, fg_style_from_depth}
     },
     std::sync::Arc,
@@ -14,7 +14,7 @@ use {
 };
 
 pub enum ListSegment<ItemEditor>
-where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
+where ItemEditor: Nested + ?Sized + Send + Sync + 'static
 {
     InsertCursor,
     Item {
@@ -29,7 +29,7 @@ pub trait PTYSegment {
 }
 
 impl<ItemEditor> PTYSegment for ListSegment<ItemEditor>
-where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
+where ItemEditor: Nested + ?Sized + Send + Sync + 'static
 {
     fn pty_view(&self) -> OuterViewPort<dyn TerminalView> {
         match self {
@@ -64,7 +64,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
 }
 
 pub struct ListSegmentSequence<ItemEditor>
-where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
+where ItemEditor: Nested + ?Sized + Send + Sync + 'static
 {
     data: Arc<dyn SequenceView<Item = Arc<RwLock<ItemEditor>>>>,
     cursor: Arc<dyn SingletonView<Item = ListCursor>>,
@@ -77,13 +77,13 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
 }
 
 impl<ItemEditor> View for ListSegmentSequence<ItemEditor>
-where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
+where ItemEditor: Nested + ?Sized + Send + Sync + 'static
 {
     type Msg = usize;
 }
 
 impl<ItemEditor> SequenceView for ListSegmentSequence<ItemEditor>
-where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
+where ItemEditor: Nested + ?Sized + Send + Sync + 'static
 {
     type Item = ListSegment<ItemEditor>;
 
@@ -136,7 +136,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
 }
 
 impl<ItemEditor> ListSegmentSequence<ItemEditor>
-where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
+where ItemEditor: Nested + ?Sized + Send + Sync + 'static
 {
     pub fn new(
         cursor_port: OuterViewPort<dyn SingletonView<Item = ListCursor>>,

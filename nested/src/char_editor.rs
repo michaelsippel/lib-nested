@@ -8,8 +8,9 @@ use {
             TerminalAtom, TerminalEditor, TerminalEditorResult, TerminalEvent, TerminalStyle,
             TerminalView,
         },
-        tree_nav::{TerminalTreeEditor, TreeCursor, TreeNav, TreeNavResult},
-        diagnostics::Diagnostics
+        tree::{TreeCursor, TreeNav, TreeNavResult},
+        diagnostics::Diagnostics,
+        Nested
     },
     std::sync::Arc,
     std::sync::RwLock,
@@ -69,6 +70,6 @@ impl TerminalEditor for CharEditor {
     }
 }
 
-impl TerminalTreeEditor for CharEditor {}
+impl Nested for CharEditor {}
 
 

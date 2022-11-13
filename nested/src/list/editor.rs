@@ -12,7 +12,8 @@ use {
             make_label, TerminalEditor, TerminalEditorResult, TerminalEvent, TerminalStyle,
             TerminalView,
         },
-        tree_nav::{TerminalTreeEditor, TreeCursor, TreeNav, TreeNavResult},
+        Nested,
+        tree::{TreeCursor, TreeNav, TreeNavResult},
         vec::VecBuffer,
         color::{bg_style_from_depth, fg_style_from_depth}
     },
@@ -23,7 +24,7 @@ use {
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
                                                             
 pub struct ListEditor<ItemEditor>
-where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
+where ItemEditor: Nested + ?Sized + Send + Sync + 'static
 {
     pub(super) cursor: SingletonBuffer<ListCursor>,
     pub(super) data: VecBuffer<Arc<RwLock<ItemEditor>>>,
@@ -34,7 +35,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
 }
 
 impl<ItemEditor> ListEditor<ItemEditor>
-where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
+where ItemEditor: Nested + ?Sized + Send + Sync + 'static
 {
     pub fn new(make_item_editor: impl Fn() -> Arc<RwLock<ItemEditor>> + Send + Sync + 'static, depth: usize) -> Self {
         ListEditor {
@@ -58,7 +59,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
         );
         segment_view_port.into_outer().map(move |segment| segment.pty_view())
     }
-    
+
     pub fn get_data_port(&self) -> OuterViewPort<dyn SequenceView<Item = Arc<RwLock<ItemEditor>>>> {
         self.data.get_port().to_sequence()
     }

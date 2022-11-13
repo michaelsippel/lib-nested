@@ -10,8 +10,9 @@ use {
             TerminalAtom, TerminalEditor, TerminalEditorResult, TerminalEvent, TerminalStyle,
             TerminalView,
         },
-        tree_nav::{TerminalTreeEditor, TreeCursor, TreeNav, TreeNavResult},
-        diagnostics::Diagnostics
+        tree::{TreeCursor, TreeNav, TreeNavResult},
+        diagnostics::Diagnostics,
+        Nested
     },
     std::sync::Arc,
     std::sync::RwLock,
@@ -77,7 +78,7 @@ impl TreeNav for ProcessArg {
 impl Diagnostics for ProcessArg {    
 }
 
-impl TerminalTreeEditor for ProcessArg {}
+impl Nested for ProcessArg {}
 
 pub struct ProcessLauncher {
     cmd_editor: PTYListEditor<ProcessArg>,
@@ -272,5 +273,5 @@ impl TreeNav for ProcessLauncher {
 impl Diagnostics for ProcessLauncher {
 }
 
-impl TerminalTreeEditor for ProcessLauncher {}
+impl Nested for ProcessLauncher {}
 

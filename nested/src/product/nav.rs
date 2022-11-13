@@ -1,9 +1,10 @@
 use {
     crate::{
         list::ListCursorMode,
-        tree_nav::{TreeNav, TreeNavResult, TreeCursor, TerminalTreeEditor},
+        tree::{TreeNav, TreeNavResult, TreeCursor},
         product::{segment::ProductEditorSegment, ProductEditor},
-        make_editor::{make_editor}
+        make_editor::{make_editor},
+        Nested
     },
     cgmath::{Point2, Vector2},
     std::{sync::{Arc, RwLock}, ops::{Deref, DerefMut}},
@@ -248,5 +249,5 @@ impl TreeNav for ProductEditor {
     }
 }
 
-impl TerminalTreeEditor for ProductEditor {}
+impl Nested for ProductEditor {}
 

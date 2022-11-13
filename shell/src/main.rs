@@ -22,10 +22,11 @@ use {
             make_label, Terminal, TerminalAtom, TerminalCompositor, TerminalEditor,
             TerminalEditorResult, TerminalEvent, TerminalStyle, TerminalView,
         },
-        tree_nav::{TreeNav, TerminalTreeEditor, TreeCursor, TreeNavResult},
+        tree::{TreeNav, TreeCursor, TreeNavResult},
         vec::VecBuffer,
         integer::{PosIntEditor},
-        diagnostics::{Diagnostics}
+        diagnostics::{Diagnostics},
+        Nested
     },
     std::sync::{Arc, RwLock},
     termion::event::{Event, Key},

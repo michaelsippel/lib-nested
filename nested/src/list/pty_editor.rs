@@ -12,10 +12,11 @@ use {
             make_label, TerminalEditor, TerminalEditorResult, TerminalEvent, TerminalStyle,
             TerminalView,
         },
-        tree_nav::{TerminalTreeEditor, TreeCursor, TreeNav, TreeNavResult},
+        tree::{TreeCursor, TreeNav, TreeNavResult},
         diagnostics::{Diagnostics},
         vec::VecBuffer,
-        color::{bg_style_from_depth, fg_style_from_depth}
+        color::{bg_style_from_depth, fg_style_from_depth},
+        Nested
     },
     std::sync::{Arc, RwLock},
     termion::event::{Event, Key},
@@ -23,7 +24,7 @@ use {
 };
 
 pub struct PTYListEditor<ItemEditor>
-where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
+where ItemEditor: Nested + ?Sized + Send + Sync + 'static
 {
     pub editor: ListEditor<ItemEditor>,
 
@@ -36,7 +37,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
 }
 
 impl<ItemEditor> PTYListEditor<ItemEditor>
-where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
+where ItemEditor: Nested + ?Sized + Send + Sync + 'static
 {
     pub fn new(
         make_item_editor: impl Fn() -> Arc<RwLock<ItemEditor>> + Send + Sync + 'static,
@@ -92,7 +93,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
 }
 
 impl<ItemEditor> TerminalEditor for PTYListEditor<ItemEditor>
-where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
+where ItemEditor: Nested + ?Sized + Send + Sync + 'static
 {
     fn get_term_view(&self) -> OuterViewPort<dyn TerminalView> {
         self.editor
@@ -229,7 +230,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
 }
 
 impl<ItemEditor> TreeNav for PTYListEditor<ItemEditor>
-where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
+where ItemEditor: Nested + ?Sized + Send + Sync + 'static
 {
     fn get_cursor_warp(&self) -> TreeCursor {
         self.editor.get_cursor_warp()
@@ -249,7 +250,7 @@ where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
 }
 
 impl<ItemEditor> Diagnostics for PTYListEditor<ItemEditor>
-where ItemEditor: TerminalTreeEditor + Diagnostics + ?Sized + Send + Sync + 'static
+where ItemEditor: Nested + Diagnostics + ?Sized + Send + Sync + 'static
 {
     fn get_msg_port(&self) -> OuterViewPort<dyn SequenceView<Item = crate::diagnostics::Message>> {
         self.editor
@@ -273,8 +274,8 @@ where ItemEditor: TerminalTreeEditor + Diagnostics + ?Sized + Send + Sync + 'sta
     }
 }
 
-impl<ItemEditor> TerminalTreeEditor for PTYListEditor<ItemEditor>
-where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
+impl<ItemEditor> Nested for PTYListEditor<ItemEditor>
+where ItemEditor: Nested + ?Sized + Send + Sync + 'static
 {}
 
 use crate::{

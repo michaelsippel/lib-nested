@@ -10,8 +10,9 @@ use {
             TerminalAtom, TerminalEditor, TerminalEditorResult, TerminalEvent, TerminalStyle,
             TerminalView, make_label
         },
-        tree_nav::{TerminalTreeEditor, TreeCursor, TreeNav, TreeNavResult},
-        diagnostics::{Diagnostics, Message}
+        tree::{TreeCursor, TreeNav, TreeNavResult},
+        diagnostics::{Diagnostics, Message},
+        Nested
     },
     std::sync::Arc,
     std::sync::RwLock,
@@ -95,7 +96,7 @@ impl TerminalEditor for DigitEditor {
     }
 }
 
-impl TerminalTreeEditor for DigitEditor {}
+impl Nested for DigitEditor {}
 
 impl Diagnostics for DigitEditor {
     fn get_msg_port(&self) -> OuterViewPort<dyn SequenceView<Item = crate::diagnostics::Message>> {
@@ -205,5 +206,5 @@ impl TerminalEditor for PosIntEditor {
     }
 }
 
-impl TerminalTreeEditor for PosIntEditor {}
+impl Nested for PosIntEditor {}
 

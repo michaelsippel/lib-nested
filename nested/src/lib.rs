@@ -20,7 +20,7 @@ pub mod vec;
 pub mod product;
 pub mod sum;
 pub mod list;
-pub mod tree_nav;
+pub mod tree;
 pub mod diagnostics;
 
 // high-level types
@@ -35,3 +35,16 @@ pub mod terminal;
 pub fn magic_header() {
     eprintln!("<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>");
 }
+
+use crate::terminal::{TerminalEditor};
+use crate::diagnostics::{Diagnostics};
+use crate::tree::{TreeNav, TreeType};
+
+pub trait Nested
+    : TerminalEditor
+    + TreeNav
+//   + TreeType
+    + Diagnostics
+    + Send
+{}
+

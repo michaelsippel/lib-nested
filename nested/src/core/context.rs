@@ -4,9 +4,7 @@ use {
             type_term::{TypeDict, TypeTerm, TypeID},
             AnyOuterViewPort, OuterViewPort, View,
         },
-        tree_nav::{
-            TerminalTreeEditor
-        }
+        Nested
     },
     std::{
         collections::HashMap,
@@ -244,7 +242,7 @@ pub struct Context {
     objects: HashMap<String, Object>,
 
     /// editors
-    editor_ctors: HashMap<TypeID, Box<dyn Fn(&Self, TypeTerm) -> Option<Arc<RwLock<dyn TerminalTreeEditor>>> + Send + Sync>>,
+    editor_ctors: HashMap<TypeID, Box<dyn Fn(&Self, TypeTerm) -> Option<Arc<RwLock<dyn Nested>>> + Send + Sync>>,
 
     /// morphisms
     default_constructors: HashMap<TypeTerm, Box<dyn Fn() -> Object + Send + Sync>>,
@@ -281,7 +279,7 @@ impl Context {
         self.type_dict.type_term_to_str(&t)
     }
 
-    pub fn add_editor_ctor(&mut self, tn: &str, mk_editor: Box<dyn Fn(&Self, TypeTerm) -> Option<Arc<RwLock<dyn TerminalTreeEditor>>> + Send + Sync>) {
+    pub fn add_editor_ctor(&mut self, tn: &str, mk_editor: Box<dyn Fn(&Self, TypeTerm) -> Option<Arc<RwLock<dyn Nested>>> + Send + Sync>) {
         if let Some(tid) = self.type_dict.get_typeid(&tn.into()) {
             self.editor_ctors.insert(tid, mk_editor);
         } else {
@@ -289,7 +287,7 @@ impl Context {
         }
     }
 
-    pub fn make_editor(&self, type_term: TypeTerm) -> Option<Arc<RwLock<dyn TerminalTreeEditor>>> {
+    pub fn make_editor(&self, type_term: TypeTerm) -> Option<Arc<RwLock<dyn Nested>>> {
         if let TypeTerm::Type{ id, args } = type_term.clone() {
             let mk_editor = self.editor_ctors.get(&id)?;
             mk_editor(self, type_term)
@@ -297,7 +295,7 @@ impl Context {
             None
         }
     }
-    
+
     pub fn add_morphism(
         &mut self,
         morph_type: MorphismType,

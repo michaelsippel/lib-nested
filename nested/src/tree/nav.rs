@@ -1,5 +1,6 @@
 use {
     crate::list::ListCursorMode,
+    crate::tree::TreeCursor,
     cgmath::Vector2
 };
 
@@ -20,34 +21,6 @@ impl From<TreeNavResult> for TerminalEditorResult {
 }
  */
 
-#[derive(Clone, Eq, PartialEq)]
-pub struct TreeCursor {
-    pub leaf_mode: ListCursorMode,
-    pub tree_addr: Vec<isize>,
-}
-
-impl TreeCursor {
-    pub fn home() -> Self {
-        TreeCursor {
-            leaf_mode: ListCursorMode::Insert,
-            tree_addr: vec![0]
-        }
-    }
-
-    pub fn none() -> Self {
-        TreeCursor {
-            leaf_mode: ListCursorMode::Select,
-            tree_addr: vec![],
-        }
-    }
-}
-
-impl Default for TreeCursor {
-    fn default() -> Self {
-        TreeCursor::none()
-    }
-}
-
 pub trait TreeNav {
     /* CORE
     */
@@ -57,6 +30,10 @@ pub trait TreeNav {
 
     fn get_cursor_warp(&self) -> TreeCursor {
         TreeCursor::default()
+    }
+
+    fn get_max_depth(&self) -> usize {
+        0
     }
 
     fn goby(&mut self, direction: Vector2<isize>) -> TreeNavResult {
@@ -148,9 +125,4 @@ pub trait TreeNav {
         }
     }
 }
-
-use crate::terminal::{TerminalEditor};
-use crate::diagnostics::{Diagnostics};
-
-pub trait TerminalTreeEditor : TerminalEditor + TreeNav + Diagnostics + Send {}
 

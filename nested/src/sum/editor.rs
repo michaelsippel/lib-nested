@@ -12,9 +12,10 @@ use {
         sequence::{SequenceView},
         make_editor::make_editor,
 
-        tree_nav::{TreeNav, TreeCursor, TerminalTreeEditor, TreeNavResult},
+        tree::{TreeNav, TreeCursor, TreeNavResult},
         diagnostics::{Diagnostics, Message},
-        terminal::{TerminalStyle}
+        terminal::{TerminalStyle},
+        Nested
     },
     cgmath::{Vector2, Point2},
     std::sync::{Arc, RwLock},
@@ -24,7 +25,7 @@ use {
 
 pub struct SumEditor {
     cur: usize,
-    editors: Vec< Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>> >,
+    editors: Vec< Arc<RwLock<dyn Nested + Send + Sync>> >,
 
     port: ViewPort< dyn TerminalView >,
     diag_port: OuterViewPort< dyn SequenceView<Item = Message> >
@@ -32,7 +33,7 @@ pub struct SumEditor {
 
 impl SumEditor {
     pub fn new(
-        editors: Vec< Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>> >
+        editors: Vec< Arc<RwLock<dyn Nested + Send + Sync>> >
     ) -> Self {
         let port = ViewPort::new();
         let mut diag_buf = VecBuffer::new();
@@ -44,11 +45,12 @@ impl SumEditor {
             diag_port: diag_buf.get_port().to_sequence()
         }
     }
-    
+
     pub fn select(&mut self, idx: usize) {
         self.cur = idx;
         let tv = self.editors[ self.cur ].read().unwrap().get_term_view();
         tv.add_observer( self.port.get_cast() );
+        self.port.update_hooks.write().unwrap().clear();
         self.port.add_update_hook( Arc::new(tv.0.clone()) );
         self.port.set_view( Some(tv.get_view_arc()) );
     }
@@ -81,6 +83,9 @@ impl TerminalEditor for SumEditor {
         match event {
             TerminalEvent::Input( termion::event::Event::Key(Key::Ctrl('x')) ) => {
                 self.select( (self.cur + 1) % self.editors.len() );
+                if self.editors[ self.cur ].read().unwrap().get_cursor().tree_addr.len() == 0 {
+                    self.dn();
+                }
                 TerminalEditorResult::Continue
             },
             event => {
@@ -96,6 +101,6 @@ impl Diagnostics for SumEditor {
     }
 }
 
-impl TerminalTreeEditor for SumEditor {}
+impl Nested for SumEditor {}
 
 

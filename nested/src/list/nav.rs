@@ -12,9 +12,10 @@ use {
             make_label, TerminalEditor, TerminalEditorResult, TerminalEvent, TerminalStyle,
             TerminalView,
         },
-        tree_nav::{TerminalTreeEditor, TreeCursor, TreeNav, TreeNavResult},
+        tree::{TreeCursor, TreeNav, TreeNavResult},
         vec::VecBuffer,
-        color::{bg_style_from_depth, fg_style_from_depth}
+        color::{bg_style_from_depth, fg_style_from_depth},
+        Nested
     },
     std::sync::{Arc, RwLock},
     termion::event::{Event, Key},
@@ -22,7 +23,7 @@ use {
 };
 
 impl<ItemEditor> TreeNav for ListEditor<ItemEditor>
-where ItemEditor: TerminalTreeEditor + ?Sized + Send + Sync + 'static
+where ItemEditor: Nested + ?Sized + Send + Sync + 'static
 {
     fn get_cursor_warp(&self) -> TreeCursor {
         let cur = self.cursor.get();

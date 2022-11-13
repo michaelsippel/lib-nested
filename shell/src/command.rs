@@ -16,30 +16,32 @@ use {
         terminal::{
             TerminalAtom, TerminalEditor, TerminalEditorResult, TerminalEvent, TerminalStyle, TerminalView, make_label
         },
-        tree_nav::{TreeCursor, TreeNav, TreeNavResult, TerminalTreeEditor},
+        tree::{TreeCursor, TreeNav, TreeNavResult},
         diagnostics::{Diagnostics},
         make_editor::make_editor,
-        product::ProductEditor
+        product::ProductEditor,
+        sum::SumEditor,
+        Nested
     }
 };
 
 trait Action {
-    fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>;
+    fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn Nested + Send + Sync>>;
 }
 
 pub struct ActCd {}
 impl Action for ActCd {
-    fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>> {
+    fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn Nested + Send + Sync>> {
         let depth = 1;
         Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
                              .with_n(Point2::new(0, 0), vec![ ctx.read().unwrap().type_term_from_str("( Path )").unwrap() ] )
-        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+        )) as Arc<RwLock<dyn Nested + Send + Sync>>
     }
 }
 
 pub struct ActLs {}
 impl Action for ActLs {
-    fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>> {
+    fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn Nested + Send + Sync>> {
         let depth = 1;
         Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
                              .with_t(Point2::new(1, 0), " Files")
@@ -47,24 +49,39 @@ impl Action for ActLs {
                              .with_t(Point2::new(1, 1), " Options")
                              .with_n(Point2::new(0, 1), vec![ ctx.read().unwrap().type_term_from_str("( List String )").unwrap() ] )
 
-        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+        )) as Arc<RwLock<dyn Nested + Send + Sync>>
     }
 }
 
 pub struct ActEcho {}
 impl Action for ActEcho {
-    fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>> {
+    fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn Nested + Send + Sync>> {
         let depth = 1;
-        Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
+        
+        let a = Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
                              .with_n(Point2::new(0, 0), vec![ ctx.read().unwrap().type_term_from_str("( String )").unwrap() ] )
 
-        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+        )) as Arc<RwLock<dyn Nested + Send + Sync>>;
+
+        let b = Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
+                             .with_n(Point2::new(0, 0), vec![ ctx.read().unwrap().type_term_from_str("( PosInt 16 BigEndian )").unwrap() ] )
+
+        )) as Arc<RwLock<dyn Nested + Send + Sync>>;
+
+        let mut x = Arc::new(RwLock::new( SumEditor::new(
+            vec![
+                a, b
+            ]
+        )  ));
+
+        x.write().unwrap().select(0);
+        x
     }
 }
 
 pub struct ActCp {}
 impl Action for ActCp {
-    fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>> {
+    fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn Nested + Send + Sync>> {
         let depth = 1;
         Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
                              .with_t(Point2::new(1, 1), " Source")
@@ -73,13 +90,13 @@ impl Action for ActCp {
                              .with_n(Point2::new(0, 2), vec![ ctx.read().unwrap().type_term_from_str("( Path )").unwrap() ] )
                              .with_t(Point2::new(1, 3), " Options")
                              .with_n(Point2::new(0, 3), vec![ ctx.read().unwrap().type_term_from_str("( List Symbol )").unwrap() ] )
-        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+        )) as Arc<RwLock<dyn Nested + Send + Sync>>
     }
 }
 
 pub struct ActNum {}
 impl Action for ActNum {
-    fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>> {
+    fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn Nested + Send + Sync>> {
         let depth = 1;
         Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
                              .with_t(Point2::new(1, 1), " Value")
@@ -87,7 +104,7 @@ impl Action for ActNum {
                              .with_t(Point2::new(1, 2), " Radix")
                              .with_n(Point2::new(0, 2), vec![ ctx.read().unwrap().type_term_from_str("( PosInt 10 BigEndian )").unwrap() ] )
 
-    )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+    )) as Arc<RwLock<dyn Nested + Send + Sync>>
 
 //        Arc::new(RwLock::new(nested::integer::PosIntEditor::new(10)))
     }
@@ -95,7 +112,7 @@ impl Action for ActNum {
 
 pub struct ActColor {}
 impl Action for ActColor {
-    fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>> {
+    fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn Nested + Send + Sync>> {
         let depth = 1;
         Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
                              .with_t(Point2::new(1, 1), " RGB")
@@ -104,19 +121,19 @@ impl Action for ActColor {
                              .with_n(Point2::new(0, 2), vec![ ctx.read().unwrap().type_term_from_str("( RGB )").unwrap() ] )
                              .with_t(Point2::new(1, 3), " HSL")
                              .with_n(Point2::new(0, 3), vec![ ctx.read().unwrap().type_term_from_str("( RGB )").unwrap() ] )
-        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+        )) as Arc<RwLock<dyn Nested + Send + Sync>>
     }
 }
 
 pub struct ActLet {}
 impl Action for ActLet {
-    fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>> {
+    fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn Nested + Send + Sync>> {
         let depth = 1;
         Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
                              .with_n(Point2::new(0, 0), vec![ ctx.read().unwrap().type_term_from_str("( Symbol )").unwrap() ] )
                              .with_t(Point2::new(1, 0), " := ")
                              .with_n(Point2::new(2, 0), vec![ ctx.read().unwrap().type_term_from_str("( PosInt 10 BigEndian )").unwrap() ] )
-        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+        )) as Arc<RwLock<dyn Nested + Send + Sync>>
     }
 }
 
@@ -127,7 +144,7 @@ pub struct Commander {
     valid: Arc<RwLock<bool>>,
     confirmed: bool,
     symbol_editor: PTYListEditor<CharEditor>,
-    cmd_editor: Option<Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>>,
+    cmd_editor: Option<Arc<RwLock<dyn Nested + Send + Sync>>>,
 
     view_elements: VecBuffer<OuterViewPort<dyn TerminalView>>,
     out_port: OuterViewPort<dyn TerminalView>,
@@ -209,9 +226,12 @@ impl TerminalEditor for Commander {
         if let (Some(cmd_editor), true) = (self.cmd_editor.as_ref(), self.confirmed) {
             match event {
                 TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {
-                    if cmd_editor.write().unwrap().nexd() == TreeNavResult::Exit {
+                    let mut c = cmd_editor.write().unwrap();
+                    if let TerminalEditorResult::Exit = c.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Char('\n')))) {
+
                         // run
-                        cmd_editor.write().unwrap().goto(TreeCursor::none());
+                        c.goto(TreeCursor::none());
+                        c.up();
 
                         TerminalEditorResult::Exit
                     } else {
@@ -245,7 +265,7 @@ impl TerminalEditor for Commander {
                         self.m_buf.clear();
                         self.m_buf.push(b.get_port().to_sequence());
                     }
-
+                    
                     TerminalEditorResult::Continue
                 }
 
@@ -323,5 +343,5 @@ impl TreeNav for Commander {
     }
 }
 
-impl TerminalTreeEditor for Commander {}
+impl Nested for Commander {}
 

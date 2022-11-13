@@ -1,26 +1,60 @@
 
 use {
     crate::{
-        core::{TypeLadder, Context},
-        terminal::{TerminalView},
-        tree_nav::{TerminalTreeEditor},
+        core::{TypeLadder, Context, OuterViewPort},
+        terminal::{TerminalView, TerminalEditor, TerminalEvent, TerminalEditorResult, make_label},
+        tree::{TreeNav},
         integer::PosIntEditor,
         list::{ListEditor, PTYListEditor},
         sequence::{decorator::{SeqDecorStyle}},
         product::editor::ProductEditor,
-        char_editor::CharEditor
+        char_editor::CharEditor,
+        diagnostics::Diagnostics,
+        Nested
     },
     cgmath::{Vector2, Point2},
     std::sync::{Arc, RwLock},
 };
 
-pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>> {
+enum RhsNode {
+    Sum (
+        Arc<RwLock< PTYListEditor< RhsNode > >>
+    ),
+    Product (
+        Arc<RwLock< PTYListEditor< RhsNode > >>
+    ),
+    String(
+        Arc<RwLock< PTYListEditor< CharEditor > >>
+    )
+}
+
+impl TreeNav for RhsNode {}
+
+impl TerminalEditor for RhsNode {
+    fn get_term_view(&self) -> OuterViewPort<dyn TerminalView> {
+        make_label("todo")
+    }
+
+    fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
+        TerminalEditorResult::Continue
+    }
+}
+
+impl Diagnostics for RhsNode {}
+impl Nested for RhsNode {}
+
+struct GrammarRuleEditor {
+    lhs: Arc<RwLock<PTYListEditor<CharEditor>>>,
+    rhs: Arc<RwLock<PTYListEditor<RhsNode>>>
+}
+
+pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> Arc<RwLock<dyn Nested + Send + Sync>> {
     let c = ctx.read().unwrap();
     if t[0] == c.type_term_from_str("( PosInt 16 BigEndian )").unwrap() {
-        Arc::new(RwLock::new(PosIntEditor::new(16))) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+        Arc::new(RwLock::new(PosIntEditor::new(16))) as Arc<RwLock<dyn Nested + Send + Sync>>
 
     } else if t[0] == c.type_term_from_str("( PosInt 10 BigEndian )").unwrap() {
-        Arc::new(RwLock::new(PosIntEditor::new(10))) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+        Arc::new(RwLock::new(PosIntEditor::new(10))) as Arc<RwLock<dyn Nested + Send + Sync>>
 
     } else if t[0] == c.type_term_from_str("( String )").unwrap() {
         Arc::new(RwLock::new(
@@ -64,7 +98,7 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
                 '"',
                 depth
             )
-        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+        )) as Arc<RwLock<dyn Nested + Send + Sync>>
     } else if t[0] == c.type_term_from_str("( List Symbol )").unwrap() {
         Arc::new(RwLock::new(
             PTYListEditor::new(
@@ -83,7 +117,7 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
                 ' ',
                 depth
             )
-        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+        )) as Arc<RwLock<dyn Nested + Send + Sync>>
 
     } else if t[0] == c.type_term_from_str("( List Char )").unwrap() {
         Arc::new(RwLock::new(
@@ -95,7 +129,7 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
                 '\n',
                 depth+1
             )
-        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+        )) as Arc<RwLock<dyn Nested + Send + Sync>>
 
     } else if t[0] == c.type_term_from_str("( List ℕ )").unwrap() {
         Arc::new(RwLock::new(
@@ -107,7 +141,7 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
                 ',',
                 depth
             )
-        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+        )) as Arc<RwLock<dyn Nested + Send + Sync>>
 
     } else if t[0] == c.type_term_from_str("( Path )").unwrap() {
         Arc::new(RwLock::new(PTYListEditor::new(
@@ -126,7 +160,7 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
             SeqDecorStyle::Path,
             '/',
             depth
-        ))) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+        ))) as Arc<RwLock<dyn Nested + Send + Sync>>
 
     } else if t[0] == c.type_term_from_str("( List Path )").unwrap() {
         Arc::new(RwLock::new(
@@ -146,11 +180,11 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
                 ',',
                 depth
             )
-        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+        )) as Arc<RwLock<dyn Nested + Send + Sync>>
 
     } else if t[0] == c.type_term_from_str("( List RGB )").unwrap() {
         Arc::new(RwLock::new(
-            PTYListEditor::<dyn TerminalTreeEditor + Send +Sync>::new(
+            PTYListEditor::<dyn Nested + Send +Sync>::new(
                 {
                     let d = depth+1;
                     let ctx = ctx.clone();
@@ -162,7 +196,7 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
                 ',',
                 depth
             )
-        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+        )) as Arc<RwLock<dyn Nested + Send + Sync>>
 
     } else if t[0] == c.type_term_from_str("( RGB )").unwrap() {
         Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
@@ -174,7 +208,7 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
                              .with_t(Point2::new(1, 3), "b: ")
                              .with_n(Point2::new(2, 3), vec![ ctx.read().unwrap().type_term_from_str("( PosInt 16 BigEndian )").unwrap() ] )
                              .with_t(Point2::new(0, 4), "}   ")
-        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+        )) as Arc<RwLock<dyn Nested + Send + Sync>>
 
     } else if t[0] == c.type_term_from_str("( Vec3i )").unwrap() {
         Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
@@ -186,11 +220,11 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
                              .with_t(Point2::new(1, 3), "z: ")
                              .with_n(Point2::new(2, 3), vec![ ctx.read().unwrap().type_term_from_str("( PosInt 10 BigEndian )").unwrap() ] )
                              .with_t(Point2::new(0, 4), "}")
-        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+        )) as Arc<RwLock<dyn Nested + Send + Sync>>
 
     } else if t[0] == c.type_term_from_str("( Json )").unwrap() {
         Arc::new(RwLock::new(
-            PTYListEditor::<dyn TerminalTreeEditor + Send + Sync>::new(
+            PTYListEditor::<dyn Nested + Send + Sync>::new(
                 Box::new({
                     let ctx = ctx.clone();
                     move || {
@@ -198,18 +232,18 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
                                              .with_n(Point2::new(0, 0), vec![ ctx.read().unwrap().type_term_from_str("( String )").unwrap() ] )
                                              .with_t(Point2::new(1, 0), ": ")
                                              .with_n(Point2::new(2, 0), vec![ ctx.read().unwrap().type_term_from_str("( Json )").unwrap() ] )
-                        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+                        )) as Arc<RwLock<dyn Nested + Send + Sync>>
                     }
                 }),
                 SeqDecorStyle::VerticalSexpr,
                 '\n',
                 depth
             )
-        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+        )) as Arc<RwLock<dyn Nested + Send + Sync>>
             
     } else if t[0] == c.type_term_from_str("( List Term )").unwrap() {
         Arc::new(RwLock::new(
-            PTYListEditor::<dyn TerminalTreeEditor + Send + Sync>::new(
+            PTYListEditor::<dyn Nested + Send + Sync>::new(
                 Box::new({
                     let ctx = ctx.clone();
                     move || {
@@ -220,7 +254,7 @@ pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> A
                 '\n',
                 depth
             )
-        )) as Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>
+        )) as Arc<RwLock<dyn Nested + Send + Sync>>
 
     } else { // else: term
         Arc::new(RwLock::new(

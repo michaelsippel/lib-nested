@@ -6,8 +6,8 @@ use {
             make_label
         },
         list::{ListCursorMode},
-        tree_nav::{TerminalTreeEditor},
-        color::{bg_style_from_depth, fg_style_from_depth}
+        color::{bg_style_from_depth, fg_style_from_depth},
+        Nested
     },
     std::{sync::{Arc, RwLock}, ops::{Deref, DerefMut}},
     termion::event::{Event, Key},
@@ -18,7 +18,7 @@ pub enum ProductEditorSegment {
     T( String, usize ),
     N {
         t: TypeLadder,
-        editor: Option<Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>>,
+        editor: Option<Arc<RwLock<dyn Nested + Send + Sync>>>,
         ed_depth: usize,
         cur_depth: usize,
         cur_dist: isize

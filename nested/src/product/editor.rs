@@ -12,9 +12,11 @@ use {
         sequence::{SequenceView},
         make_editor::make_editor,
 
-        tree_nav::{TreeNav, TerminalTreeEditor, TreeNavResult},
+        tree::{TreeNav, TreeNavResult},
         diagnostics::{Diagnostics, Message},
-        terminal::{TerminalStyle}
+        terminal::{TerminalStyle},
+
+        Nested
     },
     cgmath::{Vector2, Point2},
     std::sync::{Arc, RwLock},
@@ -111,7 +113,7 @@ impl ProductEditor {
         Some(self.get_editor_segment_mut(self.cursor?))
     }
 
-    pub fn get_editor(&self, idx: isize) -> Option<Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>> {
+    pub fn get_editor(&self, idx: isize) -> Option<Arc<RwLock<dyn Nested + Send + Sync>>> {
         if let ProductEditorSegment::N{ t: _, editor, ed_depth: _, cur_depth: _, cur_dist: _ } = self.get_editor_segment(idx) {
             editor
         } else {
@@ -119,7 +121,7 @@ impl ProductEditor {
         }
     }
 
-    pub fn get_cur_editor(&self) -> Option<Arc<RwLock<dyn TerminalTreeEditor + Send + Sync>>> {
+    pub fn get_cur_editor(&self) -> Option<Arc<RwLock<dyn Nested + Send + Sync>>> {
         self.get_editor(self.cursor?)
     }
 
