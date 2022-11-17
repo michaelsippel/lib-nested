@@ -18,7 +18,6 @@ use {
         },
         tree::{TreeCursor, TreeNav, TreeNavResult},
         diagnostics::{Diagnostics},
-        make_editor::make_editor,
         product::ProductEditor,
         sum::SumEditor,
         Nested
@@ -227,11 +226,9 @@ impl TerminalEditor for Commander {
             match event {
                 TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {
                     let mut c = cmd_editor.write().unwrap();
-                    if let TerminalEditorResult::Exit = c.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Char('\n')))) {
-
+                    if c.nexd() == TreeNavResult::Exit {
                         // run
                         c.goto(TreeCursor::none());
-                        c.up();
 
                         TerminalEditorResult::Exit
                     } else {

@@ -16,20 +16,22 @@ use {
 
 #[derive(Clone)]
 pub struct ReprTree {
+    type_tag: TypeTerm,
     port: Option<AnyOuterViewPort>,
     branches: HashMap<TypeTerm, Arc<RwLock<ReprTree>>>,
 }
 
 impl ReprTree {
-    pub fn new() -> Self {
+    pub fn new(type_tag: TypeTerm) -> Self {
         ReprTree {
+            type_tag,
             port: None,
             branches: HashMap::new(),
         }
     }
 
-    pub fn new_leaf(port: AnyOuterViewPort) -> Arc<RwLock<Self>> {
-        let mut tree = ReprTree::new();
+    pub fn new_leaf(type_tag: TypeTerm, port: AnyOuterViewPort) -> Arc<RwLock<Self>> {
+        let mut tree = ReprTree::new(type_tag);
         tree.insert_leaf(vec![].into_iter(), port);
         Arc::new(RwLock::new(tree))
     }
@@ -47,7 +49,7 @@ impl ReprTree {
             if let Some(next_repr) = self.branches.get(&type_term) {
                 next_repr.write().unwrap().insert_leaf(type_ladder, port);
             } else {
-                let mut next_repr = ReprTree::new();
+                let mut next_repr = ReprTree::new(type_term.clone());
                 next_repr.insert_leaf(type_ladder, port);
                 self.insert_branch(type_term, Arc::new(RwLock::new(next_repr)));
             }
@@ -55,48 +57,34 @@ impl ReprTree {
             self.port = Some(port);
         }
     }
-}
 
-//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+    //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-#[derive(Clone)]
-pub struct Object {
-    pub type_tag: TypeTerm,
-    pub repr: Arc<RwLock<ReprTree>>,
-}
-
-impl Object {
     pub fn get_port<V: View + ?Sized + 'static>(&self) -> Option<OuterViewPort<V>>
     where
         V::Msg: Clone,
     {
         Some(
-            self.repr
-                .read()
-                .unwrap()
-                .port
+            self.port
                 .clone()?
                 .downcast::<V>()
                 .ok()
-                .unwrap(),
+                .unwrap()
         )
     }
 
-    pub fn downcast(&self, dst_type: TypeTerm) -> Option<Object> {
-        if let Some(repr) = self.repr.read().unwrap().branches.get(&dst_type) {
-            Some(Object {
-                type_tag: dst_type,
-                repr: repr.clone(),
-            })
-        } else {
-            None
-        }
+    pub fn downcast(&self, dst_type: &TypeTerm) -> Option<Arc<RwLock<ReprTree>>> {
+        self.branches.get(dst_type).cloned()
     }
 
-    fn downcast_ladder(&self, repr_ladder: impl Iterator<Item = TypeTerm>) -> Option<Object> {
-        repr_ladder.fold(Some(self.clone()), |s, t| s?.downcast(t.clone()))
+    pub fn downcast_ladder(&self, mut repr_ladder: impl Iterator<Item = TypeTerm>) -> Option<Arc<RwLock<ReprTree>>> {
+        let first = repr_ladder.next()?;
+        repr_ladder.fold(
+            self.downcast(&first),
+            |s, t| s?.read().unwrap().downcast(&t))
     }
 
+/*
     pub fn add_iso_repr(
         &self,
         type_ladder: impl Iterator<Item = TypeTerm>,
@@ -154,7 +142,7 @@ impl Object {
         morphism_constructors: &HashMap<MorphismType, Box<dyn Fn(Object) -> Object>>,
     ) {
         let mut cur_type = self.type_tag.clone();
-        let mut cur_repr = self.repr.clone();
+        let mut cur_repr = self.repr.clone();   
 
         for dst_type in type_ladder {
             if let Some(next_repr) = self.repr.read().unwrap().branches.get(&dst_type) {
@@ -198,7 +186,9 @@ impl Object {
         _morphism_constructors: &HashMap<MorphismType, Box<dyn Fn(Object) -> Object>>,
     ) {
         // todo
-    }
+        
+}
+    */
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
@@ -237,16 +227,16 @@ pub struct MorphismType {
 pub struct Context {
     /// assigns a name to every type
     type_dict: TypeDict,
-    
+
     /// objects
-    objects: HashMap<String, Object>,
+    objects: HashMap<String, Arc<RwLock<ReprTree>>>,
 
     /// editors
-    editor_ctors: HashMap<TypeID, Box<dyn Fn(&Self, TypeTerm) -> Option<Arc<RwLock<dyn Nested>>> + Send + Sync>>,
+    editor_ctors: HashMap<TypeID, Box<dyn Fn(&Self, TypeTerm, usize) -> Option<Arc<RwLock<dyn Nested+ Send + Sync>>> + Send + Sync>>,
 
     /// morphisms
-    default_constructors: HashMap<TypeTerm, Box<dyn Fn() -> Object + Send + Sync>>,
-    morphism_constructors: HashMap<MorphismType, Box<dyn Fn(Object) -> Object + Send + Sync>>,
+    default_constructors: HashMap<TypeTerm, Box<dyn Fn() -> Arc<RwLock<ReprTree>> + Send + Sync>>,
+    morphism_constructors: HashMap<MorphismType, Box<dyn Fn(Arc<RwLock<ReprTree>>) -> Arc<RwLock<ReprTree>> + Send + Sync>>,
 
     /// recursion
     parent: Option<Arc<RwLock<Context>>>,
@@ -279,7 +269,7 @@ impl Context {
         self.type_dict.type_term_to_str(&t)
     }
 
-    pub fn add_editor_ctor(&mut self, tn: &str, mk_editor: Box<dyn Fn(&Self, TypeTerm) -> Option<Arc<RwLock<dyn Nested>>> + Send + Sync>) {
+    pub fn add_editor_ctor(&mut self, tn: &str, mk_editor: Box<dyn Fn(&Self, TypeTerm, usize) -> Option<Arc<RwLock<dyn Nested + Send + Sync>>> + Send + Sync>) {
         if let Some(tid) = self.type_dict.get_typeid(&tn.into()) {
             self.editor_ctors.insert(tid, mk_editor);
         } else {
@@ -287,10 +277,10 @@ impl Context {
         }
     }
 
-    pub fn make_editor(&self, type_term: TypeTerm) -> Option<Arc<RwLock<dyn Nested>>> {
+    pub fn make_editor(&self, type_term: TypeTerm, depth: usize) -> Option<Arc<RwLock<dyn Nested + Send + Sync>>> {
         if let TypeTerm::Type{ id, args } = type_term.clone() {
             let mk_editor = self.editor_ctors.get(&id)?;
-            mk_editor(self, type_term)
+            mk_editor(self, type_term, depth)
         } else {
             None
         }
@@ -299,7 +289,7 @@ impl Context {
     pub fn add_morphism(
         &mut self,
         morph_type: MorphismType,
-        morph_fn: Box<dyn Fn(Object) -> Object + Send + Sync>,
+        morph_fn: Box<dyn Fn(Arc<RwLock<ReprTree>>) -> Arc<RwLock<ReprTree>> + Send + Sync>,
     ) {
         self.morphism_constructors.insert(morph_type, morph_fn);
     }
@@ -313,15 +303,12 @@ impl Context {
             if let Some(ctor) = self.default_constructors.get(&type_tag) {
                 ctor()
             } else {
-                Object {
-                    type_tag,
-                    repr: Arc::new(RwLock::new(ReprTree::new())),
-                }
+                Arc::new(RwLock::new(ReprTree::new(type_tag)))
             },
         );
     }
 
-    pub fn get_obj(&self, name: &String) -> Option<Object> {
+    pub fn get_obj(&self, name: &String) -> Option<Arc<RwLock<ReprTree>>> {
         if let Some(obj) = self.objects.get(name) {
             Some(obj.clone())
         } else if let Some(parent) = self.parent.as_ref() {
@@ -331,6 +318,7 @@ impl Context {
         }
     }
 
+/*
     pub fn get_obj_port<'a, V: View + ?Sized + 'static>(
         &self,
         name: &str,
@@ -371,10 +359,7 @@ impl Context {
         }) {
             ctor(old_obj.clone())
         } else {
-            Object {
-                type_tag: dst_type,
-                repr: Arc::new(RwLock::new(ReprTree::new())),
-            }
+            Arc::new(RwLock::new(ReprTree::new(dst_type)))
         };
 
         new_obj
@@ -409,7 +394,8 @@ impl Context {
             */
             None
         }
-    }
+}
+    */
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>

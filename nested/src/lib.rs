@@ -46,5 +46,6 @@ pub trait Nested
 //   + TreeType
     + Diagnostics
     + Send
+    + Sync
 {}
 

@@ -1,6 +1,6 @@
 use {
     crate::{
-        core::{OuterViewPort, ViewPort},
+        core::{OuterViewPort, ViewPort, TypeTerm},
         list::{
             ListCursor, ListCursorMode,
             ListSegment, ListSegmentSequence,
@@ -33,7 +33,7 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
     style: SeqDecorStyle,
     depth: usize,
 
-    port: ViewPort<dyn TerminalView>
+    port: OuterViewPort<dyn TerminalView>
 }
 
 impl<ItemEditor> PTYListEditor<ItemEditor>
@@ -45,14 +45,7 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
         split_char: char,
         depth: usize
     ) -> Self {
-        let port = ViewPort::new();
-        PTYListEditor {
-            editor: ListEditor::new(make_item_editor, depth),
-            style,
-            depth,
-            split_char,
-            port
-        }
+        Self::from_editor(ListEditor::new(make_item_editor, depth), style, split_char, depth)
     }
 
     pub fn from_editor(
@@ -61,7 +54,10 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
         split_char: char,
         depth: usize
     ) -> Self {
-        let port = ViewPort::new();
+        let port = editor
+            .get_seg_seq_view()
+            .pty_decorate(style, depth);
+
         PTYListEditor {
             editor,
             split_char,
@@ -96,9 +92,7 @@ impl<ItemEditor> TerminalEditor for PTYListEditor<ItemEditor>
 where ItemEditor: Nested + ?Sized + Send + Sync + 'static
 {
     fn get_term_view(&self) -> OuterViewPort<dyn TerminalView> {
-        self.editor
-            .get_seg_seq_view()
-            .pty_decorate(self.style, self.depth)
+        self.port.clone()
     }
 
     fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
@@ -250,7 +244,7 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
 }
 
 impl<ItemEditor> Diagnostics for PTYListEditor<ItemEditor>
-where ItemEditor: Nested + Diagnostics + ?Sized + Send + Sync + 'static
+where ItemEditor: Nested + ?Sized + Send + Sync + 'static
 {
     fn get_msg_port(&self) -> OuterViewPort<dyn SequenceView<Item = crate::diagnostics::Message>> {
         self.editor

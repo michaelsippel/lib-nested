@@ -3,7 +3,6 @@ use {
         list::ListCursorMode,
         tree::{TreeNav, TreeNavResult, TreeCursor},
         product::{segment::ProductEditorSegment, ProductEditor},
-        make_editor::{make_editor},
         Nested
     },
     cgmath::{Point2, Vector2},
@@ -66,14 +65,13 @@ impl TreeNav for ProductEditor {
 
         if c.tree_addr.len() > 0 {
             self.cursor = Some(crate::modulo(c.tree_addr.remove(0), self.n_indices.len() as isize));
-
             if let Some(mut element) = self.get_cur_segment_mut() {
                 if let Some(ProductEditorSegment::N{ t, editor, ed_depth, cur_depth, cur_dist:_ }) = element.deref_mut() {
                     if let Some(e) = editor {
                         e.write().unwrap().goto(c.clone());
                     } else if c.tree_addr.len() > 0 {
                         // create editor
-                        let e = make_editor(self.ctx.clone(), t, *ed_depth+1);
+                        let e = self.ctx.read().unwrap().make_editor(t[0].clone(), *ed_depth+1).unwrap();
                         *editor = Some(e.clone());
                         let mut e = e.write().unwrap();
                         e.goto(c.clone());
@@ -91,6 +89,10 @@ impl TreeNav for ProductEditor {
 
             TreeNavResult::Continue
         } else {
+            if let Some(mut ed) = self.get_cur_editor() {
+                ed.write().unwrap().goto(TreeCursor::none());
+            }
+
             self.cursor = None;
 
             if let Some(i) = old_cursor {
@@ -127,7 +129,8 @@ impl TreeNav for ProductEditor {
                                 e.goby(direction);
                             } else {
                                 // create editor
-                                let e = make_editor(self.ctx.clone(), t, *ed_depth+1);
+
+                                let e = self.ctx.read().unwrap().make_editor(t[0].clone(), *ed_depth+1).unwrap();
                                 *editor = Some(e.clone());
                                 let mut e = e.write().unwrap();
                                 e.goby(direction);

@@ -25,6 +25,9 @@ use {
         tree::{TreeNav, TreeCursor, TreeNavResult},
         vec::VecBuffer,
         integer::{PosIntEditor},
+        char_editor::CharEditor,
+        product::ProductEditor,
+        sum::SumEditor,
         diagnostics::{Diagnostics},
         Nested
     },
@@ -50,15 +53,9 @@ async fn main() {
     });
 
     // Type Context //
-    let mut ctx = Arc::new(RwLock::new(Context::new()));
-    for tn in vec![
-        "MachineWord", "MachineInt", "MachineSyllab", "Bits",
-        "Vec", "Stream", "Json",
-        "Sequence", "AsciiString", "UTF-8-String", "Char", "String", "Symbol",
-        "PosInt", "Digit", "LittleEndian", "BigEndian",
-        "DiffStream", "ℕ", "List", "Path", "Term", "RGB", "Vec3i"
-    ] { ctx.write().unwrap().add_typename(tn.into()); }
-
+    let ctx = nested::make_editor::init_ctx();
+    
+    let c = ctx.clone();
     let mut process_list_editor =
         PTYListEditor::new(
             Box::new( move || {
@@ -215,7 +212,7 @@ async fn main() {
             }
 
             let ev = term.next_event().await;
-
+ 
             if let TerminalEvent::Resize(new_size) = ev {
                 cur_size.set(new_size);
                 term_port.inner().get_broadcast().notify(&IndexArea::Full);
@@ -292,3 +289,4 @@ async fn main() {
 
     term_writer.show().await.expect("output error!");
 }
+

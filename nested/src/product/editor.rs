@@ -10,12 +10,9 @@ use {
         list::ListCursorMode,
         product::{segment::ProductEditorSegment},
         sequence::{SequenceView},
-        make_editor::make_editor,
-
         tree::{TreeNav, TreeNavResult},
         diagnostics::{Diagnostics, Message},
         terminal::{TerminalStyle},
-
         Nested
     },
     cgmath::{Vector2, Point2},
@@ -139,7 +136,6 @@ impl ProductEditor {
                 if cur.tree_addr[0] == idx {
                     *cur_depth = cur.tree_addr.len();
                 }
-
                 
                 *cur_dist = cur.tree_addr[0] - idx
             } else {
@@ -221,7 +217,7 @@ impl TerminalEditor for ProductEditor {
                         }
                     }
                 } else {
-                    let e = make_editor(self.ctx.clone(), t, *ed_depth+1);
+                    let e = self.ctx.read().unwrap().make_editor(t[0].clone(), *ed_depth+1).unwrap();
                     *editor = Some(e.clone());
                     update_segment = true;
 

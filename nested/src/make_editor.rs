@@ -1,13 +1,14 @@
 
 use {
     crate::{
-        core::{TypeLadder, Context, OuterViewPort},
+        core::{TypeTerm, TypeLadder, Context, OuterViewPort},
         terminal::{TerminalView, TerminalEditor, TerminalEvent, TerminalEditorResult, make_label},
         tree::{TreeNav},
         integer::PosIntEditor,
         list::{ListEditor, PTYListEditor},
         sequence::{decorator::{SeqDecorStyle}},
         product::editor::ProductEditor,
+        sum::SumEditor,
         char_editor::CharEditor,
         diagnostics::Diagnostics,
         Nested
@@ -48,226 +49,197 @@ struct GrammarRuleEditor {
     rhs: Arc<RwLock<PTYListEditor<RhsNode>>>
 }
 
-pub fn make_editor(ctx: Arc<RwLock<Context>>, t: &TypeLadder, depth: usize) -> Arc<RwLock<dyn Nested + Send + Sync>> {
-    let c = ctx.read().unwrap();
-    if t[0] == c.type_term_from_str("( PosInt 16 BigEndian )").unwrap() {
-        Arc::new(RwLock::new(PosIntEditor::new(16))) as Arc<RwLock<dyn Nested + Send + Sync>>
 
-    } else if t[0] == c.type_term_from_str("( PosInt 10 BigEndian )").unwrap() {
-        Arc::new(RwLock::new(PosIntEditor::new(10))) as Arc<RwLock<dyn Nested + Send + Sync>>
+pub fn init_ctx() -> Arc<RwLock<Context>> {
+        let mut ctx = Arc::new(RwLock::new(Context::new()));
+    for tn in vec![
+        "MachineWord", "MachineInt", "MachineSyllab", "Bits",
+        "Vec", "Stream", "Json",
+        "Sequence", "AsciiString", "UTF-8-String", "Char", "String", "Symbol",
+        "PosInt", "Digit", "LittleEndian", "BigEndian",
+        "DiffStream", "ℕ", "List", "PathSegment", "Path", "Term", "RGB", "Vec3i"
+    ] { ctx.write().unwrap().add_typename(tn.into()); }
 
-    } else if t[0] == c.type_term_from_str("( String )").unwrap() {
-        Arc::new(RwLock::new(
-            PTYListEditor::new(
-                Box::new(|| {
+    ctx.write().unwrap().add_editor_ctor(
+        "Char", Box::new(
+            |ctx: &Context, ty: TypeTerm, _depth: usize| {
+                Some(
                     Arc::new(RwLock::new(CharEditor::new()))
-                }),
-                SeqDecorStyle::DoubleQuote,
-                '"',
-                depth
-            )
-        ))
-
-    } else if t[0] == c.type_term_from_str("( Symbol )").unwrap() {
-        Arc::new(RwLock::new(
-            PTYListEditor::new(
-                Box::new(|| {
-                    Arc::new(RwLock::new(CharEditor::new()))
-                }),
-                SeqDecorStyle::Plain,
-                ' ',
-                depth
-            )
-        ))
-
-    } else if t[0] == c.type_term_from_str("( List String )").unwrap() {
-        Arc::new(RwLock::new(
-            PTYListEditor::new(
-                Box::new({
-                    let d = depth + 1;
-                    let ctx = ctx.clone();
-                    move || {
-                        make_editor(
-                            ctx.clone(),
-                            &vec![ctx.read().unwrap().type_term_from_str("( String )").unwrap()],
-                            d
-                        )
+                        as Arc<RwLock<dyn Nested + Send + Sync>>)
+            }
+        )
+    );
+    ctx.write().unwrap().add_editor_ctor(
+        "Symbol", Box::new(
+            |ctx: &Context, ty: TypeTerm, depth: usize| {
+                ctx.make_editor(
+                    ctx.type_term_from_str("( List Char 0 )").unwrap(),
+                    depth
+                )
+            }
+        )
+    );
+    ctx.write().unwrap().add_editor_ctor(
+        "String", Box::new(
+            |ctx: &Context, ty: TypeTerm, depth: usize| {
+                ctx.make_editor(
+                    ctx.type_term_from_str("( List Char 3 )").unwrap(),
+                    depth
+                )
+            }
+        )
+    );
+    ctx.write().unwrap().add_editor_ctor(
+        "PosInt", Box::new(
+            |ctx: &Context, ty: TypeTerm, _depth: usize| {
+                match ty {
+                    TypeTerm::Type {
+                        id, args
+                    } => {
+                        if args.len() > 0 {
+                            match args[0] {
+                                TypeTerm::Num(radix) => {
+                                    Some(
+                                        Arc::new(RwLock::new(PosIntEditor::new(radix as u32)))
+                                            as Arc<RwLock<dyn Nested + Send + Sync>>
+                                    )
+                                },
+                                _ => None
+                            }
+                        } else {
+                            None
+                        }
                     }
-                }),
-                SeqDecorStyle::EnumSet,
-                '"',
-                depth
-            )
-        )) as Arc<RwLock<dyn Nested + Send + Sync>>
-    } else if t[0] == c.type_term_from_str("( List Symbol )").unwrap() {
-        Arc::new(RwLock::new(
-            PTYListEditor::new(
-                Box::new({
-                    let d = depth + 1;
-                    let ctx = ctx.clone();
-                    move || {
-                        make_editor(
-                            ctx.clone(),
-                            &vec![ctx.read().unwrap().type_term_from_str("( Symbol )").unwrap()],
-                            d
-                        )
+                    _ => None
+                }
+            }
+        )
+    );
+    
+    ctx.write().unwrap().add_editor_ctor(
+        "List", Box::new({
+            let ctx = ctx.clone();
+            move |c_: &Context, ty: TypeTerm, depth: usize| {
+                match ty {
+                    TypeTerm::Type {
+                        id, args
+                    } => {
+                        if args.len() > 0 {
+                            // todod factor style out of type arGS
+                            let style = if args.len() > 1 {
+                                match args[1] {
+                                    TypeTerm::Num(0) => SeqDecorStyle::Plain,
+                                    TypeTerm::Num(1) => SeqDecorStyle::HorizontalSexpr,
+                                    TypeTerm::Num(2) => SeqDecorStyle::VerticalSexpr,
+                                    TypeTerm::Num(3) => SeqDecorStyle::DoubleQuote,
+                                    TypeTerm::Num(4) => SeqDecorStyle::Tuple,
+                                    TypeTerm::Num(5) => SeqDecorStyle::EnumSet,
+                                    TypeTerm::Num(6) => SeqDecorStyle::Path,
+                                    _ => SeqDecorStyle::HorizontalSexpr
+                                }
+                            }else {
+                                SeqDecorStyle::HorizontalSexpr
+                            };
+
+                            let delim = if args.len() > 1 {
+                                match args[1] {
+                                    TypeTerm::Num(0) => ' ',
+                                    TypeTerm::Num(1) => ' ',
+                                    TypeTerm::Num(2) => '\n',
+                                    TypeTerm::Num(3) => '"',
+                                    TypeTerm::Num(4) => ',',
+                                    TypeTerm::Num(5) => ',',
+                                    TypeTerm::Num(6) => '/',
+                                    _ => '\0'
+                                }
+                            }else {
+                                '\0'
+                            };
+
+                            Some(
+                                Arc::new(RwLock::new(PTYListEditor::new(
+                                    Box::new({
+                                        let ctx = ctx.clone();
+                                        move || {
+                                            ctx.read().unwrap().make_editor(args[0].clone(), depth + 1).unwrap()
+                                        }
+                                    }),
+                                    style,
+                                    delim,
+                                    depth
+                                    )))
+                                    as Arc<RwLock<dyn Nested + Send + Sync>>
+                            )
+                        } else {
+                            None
+                        }
                     }
-                }),
-                SeqDecorStyle::EnumSet,
-                ' ',
-                depth
-            )
-        )) as Arc<RwLock<dyn Nested + Send + Sync>>
+                    _ => None
+                }
+            }
+        }
+    ));
 
-    } else if t[0] == c.type_term_from_str("( List Char )").unwrap() {
-        Arc::new(RwLock::new(
-            PTYListEditor::new(
-                Box::new(
-                    || { Arc::new(RwLock::new(CharEditor::new())) }
-                ),
-                SeqDecorStyle::Plain,
-                '\n',
-                depth+1
-            )
-        )) as Arc<RwLock<dyn Nested + Send + Sync>>
+    ctx.write().unwrap().add_editor_ctor(
+        "RGB", Box::new({
+            let c = ctx.clone();
+            move |ctx: &Context, ty: TypeTerm, depth: usize| {
+                Some(Arc::new(RwLock::new(ProductEditor::new(depth, c.clone())
+                                          .with_t(Point2::new(0, 0), "{   ")
+                                          .with_t(Point2::new(1, 1), "r: ")
+                                          .with_n(Point2::new(2, 1), vec![ ctx.type_term_from_str("( PosInt 16 BigEndian )").unwrap() ] )
+                                          .with_t(Point2::new(1, 2), "g: ")
+                                          .with_n(Point2::new(2, 2), vec![ ctx.type_term_from_str("( PosInt 16 BigEndian )").unwrap() ] )
+                                          .with_t(Point2::new(1, 3), "b: ")
+                                          .with_n(Point2::new(2, 3), vec![ ctx.type_term_from_str("( PosInt 16 BigEndian )").unwrap() ] )
+                                          .with_t(Point2::new(0, 4), "}   ")
+                )) as Arc<RwLock<dyn Nested + Send + Sync>>)
+            }
+        }));
 
-    } else if t[0] == c.type_term_from_str("( List ℕ )").unwrap() {
-        Arc::new(RwLock::new(
-            PTYListEditor::new(
-                Box::new(|| {
-                    Arc::new(RwLock::new(PosIntEditor::new(16)))
-                }),
-                SeqDecorStyle::EnumSet,
-                ',',
-                depth
-            )
-        )) as Arc<RwLock<dyn Nested + Send + Sync>>
+    ctx.write().unwrap().add_editor_ctor(
+        "PathSegment", Box::new(
+            |ctx: &Context, ty: TypeTerm, depth: usize| {
+                ctx.make_editor(
+                    ctx.type_term_from_str("( List Char 0 )").unwrap(),
+                    depth
+                )
+            }
+        )
+    );
+    ctx.write().unwrap().add_editor_ctor(
+        "Path", Box::new(
+            |ctx: &Context, ty: TypeTerm, depth: usize| {
+                ctx.make_editor(
+                    ctx.type_term_from_str("( List PathSegment 6 )").unwrap(),
+                    depth+1
+                )
+            }
+        )
+    );
 
-    } else if t[0] == c.type_term_from_str("( Path )").unwrap() {
-        Arc::new(RwLock::new(PTYListEditor::new(
-            Box::new({
-                let d= depth+1;
-                move || {
-                    Arc::new(RwLock::new(PTYListEditor::new(
-                        Box::new(|| {
-                            Arc::new(RwLock::new(CharEditor::new()))
-                        }),
-                        SeqDecorStyle::Plain,
-                        '\n',
-                        d
-                    )))
-            }}),
-            SeqDecorStyle::Path,
-            '/',
-            depth
-        ))) as Arc<RwLock<dyn Nested + Send + Sync>>
+    ctx.write().unwrap().add_editor_ctor(
+        "Term", Box::new(
+            |ctx: &Context, ty: TypeTerm, depth: usize| {
+                let mut s = SumEditor::new(
+                    vec![
+                        ctx.make_editor(ctx.type_term_from_str("( Symbol )").unwrap(), depth+1).unwrap(),
+                        ctx.make_editor(ctx.type_term_from_str("( PosInt 10 )").unwrap(), depth+1).unwrap(),
+                        ctx.make_editor(ctx.type_term_from_str("( List Term )").unwrap(), depth+1).unwrap(),
+                    ]
+                );
+                s.select(0);
+                Some(
+                    Arc::new(RwLock::new(
+                        s
+                    ))
+                )
+            }
+        )
+    );
 
-    } else if t[0] == c.type_term_from_str("( List Path )").unwrap() {
-        Arc::new(RwLock::new(
-            PTYListEditor::new(
-                Box::new({
-                    let d = depth + 1;
-                    let ctx = ctx.clone();
-                    move || {
-                        make_editor(
-                            ctx.clone(),
-                            &vec![ctx.read().unwrap().type_term_from_str("( Path )").unwrap()],
-                            d
-                        )
-                    }
-                }),
-                SeqDecorStyle::EnumSet,
-                ',',
-                depth
-            )
-        )) as Arc<RwLock<dyn Nested + Send + Sync>>
-
-    } else if t[0] == c.type_term_from_str("( List RGB )").unwrap() {
-        Arc::new(RwLock::new(
-            PTYListEditor::<dyn Nested + Send +Sync>::new(
-                {
-                    let d = depth+1;
-                    let ctx = ctx.clone();
-                    Box::new(move || {
-                        make_editor(ctx.clone(), &vec![ ctx.read().unwrap().type_term_from_str("( RGB )").unwrap() ], d)
-                    })
-                },
-                SeqDecorStyle::VerticalSexpr,
-                ',',
-                depth
-            )
-        )) as Arc<RwLock<dyn Nested + Send + Sync>>
-
-    } else if t[0] == c.type_term_from_str("( RGB )").unwrap() {
-        Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
-                             .with_t(Point2::new(0, 0), "{   ")
-                             .with_t(Point2::new(1, 1), "r: ")
-                             .with_n(Point2::new(2, 1), vec![ ctx.read().unwrap().type_term_from_str("( PosInt 16 BigEndian )").unwrap() ] )
-                             .with_t(Point2::new(1, 2), "g: ")
-                             .with_n(Point2::new(2, 2), vec![ ctx.read().unwrap().type_term_from_str("( PosInt 16 BigEndian )").unwrap() ] )
-                             .with_t(Point2::new(1, 3), "b: ")
-                             .with_n(Point2::new(2, 3), vec![ ctx.read().unwrap().type_term_from_str("( PosInt 16 BigEndian )").unwrap() ] )
-                             .with_t(Point2::new(0, 4), "}   ")
-        )) as Arc<RwLock<dyn Nested + Send + Sync>>
-
-    } else if t[0] == c.type_term_from_str("( Vec3i )").unwrap() {
-        Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
-                             .with_t(Point2::new(0, 0), "{")
-                             .with_t(Point2::new(1, 1), "x: ")
-                             .with_n(Point2::new(2, 1), vec![ ctx.read().unwrap().type_term_from_str("( PosInt 10 BigEndian )").unwrap() ] )
-                             .with_t(Point2::new(1, 2), "y: ")
-                             .with_n(Point2::new(2, 2), vec![ ctx.read().unwrap().type_term_from_str("( PosInt 10 BigEndian )").unwrap() ] )
-                             .with_t(Point2::new(1, 3), "z: ")
-                             .with_n(Point2::new(2, 3), vec![ ctx.read().unwrap().type_term_from_str("( PosInt 10 BigEndian )").unwrap() ] )
-                             .with_t(Point2::new(0, 4), "}")
-        )) as Arc<RwLock<dyn Nested + Send + Sync>>
-
-    } else if t[0] == c.type_term_from_str("( Json )").unwrap() {
-        Arc::new(RwLock::new(
-            PTYListEditor::<dyn Nested + Send + Sync>::new(
-                Box::new({
-                    let ctx = ctx.clone();
-                    move || {
-                        Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
-                                             .with_n(Point2::new(0, 0), vec![ ctx.read().unwrap().type_term_from_str("( String )").unwrap() ] )
-                                             .with_t(Point2::new(1, 0), ": ")
-                                             .with_n(Point2::new(2, 0), vec![ ctx.read().unwrap().type_term_from_str("( Json )").unwrap() ] )
-                        )) as Arc<RwLock<dyn Nested + Send + Sync>>
-                    }
-                }),
-                SeqDecorStyle::VerticalSexpr,
-                '\n',
-                depth
-            )
-        )) as Arc<RwLock<dyn Nested + Send + Sync>>
-            
-    } else if t[0] == c.type_term_from_str("( List Term )").unwrap() {
-        Arc::new(RwLock::new(
-            PTYListEditor::<dyn Nested + Send + Sync>::new(
-                Box::new({
-                    let ctx = ctx.clone();
-                    move || {
-                        make_editor(ctx.clone(), &vec![ ctx.read().unwrap().type_term_from_str("( Term )").unwrap() ], depth+1)
-                    }
-                }),
-                SeqDecorStyle::Tuple,
-                '\n',
-                depth
-            )
-        )) as Arc<RwLock<dyn Nested + Send + Sync>>
-
-    } else { // else: term
-        Arc::new(RwLock::new(
-            PTYListEditor::new(
-                || {
-                    Arc::new(RwLock::new(CharEditor::new()))
-                },
-                SeqDecorStyle::DoubleQuote,
-                ' ',
-                depth
-            )
-        ))
-    }
+    ctx
 }
+
 
 

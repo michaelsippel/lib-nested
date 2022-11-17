@@ -10,8 +10,6 @@ use {
         list::ListCursorMode,
         product::{segment::ProductEditorSegment},
         sequence::{SequenceView},
-        make_editor::make_editor,
-
         tree::{TreeNav, TreeCursor, TreeNavResult},
         diagnostics::{Diagnostics, Message},
         terminal::{TerminalStyle},

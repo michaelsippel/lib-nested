@@ -7,7 +7,7 @@ pub mod view;
 
 pub use {
     channel::{queue_channel, set_channel, singleton_channel, ChannelReceiver, ChannelSender},
-    context::{Context, MorphismMode, MorphismType, Object, ReprTree},
+    context::{Context, MorphismMode, MorphismType, ReprTree},
     observer::{NotifyFnObserver, Observer, ObserverBroadcast, ObserverExt, ResetFnObserver},
     port::{
         AnyInnerViewPort, AnyOuterViewPort, AnyViewPort, InnerViewPort, OuterViewPort, ViewPort,
