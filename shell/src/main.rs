@@ -53,8 +53,11 @@ async fn main() {
     });
 
     // Type Context //
-    let ctx = nested::make_editor::init_ctx();
-    
+    let ctx = Arc::new(RwLock::new(Context::new()));
+    let ctx = nested::make_editor::init_editor_ctx(ctx);
+    let ctx = nested::make_editor::init_math_ctx(ctx);
+    let ctx = nested::make_editor::init_os_ctx(ctx);
+
     let c = ctx.clone();
     let mut process_list_editor =
         PTYListEditor::new(

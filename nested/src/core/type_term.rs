@@ -137,9 +137,11 @@ impl TypeDict {
         }
     }
 
-    pub fn add_typename(&mut self, tn: String) {
-        self.typenames.insert(tn, self.type_id_counter);
+    pub fn add_typename(&mut self, tn: String) -> u64 {
+        let tyid = self.type_id_counter;
+        self.typenames.insert(tn, tyid);
         self.type_id_counter += 1;
+        tyid
     }
 
     pub fn get_typeid(&self, tn: &String) -> Option<TypeID> {

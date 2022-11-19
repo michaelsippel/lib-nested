@@ -109,29 +109,16 @@ impl Action for ActNum {
     }
 }
 
-pub struct ActColor {}
-impl Action for ActColor {
-    fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn Nested + Send + Sync>> {
-        let depth = 1;
-        Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
-                             .with_t(Point2::new(1, 1), " RGB")
-                             .with_n(Point2::new(0, 1), vec![ ctx.read().unwrap().type_term_from_str("( RGB )").unwrap() ] )
-                             .with_t(Point2::new(1, 2), " HSV")
-                             .with_n(Point2::new(0, 2), vec![ ctx.read().unwrap().type_term_from_str("( RGB )").unwrap() ] )
-                             .with_t(Point2::new(1, 3), " HSL")
-                             .with_n(Point2::new(0, 3), vec![ ctx.read().unwrap().type_term_from_str("( RGB )").unwrap() ] )
-        )) as Arc<RwLock<dyn Nested + Send + Sync>>
-    }
-}
-
 pub struct ActLet {}
 impl Action for ActLet {
     fn make_editor(&self, ctx: Arc<RwLock<Context>>) -> Arc<RwLock<dyn Nested + Send + Sync>> {
         let depth = 1;
         Arc::new(RwLock::new(ProductEditor::new(depth, ctx.clone())
                              .with_n(Point2::new(0, 0), vec![ ctx.read().unwrap().type_term_from_str("( Symbol )").unwrap() ] )
-                             .with_t(Point2::new(1, 0), " := ")
-                             .with_n(Point2::new(2, 0), vec![ ctx.read().unwrap().type_term_from_str("( PosInt 10 BigEndian )").unwrap() ] )
+                             .with_t(Point2::new(1, 0), " : ")
+                             .with_n(Point2::new(2, 0), vec![ ctx.read().unwrap().type_term_from_str("( TypeTerm )").unwrap() ] )
+                             .with_t(Point2::new(3, 0), " := ")
+                             .with_n(Point2::new(4, 0), vec![ ctx.read().unwrap().type_term_from_str("( PosInt 16 BigEndian )").unwrap() ] )
         )) as Arc<RwLock<dyn Nested + Send + Sync>>
     }
 }
@@ -189,7 +176,6 @@ impl Commander {
         cmds.insert("ls".into(), Arc::new(ActLs{}) as Arc<dyn Action + Send + Sync>);
         cmds.insert("cp".into(), Arc::new(ActCp{}) as Arc<dyn Action + Send + Sync>);
         cmds.insert("num".into(), Arc::new(ActNum{}) as Arc<dyn Action + Send + Sync>);
-        cmds.insert("color".into(), Arc::new(ActColor{}) as Arc<dyn Action + Send + Sync>);
 
         let m_buf = VecBuffer::new();
         let mut c = Commander {

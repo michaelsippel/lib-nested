@@ -226,13 +226,13 @@ pub struct MorphismType {
 
 pub struct Context {
     /// assigns a name to every type
-    type_dict: TypeDict,
+    type_dict: Arc<RwLock<TypeDict>>,
 
     /// objects
     objects: HashMap<String, Arc<RwLock<ReprTree>>>,
 
     /// editors
-    editor_ctors: HashMap<TypeID, Box<dyn Fn(&Self, TypeTerm, usize) -> Option<Arc<RwLock<dyn Nested+ Send + Sync>>> + Send + Sync>>,
+    editor_ctors: HashMap<TypeID, Arc<dyn Fn(Arc<RwLock<Self>>, TypeTerm, usize) -> Option<Arc<RwLock<dyn Nested + Send + Sync>>> + Send + Sync>>,
 
     /// morphisms
     default_constructors: HashMap<TypeTerm, Box<dyn Fn() -> Arc<RwLock<ReprTree>> + Send + Sync>>,
@@ -245,7 +245,10 @@ pub struct Context {
 impl Context {
     pub fn with_parent(parent: Option<Arc<RwLock<Context>>>) -> Self {
         Context {
-            type_dict: TypeDict::new(),
+            type_dict: match parent.as_ref() {
+                Some(p) => p.read().unwrap().type_dict.clone(),
+                None => Arc::new(RwLock::new(TypeDict::new()))
+            },
             editor_ctors: HashMap::new(),
             default_constructors: HashMap::new(),
             morphism_constructors: HashMap::new(),
@@ -259,31 +262,39 @@ impl Context {
     }
 
     pub fn add_typename(&mut self, tn: String) {
-        self.type_dict.add_typename(tn);
+        self.type_dict.write().unwrap().add_typename(tn);
     }
 
     pub fn type_term_from_str(&self, tn: &str) -> Option<TypeTerm> {
-        self.type_dict.type_term_from_str(&tn)
+        self.type_dict.read().unwrap().type_term_from_str(&tn)
     }
     pub fn type_term_to_str(&self, t: &TypeTerm) -> String {
-        self.type_dict.type_term_to_str(&t)
+        self.type_dict.read().unwrap().type_term_to_str(&t)
     }
 
-    pub fn add_editor_ctor(&mut self, tn: &str, mk_editor: Box<dyn Fn(&Self, TypeTerm, usize) -> Option<Arc<RwLock<dyn Nested + Send + Sync>>> + Send + Sync>) {
-        if let Some(tid) = self.type_dict.get_typeid(&tn.into()) {
-            self.editor_ctors.insert(tid, mk_editor);
-        } else {
-            println!("invalid type name");
-        }
+    pub fn add_editor_ctor(&mut self, tn: &str, mk_editor: Arc<dyn Fn(Arc<RwLock<Self>>, TypeTerm, usize) -> Option<Arc<RwLock<dyn Nested + Send + Sync>>> + Send + Sync>) {
+        let mut dict = self.type_dict.write().unwrap();
+        let tyid = dict.get_typeid(&tn.into()).unwrap_or( dict.add_typename(tn.into()) );
+        self.editor_ctors.insert(tyid, mk_editor);
     }
 
-    pub fn make_editor(&self, type_term: TypeTerm, depth: usize) -> Option<Arc<RwLock<dyn Nested + Send + Sync>>> {
-        if let TypeTerm::Type{ id, args } = type_term.clone() {
-            let mk_editor = self.editor_ctors.get(&id)?;
-            mk_editor(self, type_term, depth)
+    pub fn get_editor_ctor(&self, ty: &TypeTerm) -> Option<Arc<dyn Fn(Arc<RwLock<Self>>, TypeTerm, usize) -> Option<Arc<RwLock<dyn Nested + Send + Sync>>> + Send + Sync>> {
+        if let TypeTerm::Type{ id, args } = ty.clone() {
+            if let Some(m) = self.editor_ctors.get(&id).cloned() {
+                Some(m)
+            } else {
+                self.parent.as_ref()?
+                    .read().unwrap()
+                    .get_editor_ctor(&ty)
+            }
         } else {
             None
         }
+    }
+
+    pub fn make_editor(ctx: Arc<RwLock<Self>>, type_term: TypeTerm, depth: usize) -> Option<Arc<RwLock<dyn Nested + Send + Sync>>> {
+        let mk_editor = ctx.read().unwrap().get_editor_ctor(&type_term)?;
+        mk_editor(ctx, type_term, depth)
     }
 
     pub fn add_morphism(
@@ -296,7 +307,7 @@ impl Context {
 
     /// adds an object without any representations
     pub fn add_obj(&mut self, name: String, typename: &str) {
-        let type_tag = self.type_dict.type_term_from_str(typename).unwrap();
+        let type_tag = self.type_dict.read().unwrap().type_term_from_str(typename).unwrap();
 
         self.objects.insert(
             name,

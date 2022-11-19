@@ -1,5 +1,6 @@
 use {
     crate::{
+        core::Context,
         list::ListCursorMode,
         tree::{TreeNav, TreeNavResult, TreeCursor},
         product::{segment::ProductEditorSegment, ProductEditor},
@@ -71,7 +72,7 @@ impl TreeNav for ProductEditor {
                         e.write().unwrap().goto(c.clone());
                     } else if c.tree_addr.len() > 0 {
                         // create editor
-                        let e = self.ctx.read().unwrap().make_editor(t[0].clone(), *ed_depth+1).unwrap();
+                        let e = Context::make_editor(self.ctx.clone(), t[0].clone(), *ed_depth+1).unwrap();
                         *editor = Some(e.clone());
                         let mut e = e.write().unwrap();
                         e.goto(c.clone());
@@ -130,7 +131,7 @@ impl TreeNav for ProductEditor {
                             } else {
                                 // create editor
 
-                                let e = self.ctx.read().unwrap().make_editor(t[0].clone(), *ed_depth+1).unwrap();
+                                let e = Context::make_editor(self.ctx.clone(), t[0].clone(), *ed_depth+1).unwrap();
                                 *editor = Some(e.clone());
                                 let mut e = e.write().unwrap();
                                 e.goby(direction);
