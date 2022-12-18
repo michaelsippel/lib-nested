@@ -64,7 +64,7 @@ where
     pub fn get_port(&self) -> OuterViewPort<dyn SingletonView<Item = T>> {
         self.port.0.outer()
     }
-    
+
     pub fn get(&self) -> T {
         self.value.read().unwrap().clone()
     }

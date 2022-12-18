@@ -23,7 +23,7 @@ use {
 
 pub struct SumEditor {
     cur: usize,
-    editors: Vec< Arc<RwLock<dyn Nested + Send + Sync>> >,
+    pub editors: Vec< Arc<RwLock<dyn Nested + Send + Sync + 'static>> >,
 
     port: ViewPort< dyn TerminalView >,
     diag_port: ViewPort< dyn SequenceView<Item = Message> >
@@ -31,7 +31,7 @@ pub struct SumEditor {
 
 impl SumEditor {
     pub fn new(
-        editors: Vec< Arc<RwLock<dyn Nested + Send + Sync>> >
+        editors: Vec< Arc<RwLock<dyn Nested + Send + Sync + 'static>> >
     ) -> Self {
         let port = ViewPort::new();
         //let mut diag_buf = VecBuffer::new();
@@ -42,6 +42,10 @@ impl SumEditor {
             port,
             diag_port: ViewPort::new()//diag_buf.get_port().to_sequence()
         }
+    }
+
+    pub fn get(&self) -> Arc<RwLock<dyn Nested + Send + Sync>> {
+        self.editors[ self.cur ].clone()
     }
 
     pub fn select(&mut self, idx: usize) {

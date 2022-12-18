@@ -65,7 +65,8 @@ impl TerminalEditor for DigitEditor {
 
     fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
         match event {
-            TerminalEvent::Input(Event::Key(Key::Char(' ')))
+            TerminalEvent::Input(Event::Key(Key::Ctrl('x')))
+            | TerminalEvent::Input(Event::Key(Key::Char(' ')))
             | TerminalEvent::Input(Event::Key(Key::Char('\n'))) => TerminalEditorResult::Exit,
             TerminalEvent::Input(Event::Key(Key::Char(c))) => {
                 self.data.set(Some(*c));
@@ -116,7 +117,7 @@ impl PosIntEditor {
             digits_editor: PTYListEditor::new(
                 Box::new(move || Arc::new(RwLock::new(DigitEditor::new(radix)))) as Box<dyn Fn() -> Arc<RwLock<DigitEditor>> + Send + Sync>,
                 SeqDecorStyle::Hex,
-                ' ',
+                None,
                 0
             ),
         }
@@ -195,7 +196,8 @@ impl TerminalEditor for PosIntEditor {
 
     fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
         match event {
-            TerminalEvent::Input(Event::Key(Key::Char(' ')))
+            TerminalEvent::Input(Event::Key(Key::Ctrl('x')))
+            | TerminalEvent::Input(Event::Key(Key::Char(' ')))
             | TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {
                 self.digits_editor.up();
                 TerminalEditorResult::Exit

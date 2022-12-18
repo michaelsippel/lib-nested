@@ -1,4 +1,3 @@
-
 use {
     crate::{
         core::{TypeTerm, TypeLadder, Context, OuterViewPort},
@@ -17,38 +16,6 @@ use {
     std::sync::{Arc, RwLock},
 };
 
-enum RhsNode {
-    Sum (
-        Arc<RwLock< PTYListEditor< RhsNode > >>
-    ),
-    Product (
-        Arc<RwLock< PTYListEditor< RhsNode > >>
-    ),
-    String(
-        Arc<RwLock< PTYListEditor< CharEditor > >>
-    )
-}
-
-impl TreeNav for RhsNode {}
-
-impl TerminalEditor for RhsNode {
-    fn get_term_view(&self) -> OuterViewPort<dyn TerminalView> {
-        make_label("todo")
-    }
-
-    fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
-        TerminalEditorResult::Continue
-    }
-}
-
-impl Diagnostics for RhsNode {}
-impl Nested for RhsNode {}
-
-struct GrammarRuleEditor {
-    lhs: Arc<RwLock<PTYListEditor<CharEditor>>>,
-    rhs: Arc<RwLock<PTYListEditor<RhsNode>>>
-}
-
 pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
     let mut ctx = Arc::new(RwLock::new(Context::with_parent(Some(parent))));
 
@@ -56,7 +23,7 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
         "Char", Arc::new(
             |ctx: Arc<RwLock<Context>>, ty: TypeTerm, _depth: usize| {
                 Some(
-                    Arc::new(RwLock::new(CharEditor::new()))
+                    Arc::new(RwLock::new(CharEditor::new_node(&ctx)))
                         as Arc<RwLock<dyn Nested + Send + Sync>>)
             }
         )
@@ -70,7 +37,7 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
                         id, args
                     } => {
                         if args.len() > 0 {
-                            // todod factor style out of type arGS
+                            // todo: factor style out of type arGS
                             let style = if args.len() > 1 {
                                 match args[1] {
                                     TypeTerm::Num(0) => SeqDecorStyle::Plain,
@@ -82,23 +49,23 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
                                     TypeTerm::Num(6) => SeqDecorStyle::Path,
                                     _ => SeqDecorStyle::HorizontalSexpr
                                 }
-                            }else {
+                            } else {
                                 SeqDecorStyle::HorizontalSexpr
                             };
 
                             let delim = if args.len() > 1 {
                                 match args[1] {
-                                    TypeTerm::Num(0) => ' ',
-                                    TypeTerm::Num(1) => ' ',
-                                    TypeTerm::Num(2) => '\n',
-                                    TypeTerm::Num(3) => '"',
-                                    TypeTerm::Num(4) => ',',
-                                    TypeTerm::Num(5) => ',',
-                                    TypeTerm::Num(6) => '/',
-                                    _ => '\0'
+                                    TypeTerm::Num(0) => Some(' '),
+                                    TypeTerm::Num(1) => Some(' '),
+                                    TypeTerm::Num(2) => Some('\n'),
+                                    TypeTerm::Num(3) => None,
+                                    TypeTerm::Num(4) => Some(','),
+                                    TypeTerm::Num(5) => Some(','),
+                                    TypeTerm::Num(6) => Some('/'),
+                                    _ => None
                                 }
                             }else {
-                                '\0'
+                                None
                             };
 
                             Some(
@@ -167,13 +134,16 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
             }
         )
     );
-    
+
+    ctx.write().unwrap().add_typename("TerminalEvent".into());    
     ctx
 }
 
 pub fn init_math_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
     let mut ctx = Arc::new(RwLock::new(Context::with_parent(Some(parent))));
 
+    ctx.write().unwrap().add_typename("MachineInt".into());
+    ctx.write().unwrap().add_typename("Digit".into());
     ctx.write().unwrap().add_typename("BigEndian".into());
     ctx.write().unwrap().add_editor_ctor(
         "PosInt", Arc::new(

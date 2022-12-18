@@ -1,6 +1,6 @@
 use {
     crate::{
-        core::{InnerViewPort, Observer, ObserverBroadcast, OuterViewPort, View, ViewPort},
+        core::{InnerViewPort, Observer, ObserverBroadcast, OuterViewPort, View, ViewPort, port::UpdateTask},
         grid::{GridView, GridWindowIterator},
         index::{IndexArea, IndexView},
         projection::ProjectionHelper,
@@ -113,15 +113,21 @@ where
                     }
 
                     if let Some(chunk) = s.chunks.get(&chunk_idx) {
-                        s.cast.notify(&area.map(|pt| pt + chunk.offset));
+                        s.cast.notify(&area.map(|pt| pt + chunk.offset));                    
                     }
                 },
             );
 
             if let Some(chunk) = self.chunks.get_mut(&chunk_idx) {
                 chunk.view = view;
-                self.cast
-                    .notify(&chunk.view.area().map(|pt| pt + chunk.offset));
+
+                let old_limit = chunk.limit;
+                let new_limit = *chunk.view.area().range().end();
+
+                self.cast.notify(
+                    &IndexArea::Range(
+                        Point2::new(chunk.offset.x, chunk.offset.y) ..= Point2::new(chunk.offset.x + max(old_limit.x, new_limit.x), chunk.offset.y + max(old_limit.y, new_limit.y) )));
+
             } else {
                 self.chunks.insert(
                     chunk_idx,
@@ -132,7 +138,7 @@ where
                     },
                 );
             }
-
+            
             self.update_all_offsets();
         } else {
             self.proj_helper.remove_arg(&chunk_idx);
@@ -168,15 +174,18 @@ where
 
         for chunk_idx in GridWindowIterator::from(top_range.clone()) {
             if let Some(chunk) = self.chunks.get_mut(&chunk_idx) {
-                let _old_offset = chunk.offset;
-                let _old_limit = chunk.limit;
+                let old_offset = chunk.offset;
+                let old_limit = chunk.limit;
 
+                //chunk.limit = Point2::new( col_widths[chunk_idx.x as usize]-1, row_heights[chunk_idx.y as usize]-1 );
                 chunk.limit = *chunk.view.area().range().end();
+
                 chunk.offset = Vector2::new(
                     (0..chunk_idx.x as usize).map(|x| col_widths[x]).sum(),
                     (0..chunk_idx.y as usize).map(|y| row_heights[y]).sum(),
                 );
-                /*
+/*
+
                                 if old_offset != chunk.offset {
                                     self.cast.notify(
                                         &IndexArea::Range(
@@ -191,7 +200,7 @@ where
                                         )
                                     );
                                 }
-                */
+*/
             }
         }
 
@@ -214,6 +223,7 @@ where
                     max(self.limit.y, old_limit.y),
                 ),
         ));
+
     }
 
     /// given an index in the flattened sequence,

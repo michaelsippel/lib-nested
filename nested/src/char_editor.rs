@@ -1,6 +1,6 @@
 use {
     crate::{
-        core::{OuterViewPort, ViewPort},
+        core::{OuterViewPort, ViewPort, Context},
         list::{ListEditor},
         sequence::{SequenceView, SequenceViewExt},
         singleton::{SingletonBuffer, SingletonView},
@@ -10,7 +10,7 @@ use {
         },
         tree::{TreeCursor, TreeNav, TreeNavResult},
         diagnostics::Diagnostics,
-        Nested
+        Nested, tree::NestedNode, Commander
     },
     std::sync::Arc,
     std::sync::RwLock,
@@ -20,6 +20,23 @@ use {
 
 pub struct CharEditor {
     data: SingletonBuffer<Option<char>>
+}
+
+impl Commander for CharEditor {
+    type Cmd = TerminalEvent;
+
+    fn send_cmd(&mut self, event: &TerminalEvent) {
+        match event {
+            TerminalEvent::Input(Event::Key(Key::Char(c))) => {
+                self.data.set(Some(*c));
+            }
+            TerminalEvent::Input(Event::Key(Key::Backspace))
+            | TerminalEvent::Input(Event::Key(Key::Delete)) => {
+                self.data.set(None);
+            }
+            _ => {}
+        }
+    }
 }
 
 impl CharEditor {
@@ -36,40 +53,32 @@ impl CharEditor {
     pub fn get(&self) -> char {
         self.get_port().get_view().unwrap().get().unwrap_or('?')
     }
-}
 
-impl TreeNav for CharEditor {}
-impl Diagnostics for CharEditor {}
+    pub fn new_node(ctx: &Arc<RwLock<Context>>) -> NestedNode {
+        let data = SingletonBuffer::new(None);
 
-impl TerminalEditor for CharEditor {
-    fn get_term_view(&self) -> OuterViewPort<dyn TerminalView> {
-        self.data
-            .get_port()
-            .map(move |c| {                
-                TerminalAtom::from(
-                    c.unwrap_or('?')
-                )
-            })
-            .to_grid()
-    }
-
-    fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
-        match event {
-            TerminalEvent::Input(Event::Key(Key::Char('\n'))) => TerminalEditorResult::Exit,
-            TerminalEvent::Input(Event::Key(Key::Char(c))) => {
-                self.data.set(Some(*c));
-                TerminalEditorResult::Exit
-            }
-            TerminalEvent::Input(Event::Key(Key::Backspace))
-            | TerminalEvent::Input(Event::Key(Key::Delete)) => {
-                self.data.set(None);
-                TerminalEditorResult::Exit
-            }
-            _ => TerminalEditorResult::Continue,
-        }
+        NestedNode::new()
+            .set_ctx(ctx.clone())
+            .set_view(data
+                      .get_port()
+                      .map(move |c| {
+                          match c {
+                              Some(c) => TerminalAtom::from(c),
+                              None => TerminalAtom::new('*', TerminalStyle::fg_color((255,0,0)))
+                          }
+                      })
+                      .to_grid()
+            )
+            .with_cmd(
+                Arc::new(RwLock::new(CharEditor{ data }))
+            )
     }
 }
 
-impl Nested for CharEditor {}
-
+use crate::StringGen;
+impl StringGen for CharEditor {
+    fn get_string(&self)  -> String {
+        String::from(self.get())
+    }
+}
 

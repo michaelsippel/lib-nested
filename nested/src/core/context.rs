@@ -36,8 +36,8 @@ impl ReprTree {
         Arc::new(RwLock::new(tree))
     }
 
-    pub fn insert_branch(&mut self, type_tag: TypeTerm, repr: Arc<RwLock<ReprTree>>) {
-        self.branches.insert(type_tag, repr);
+    pub fn insert_branch(&mut self, repr: Arc<RwLock<ReprTree>>) {
+        self.branches.insert(repr.clone().read().unwrap().type_tag.clone(), repr.clone());
     }
 
     pub fn insert_leaf(
@@ -51,7 +51,7 @@ impl ReprTree {
             } else {
                 let mut next_repr = ReprTree::new(type_term.clone());
                 next_repr.insert_leaf(type_ladder, port);
-                self.insert_branch(type_term, Arc::new(RwLock::new(next_repr)));
+                self.insert_branch(Arc::new(RwLock::new(next_repr)));
             }
         } else {
             self.port = Some(port);
@@ -73,6 +73,15 @@ impl ReprTree {
         )
     }
 
+    pub fn get_view<V: View + ?Sized + 'static>(&self) -> Option<Arc<V>>
+    where
+        V::Msg: Clone,
+    {
+            self.get_port::<V>()?
+                .get_view()
+    }
+
+    // descend
     pub fn downcast(&self, dst_type: &TypeTerm) -> Option<Arc<RwLock<ReprTree>>> {
         self.branches.get(dst_type).cloned()
     }
@@ -82,6 +91,13 @@ impl ReprTree {
         repr_ladder.fold(
             self.downcast(&first),
             |s, t| s?.read().unwrap().downcast(&t))
+    }
+
+    // ascend
+    pub fn upcast(rt: &Arc<RwLock<Self>>, type_term: TypeTerm) -> Arc<RwLock<ReprTree>> {
+        let mut n = Self::new(type_term);
+        n.insert_branch(rt.clone());
+        Arc::new(RwLock::new(n))
     }
 
 /*
@@ -268,6 +284,7 @@ impl Context {
     pub fn type_term_from_str(&self, tn: &str) -> Option<TypeTerm> {
         self.type_dict.read().unwrap().type_term_from_str(&tn)
     }
+
     pub fn type_term_to_str(&self, t: &TypeTerm) -> String {
         self.type_dict.read().unwrap().type_term_to_str(&t)
     }

@@ -1,18 +1,12 @@
+pub mod addr;
 pub mod cursor;
 pub mod nav;
-pub mod typeinfo;
-
-pub struct TreeAddr(Vec<usize>);
-
-impl From<Vec<usize>> for TreeAddr {
-    fn from(v: Vec<usize>) -> TreeAddr {
-        TreeAddr(v)
-    }
-}
+pub mod node;
 
 pub use {
+    addr::TreeAddr,
     cursor::TreeCursor,
     nav::{TreeNav, TreeNavResult},
-    typeinfo::TreeType
+    node::NestedNode
 };
 

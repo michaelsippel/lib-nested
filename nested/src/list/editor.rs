@@ -22,12 +22,12 @@ use {
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
-                                                            
+
 pub struct ListEditor<ItemEditor>
 where ItemEditor: Nested + ?Sized + Send + Sync + 'static
 {
     pub(super) cursor: SingletonBuffer<ListCursor>,
-    pub(super) data: VecBuffer<Arc<RwLock<ItemEditor>>>,
+    pub(crate) data: VecBuffer<Arc<RwLock<ItemEditor>>>,
     pub(super) make_item_editor: Box<dyn Fn() -> Arc<RwLock<ItemEditor>> + Send + Sync>,
 
     pub(super) depth: usize,

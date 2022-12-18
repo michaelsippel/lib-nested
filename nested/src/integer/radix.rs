@@ -16,10 +16,19 @@ pub struct RadixProjection {
 
 impl RadixProjection {
     pub fn new(
+        // static parameters
+        //---
         src_radix: usize,
         dst_radix: usize,
+        //---
+
+        // dynamic parameters
+        //---
+        // input
         src_digits: OuterViewPort<dyn SequenceView<Item = usize>>,
+        // output
         dst_digits: InnerViewPort<RwLock<Vec<usize>>>,
+        //---
     ) -> Arc<RwLock<Self>> {
         dst_digits.0.add_update_hook(Arc::new(src_digits.0.clone()));
         let proj = Arc::new(RwLock::new(RadixProjection {

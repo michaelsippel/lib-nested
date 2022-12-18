@@ -28,8 +28,8 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
 {
     pub editor: ListEditor<ItemEditor>,
 
-    split_char: char,
-
+    split_char: Option<char>,
+ 
     style: SeqDecorStyle,
     depth: usize,
 
@@ -42,7 +42,7 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
     pub fn new(
         make_item_editor: impl Fn() -> Arc<RwLock<ItemEditor>> + Send + Sync + 'static,
         style: SeqDecorStyle,
-        split_char: char,
+        split_char: Option<char>,
         depth: usize
     ) -> Self {
         Self::from_editor(ListEditor::new(make_item_editor, depth), style, split_char, depth)
@@ -51,7 +51,7 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
     pub fn from_editor(
         editor: ListEditor<ItemEditor>,
         style: SeqDecorStyle,
-        split_char: char,
+        split_char: Option<char>,
         depth: usize
     ) -> Self {
         let port = editor
@@ -140,15 +140,15 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
                         let mut ne = new_edit.write().unwrap();
                         ne.goto(TreeCursor::home());
 
-                        match ne.handle_terminal_event(event) {
-                            TerminalEditorResult::Exit => {
-                                self.editor.cursor.set(ListCursor {
-                                    mode: ListCursorMode::Insert,
-                                    idx: Some(idx as isize + 1),
-                                });
-                            }
-                            _ => {}
+                        ne.handle_terminal_event(event);
+
+                        if self.split_char.is_none() {
+                            self.editor.cursor.set(ListCursor {
+                                mode: ListCursorMode::Insert,
+                                idx: Some(idx as isize + 1),
+                            });
                         }
+
                         TerminalEditorResult::Continue
                     }
                 },
@@ -161,36 +161,41 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
                             }
 
                         TerminalEvent::Input(Event::Key(Key::Char(c))) => {
-                            if *c == self.split_char {
+                            if Some(*c) == self.split_char {
                                 let c = self.editor.cursor.get();
                                 self.editor.goto(TreeCursor::none());
                                 self.editor.cursor.set(ListCursor {
                                     mode: ListCursorMode::Insert,
                                     idx: Some(1 + c.idx.unwrap_or(0))
                                 });
+                                TerminalEditorResult::Continue
                             } else {
                                 if let Some(e) = self.editor.get_item() {
-                                    match e.write().unwrap().handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Char(*c)))) {
-                                        TerminalEditorResult::Exit => {
+                                    e.write().unwrap().handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Char(*c))));
+                                    //match 
+                                    if self.split_char.is_none() {
+                                    //    TerminalEditorResult::Exit =>
+                                        {
                                             self.editor.cursor.set(ListCursor {
                                                 mode: ListCursorMode::Insert,
                                                 idx: Some(idx as isize + 1),
                                             });
                                         }
-                                        TerminalEditorResult::Continue => {
-                                            
-                                        }
+                                      //  TerminalEditorResult::Continue => {
+                                      //  }
                                     }
                                 }
+                                TerminalEditorResult::Exit
                             }
-                            TerminalEditorResult::Continue
                         }
                         ev => {
                             if let Some(e) = self.editor.get_item() {
                                 match e.write().unwrap().handle_terminal_event(ev) {
                                     TerminalEditorResult::Exit => {
-
                                         match ev {
+                                            TerminalEvent::Input(Event::Key(Key::Ctrl('x'))) => {
+                                                return TerminalEditorResult::Exit
+                                            }
                                             TerminalEvent::Input(Event::Key(Key::Backspace)) => {
                                                 self.editor.data.remove(idx as usize);
                                                 self.editor.cursor.set(ListCursor {
@@ -268,18 +273,32 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
     }
 }
 
+/*
+impl<ItemEditor> TreeType for PTYListEditor<ItemEditor>
+where ItemEditor: Nested + TreeType + ?Sized + Send + Sync + 'static
+{
+    fn get_type(&self, addr: &Vec<usize>) -> TypeTerm {
+        TypeTerm::new(0)
+    }
+}
+*/
 impl<ItemEditor> Nested for PTYListEditor<ItemEditor>
 where ItemEditor: Nested + ?Sized + Send + Sync + 'static
 {}
 
 use crate::{
     char_editor::CharEditor,
-    sequence::SequenceViewExt
+    sequence::SequenceViewExt,
+    StringGen
 };
 
-impl PTYListEditor<CharEditor> {
-    pub fn get_string(&self) -> String {
-        self.get_data_port().map(|ce| ce.read().unwrap().get()).get_view().unwrap().iter().collect::<String>()
+impl<ItemEditor: StringGen + Nested + Send + Sync> StringGen for PTYListEditor<ItemEditor> {
+
+   fn get_string(&self) -> String {
+        self.get_data_port()
+            .map(|ce| ce.read().unwrap().get_string())
+            .get_view().unwrap()
+            .iter().collect::<String>()
     }
 }
 
