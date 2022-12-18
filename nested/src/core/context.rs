@@ -296,7 +296,7 @@ impl Context {
     }
 
     pub fn get_editor_ctor(&self, ty: &TypeTerm) -> Option<Arc<dyn Fn(Arc<RwLock<Self>>, TypeTerm, usize) -> Option<Arc<RwLock<dyn Nested + Send + Sync>>> + Send + Sync>> {
-        if let TypeTerm::Type{ id, args } = ty.clone() {
+        if let TypeTerm::Type{ id, args: _ } = ty.clone() {
             if let Some(m) = self.editor_ctors.get(&id).cloned() {
                 Some(m)
             } else {

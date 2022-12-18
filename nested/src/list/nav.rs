@@ -1,24 +1,12 @@
 use {
     crate::{
-        core::{OuterViewPort, ViewPort},
         list::{
             ListCursor, ListCursorMode,
-            ListSegment, ListSegmentSequence,
             ListEditor
         },
-        sequence::SequenceView,
-        singleton::{SingletonBuffer, SingletonView},
-        terminal::{
-            make_label, TerminalEditor, TerminalEditorResult, TerminalEvent, TerminalStyle,
-            TerminalView,
-        },
         tree::{TreeCursor, TreeNav, TreeNavResult},
-        vec::VecBuffer,
-        color::{bg_style_from_depth, fg_style_from_depth},
         Nested
     },
-    std::sync::{Arc, RwLock},
-    termion::event::{Event, Key},
     cgmath::Vector2
 };
 

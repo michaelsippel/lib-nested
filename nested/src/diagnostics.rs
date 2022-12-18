@@ -1,7 +1,7 @@
 use {
     crate::{
-        core::{OuterViewPort, ViewPort},
-        sequence::{SequenceView, SequenceViewExt, decorator::{PTYSeqDecorate, SeqDecorStyle}},
+        core::{OuterViewPort},
+        sequence::{SequenceView},
         vec::{VecBuffer},
         index::{buffer::IndexBuffer},
         terminal::{
@@ -28,13 +28,13 @@ pub fn make_error(msg: OuterViewPort<dyn TerminalView>) -> Message {
     mb.insert_iter(vec![
         (Point2::new(0, 0),
          make_label("error: ")
-         .map_item(|p,a| a
+         .map_item(|_p,a| a
                    .add_style_back(TerminalStyle::bold(true))
                    .add_style_back(TerminalStyle::fg_color((200,0,0))))
         ),
         (Point2::new(1, 0),
          msg
-         .map_item(|p,a| a
+         .map_item(|_p,a| a
                    .add_style_back(TerminalStyle::fg_color((180,180,180))))
         )
     ]);
@@ -50,13 +50,13 @@ pub fn make_warn(msg: OuterViewPort<dyn TerminalView>) -> Message {
     mb.insert_iter(vec![
         (Point2::new(0, 0),
          make_label("warning: ")
-         .map_item(|p,a| a
+         .map_item(|_p,a| a
                    .add_style_back(TerminalStyle::bold(true))
                    .add_style_back(TerminalStyle::fg_color((200,200,0))))
         ),
         (Point2::new(1, 0),
          msg
-         .map_item(|p,a| a
+         .map_item(|_p,a| a
                    .add_style_back(TerminalStyle::fg_color((180,180,180))))
         )
     ]);
@@ -72,13 +72,13 @@ pub fn make_todo(msg: OuterViewPort<dyn TerminalView>) -> Message {
     mb.insert_iter(vec![
         (Point2::new(0, 0),
          make_label("todo: ")
-         .map_item(|p,a| a
+         .map_item(|_p,a| a
                    .add_style_back(TerminalStyle::bold(true))
                    .add_style_back(TerminalStyle::fg_color((180,180,250))))
         ),
         (Point2::new(1, 0),
          msg
-         .map_item(|p,a| a
+         .map_item(|_p,a| a
                    .add_style_back(TerminalStyle::fg_color((180,180,180))))
         )
     ]);

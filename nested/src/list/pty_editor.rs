@@ -1,21 +1,17 @@
 use {
     crate::{
-        core::{OuterViewPort, ViewPort, TypeTerm},
+        core::{OuterViewPort},
         list::{
             ListCursor, ListCursorMode,
-            ListSegment, ListSegmentSequence,
             ListEditor
         },
         sequence::{SequenceView, decorator::{SeqDecorStyle, PTYSeqDecorate}},
-        singleton::{SingletonBuffer, SingletonView},
         terminal::{
-            make_label, TerminalEditor, TerminalEditorResult, TerminalEvent, TerminalStyle,
+            TerminalEditor, TerminalEditorResult, TerminalEvent,
             TerminalView,
         },
         tree::{TreeCursor, TreeNav, TreeNavResult},
         diagnostics::{Diagnostics},
-        vec::VecBuffer,
-        color::{bg_style_from_depth, fg_style_from_depth},
         Nested
     },
     std::sync::{Arc, RwLock},
@@ -287,7 +283,6 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
 {}
 
 use crate::{
-    char_editor::CharEditor,
     sequence::SequenceViewExt,
     StringGen
 };

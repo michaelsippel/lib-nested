@@ -195,7 +195,7 @@ impl PTYSeqDecorate for OuterViewPort<dyn SequenceView<Item = OuterViewPort<dyn 
     fn pty_decorate(
         &self,
         style: SeqDecorStyle,
-        depth: usize
+        _depth: usize
     ) -> OuterViewPort<dyn TerminalView> {
         match style {
             SeqDecorStyle::Plain => self

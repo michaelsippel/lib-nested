@@ -98,7 +98,7 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
 
     fn get(&self, idx: &usize) -> Option<Self::Item> {
         let c = self.cursor.get();
-        Some(if let Some(mut cur) = c.idx {
+        Some(if let Some(cur) = c.idx {
             match c.mode {
                 ListCursorMode::Select => {
                     ListSegment::Item {
@@ -158,7 +158,7 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
             }),
 
             data: proj_helper.new_sequence_arg(1, data_port, |s: &mut Self, idx| {
-                if let Some(mut cur_idx) = s.cur_cursor.idx {
+                if let Some(cur_idx) = s.cur_cursor.idx {
                     match s.cur_cursor.mode {
                         ListCursorMode::Insert => {
                             if *idx < cur_idx as usize {

@@ -36,7 +36,7 @@ pub trait TreeNav {
         0
     }
 
-    fn goby(&mut self, direction: Vector2<isize>) -> TreeNavResult {
+    fn goby(&mut self, _direction: Vector2<isize>) -> TreeNavResult {
         TreeNavResult::Exit
     }
 

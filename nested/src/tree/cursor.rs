@@ -1,6 +1,5 @@
 use {
-    crate::list::ListCursorMode,
-    cgmath::Vector2
+    crate::list::ListCursorMode
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>

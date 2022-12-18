@@ -1,21 +1,17 @@
 use {
     crate::{
-        core::{OuterViewPort, ViewPort, Context},
-        list::{ListEditor},
-        sequence::{SequenceView, SequenceViewExt},
+        core::{OuterViewPort, Context},
         singleton::{SingletonBuffer, SingletonView},
         terminal::{
-            TerminalAtom, TerminalEditor, TerminalEditorResult, TerminalEvent, TerminalStyle,
-            TerminalView,
+            TerminalAtom,
+            TerminalEvent,
+            TerminalStyle
         },
-        tree::{TreeCursor, TreeNav, TreeNavResult},
-        diagnostics::Diagnostics,
-        Nested, tree::NestedNode, Commander
+        tree::NestedNode, Commander
     },
     std::sync::Arc,
     std::sync::RwLock,
-    termion::event::{Event, Key},
-    cgmath::Vector2
+    termion::event::{Event, Key}
 };
 
 pub struct CharEditor {

@@ -1,6 +1,6 @@
 use {
     crate::{
-        core::{InnerViewPort, OuterViewPort, Observer, ObserverBroadcast, View, ViewPort},
+        core::{InnerViewPort, OuterViewPort, View, ViewPort},
         vec::VecDiff,
     },
     std::sync::RwLock,

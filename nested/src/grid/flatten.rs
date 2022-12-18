@@ -1,6 +1,6 @@
 use {
     crate::{
-        core::{InnerViewPort, Observer, ObserverBroadcast, OuterViewPort, View, ViewPort, port::UpdateTask},
+        core::{InnerViewPort, Observer, ObserverBroadcast, OuterViewPort, View, ViewPort},
         grid::{GridView, GridWindowIterator},
         index::{IndexArea, IndexView},
         projection::ProjectionHelper,
@@ -174,8 +174,8 @@ where
 
         for chunk_idx in GridWindowIterator::from(top_range.clone()) {
             if let Some(chunk) = self.chunks.get_mut(&chunk_idx) {
-                let old_offset = chunk.offset;
-                let old_limit = chunk.limit;
+                let _old_offset = chunk.offset;
+                let _old_limit = chunk.limit;
 
                 //chunk.limit = Point2::new( col_widths[chunk_idx.x as usize]-1, row_heights[chunk_idx.y as usize]-1 );
                 chunk.limit = *chunk.view.area().range().end();

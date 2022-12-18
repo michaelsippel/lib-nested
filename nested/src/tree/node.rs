@@ -3,12 +3,11 @@ use {
     cgmath::Vector2,
     crate::{
         core::{ViewPort, OuterViewPort, AnyOuterViewPort, context::ReprTree, Context},
-        singleton::{SingletonView, SingletonBuffer},
+        singleton::{SingletonBuffer},
         sequence::SequenceView,
         terminal::{TerminalView, TerminalEvent, TerminalEditor, TerminalEditorResult},
         diagnostics::{Diagnostics, Message},
-        tree::{TreeNav, TreeCursor, TreeNavResult},
-        Commander, ObjCommander,
+        tree::{TreeNav, TreeCursor, TreeNavResult}, ObjCommander,
         Nested
     },
 };

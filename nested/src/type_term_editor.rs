@@ -1,6 +1,6 @@
 use {
     crate::{
-        core::{ViewPort, OuterViewPort, TypeLadder, Context},
+        core::{OuterViewPort, Context},
         terminal::{TerminalEvent, TerminalView, TerminalEditor, TerminalEditorResult},
         sequence::{SequenceView, decorator::SeqDecorStyle},
         list::{PTYListEditor},
@@ -11,11 +11,10 @@ use {
         integer::PosIntEditor,
         Nested
     },
-    cgmath::{Vector2, Point2},
-    termion::event::{Event, Key},
+    cgmath::{Vector2},
+    termion::event::{Key},
     std::{
-        sync::{Arc, RwLock},
-        any::Any
+        sync::{Arc, RwLock}
     }
 };
 
@@ -114,7 +113,7 @@ impl TerminalEditor for TypeTermEditor {
                     },
                     _ => {
                         if *c  == '(' {
-                            let mut child = Arc::new(RwLock::new(TypeTermEditor {
+                            let _child = Arc::new(RwLock::new(TypeTermEditor {
                                 ty: self.ty.clone(),
                                 node: SumEditor::new(
                                     vec![

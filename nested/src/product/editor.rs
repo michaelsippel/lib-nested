@@ -1,24 +1,24 @@
 use {
     crate::{
-        core::{ViewPort, OuterViewPort, TypeLadder, Context},
+        core::{OuterViewPort, TypeLadder, Context},
         terminal::{
             TerminalEditor, TerminalEditorResult,
             TerminalEvent, TerminalView
         },
-        vec::{VecBuffer, MutableVecAccess},
-        index::{buffer::{IndexBuffer, MutableIndexAccess}, IndexView},
+        vec::{VecBuffer},
+        index::{buffer::{IndexBuffer, MutableIndexAccess}},
         list::ListCursorMode,
         product::{segment::ProductEditorSegment},
         sequence::{SequenceView},
         tree::{TreeNav, TreeNavResult},
-        diagnostics::{Diagnostics, Message},
+        diagnostics::{Diagnostics},
         terminal::{TerminalStyle},
         Nested
     },
-    cgmath::{Vector2, Point2},
+    cgmath::{Point2},
     std::sync::{Arc, RwLock},
     termion::event::{Event, Key},
-    std::ops::{Deref, DerefMut}
+    std::ops::{DerefMut}
 };
 
 pub struct ProductEditor {
@@ -155,7 +155,7 @@ impl ProductEditor {
                         self.msg_buf.update(idx as usize, Some(b.get_port().to_sequence().map(
                             |msg| {
                                 let mut msg = msg.clone();
-                                msg.port = msg.port.map_item(|p,a| a.add_style_back(TerminalStyle::bg_color((40,40,40))));
+                                msg.port = msg.port.map_item(|_p,a| a.add_style_back(TerminalStyle::bg_color((40,40,40))));
                                 msg
                             }
                         )));
@@ -189,7 +189,7 @@ impl TerminalEditor for ProductEditor {
         let mut update_segment = false;
 
         let result = if let Some(mut segment) = self.get_cur_segment_mut().as_deref_mut() {
-            if let Some(ProductEditorSegment::N{ t, editor, ed_depth, cur_depth, cur_dist }) = segment.deref_mut() {
+            if let Some(ProductEditorSegment::N{ t, editor, ed_depth, cur_depth, cur_dist: _ }) = segment.deref_mut() {
                 *cur_depth = self.get_cursor().tree_addr.len();
 
                 if let Some(e) = editor.clone() {
@@ -227,7 +227,6 @@ impl TerminalEditor for ProductEditor {
                 }
             } else {
                 unreachable!();
-                TerminalEditorResult::Exit
             }
         } else {
             TerminalEditorResult::Exit

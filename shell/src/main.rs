@@ -8,29 +8,20 @@ mod pty;
 mod plot;
 
 use {
-    crate::{
-//        process::ProcessLauncher,
-//        command::Commander
-    },
     cgmath::{Point2, Vector2},
     nested::{
-        core::{port::UpdateTask, Observer, OuterViewPort, AnyOuterViewPort, View, ViewPort, Context, TypeTerm, ReprTree},
+        core::{port::UpdateTask, Observer, AnyOuterViewPort, ViewPort, Context, ReprTree},
         index::IndexArea,
         list::{ListCursorMode, PTYListEditor},
-        sequence::{SequenceView, decorator::{SeqDecorStyle, Separate}},
+        sequence::{decorator::{SeqDecorStyle}},
         terminal::{
             make_label, Terminal, TerminalAtom, TerminalCompositor, TerminalEditor,
-            TerminalEditorResult, TerminalEvent, TerminalStyle, TerminalView,
+            TerminalEditorResult, TerminalEvent, TerminalStyle,
         },
         tree::{TreeNav, TreeCursor, TreeNavResult},
         vec::VecBuffer,
-        integer::{PosIntEditor},
-        char_editor::CharEditor,
-        product::ProductEditor,
-        sum::SumEditor,
         diagnostics::{Diagnostics},
-        index::{buffer::IndexBuffer},
-        Nested
+        index::{buffer::IndexBuffer}
     },
     std::sync::{Arc, RwLock},
     termion::event::{Event, Key},
@@ -44,7 +35,7 @@ async fn main() {
     let mut term = Terminal::new(term_port.outer());
     let term_writer = term.get_writer();
 
-    let mut portmutex = Arc::new(RwLock::new(()));
+    let portmutex = Arc::new(RwLock::new(()));
 
     // Update Loop //
     let tp = term_port.clone();
@@ -53,7 +44,7 @@ async fn main() {
         async move {
             loop {
                 {
-                    let l = portmutex.write().unwrap();
+                    let _l = portmutex.write().unwrap();
                     tp.update();
                 }
                 async_std::task::sleep(std::time::Duration::from_millis(10)).await;
@@ -67,12 +58,12 @@ async fn main() {
     let ctx = nested::make_editor::init_math_ctx(ctx);
     let ctx = nested::make_editor::init_os_ctx(ctx);
 
-    let mut vb = VecBuffer::<char>::new();
-    let mut rt_char = ReprTree::new_leaf(
+    let vb = VecBuffer::<char>::new();
+    let rt_char = ReprTree::new_leaf(
         ctx.read().unwrap().type_term_from_str("( List Char )").unwrap(),
         AnyOuterViewPort::from(vb.get_port())
     );
-    let mut rt_digit = ReprTree::upcast(&rt_char, ctx.read().unwrap().type_term_from_str("( List ( Digit 10 ) )").unwrap());
+    let rt_digit = ReprTree::upcast(&rt_char, ctx.read().unwrap().type_term_from_str("( List ( Digit 10 ) )").unwrap());
     rt_digit.write().unwrap().insert_branch(
         ReprTree::new_leaf(
             ctx.read().unwrap().type_term_from_str("( List MachineInt )").unwrap(),
@@ -194,7 +185,7 @@ async fn main() {
                     let mut b = VecBuffer::new();
                     b.push(
                          make_label("@")
-                         .map_item(|p,a| a
+                         .map_item(|_p,a| a
                                    .add_style_back(TerminalStyle::bold(true))
                                    .add_style_back(TerminalStyle::fg_color((120,120,0))))
                     );
@@ -202,12 +193,12 @@ async fn main() {
                     for x in entry.addr.iter() {
                         b.push(
                             make_label(&format!("{}", x))
-                                .map_item(|p,a| a
+                                .map_item(|_p,a| a
                                           .add_style_back(TerminalStyle::fg_color((0, 100, 20))))
                         );
                         b.push(
                             make_label(".")
-                                .map_item(|p,a| a
+                                .map_item(|_p,a| a
                                    .add_style_back(TerminalStyle::bold(true))
                                    .add_style_back(TerminalStyle::fg_color((120,120,0))))
                         );
@@ -218,7 +209,7 @@ async fn main() {
                         .to_sequence()
                         .to_grid_horizontal()
                         .flatten()
-                        .map_item(move |p,a| {
+                        .map_item(move |_p,a| {
                             let select = false;
                             if select {
                                 a.add_style_back(TerminalStyle::fg_color((60,60,60)))
@@ -231,7 +222,7 @@ async fn main() {
 
         ]);
 
-        let (w, h) = termion::terminal_size().unwrap();
+        let (_w, _h) = termion::terminal_size().unwrap();
 /*
         compositor
             .write()
@@ -251,7 +242,7 @@ async fn main() {
 
         loop {
             let ev = term.next_event().await;
-            let l = portmutex.write().unwrap();
+            let _l = portmutex.write().unwrap();
 
             if let TerminalEvent::Resize(new_size) = ev {
                 cur_size.set(new_size);

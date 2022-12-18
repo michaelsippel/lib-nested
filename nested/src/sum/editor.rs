@@ -1,24 +1,18 @@
 use {
     crate::{
-        core::{ViewPort, OuterViewPort, TypeLadder, Context},
+        core::{ViewPort, OuterViewPort},
         terminal::{
             TerminalEditor, TerminalEditorResult,
             TerminalEvent, TerminalView
         },
-        vec::{VecBuffer, MutableVecAccess},
-        index::{buffer::{IndexBuffer, MutableIndexAccess}, IndexView},
-        list::ListCursorMode,
-        product::{segment::ProductEditorSegment},
         sequence::{SequenceView},
         tree::{TreeNav, TreeCursor, TreeNavResult},
         diagnostics::{Diagnostics, Message},
-        terminal::{TerminalStyle},
         Nested
     },
-    cgmath::{Vector2, Point2},
+    cgmath::{Vector2},
     std::sync::{Arc, RwLock},
-    termion::event::{Event, Key},
-    std::ops::{Deref, DerefMut}
+    termion::event::{Key}
 };
 
 pub struct SumEditor {

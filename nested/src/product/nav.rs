@@ -6,9 +6,8 @@ use {
         product::{segment::ProductEditorSegment, ProductEditor},
         Nested
     },
-    cgmath::{Point2, Vector2},
-    std::{sync::{Arc, RwLock}, ops::{Deref, DerefMut}},
-    termion::event::{Event, Key},
+    cgmath::{Vector2},
+    std::{ops::{DerefMut}},
 };
 
 impl TreeNav for ProductEditor {
@@ -56,7 +55,7 @@ impl TreeNav for ProductEditor {
         let old_cursor = self.cursor;
 
         if let Some(mut segment) = self.get_cur_segment_mut() {
-            if let Some(ProductEditorSegment::N{ t: _t, editor, ed_depth, cur_depth, cur_dist:_ }) = segment.deref_mut() {
+            if let Some(ProductEditorSegment::N{ t: _t, editor, ed_depth: _, cur_depth: _, cur_dist:_ }) = segment.deref_mut() {
                 if let Some(e) = editor {
                     let mut e = e.write().unwrap();
                     e.goto(TreeCursor::none());
@@ -67,7 +66,7 @@ impl TreeNav for ProductEditor {
         if c.tree_addr.len() > 0 {
             self.cursor = Some(crate::modulo(c.tree_addr.remove(0), self.n_indices.len() as isize));
             if let Some(mut element) = self.get_cur_segment_mut() {
-                if let Some(ProductEditorSegment::N{ t, editor, ed_depth, cur_depth, cur_dist:_ }) = element.deref_mut() {
+                if let Some(ProductEditorSegment::N{ t, editor, ed_depth, cur_depth: _, cur_dist:_ }) = element.deref_mut() {
                     if let Some(e) = editor {
                         e.write().unwrap().goto(c.clone());
                     } else if c.tree_addr.len() > 0 {
@@ -90,7 +89,7 @@ impl TreeNav for ProductEditor {
 
             TreeNavResult::Continue
         } else {
-            if let Some(mut ed) = self.get_cur_editor() {
+            if let Some(ed) = self.get_cur_editor() {
                 ed.write().unwrap().goto(TreeCursor::none());
             }
 
@@ -124,7 +123,7 @@ impl TreeNav for ProductEditor {
                 if direction.y > 0 {
                     // dn
                     if let Some(mut element) = self.get_cur_segment_mut() {
-                        if let Some(ProductEditorSegment::N{ t, editor, ed_depth, cur_depth, cur_dist:_ }) = element.deref_mut() {
+                        if let Some(ProductEditorSegment::N{ t, editor, ed_depth, cur_depth: _, cur_dist:_ }) = element.deref_mut() {
                             if let Some(e) = editor {
                                 let mut e = e.write().unwrap();
                                 e.goby(direction);
@@ -175,7 +174,7 @@ impl TreeNav for ProductEditor {
                 let old_cursor = self.cursor;
                 let nav_result =
                     if let Some(mut element) = self.get_cur_segment_mut() {
-                        if let Some(ProductEditorSegment::N{ t, editor, ed_depth, cur_depth, cur_dist:_ }) = element.deref_mut() {
+                        if let Some(ProductEditorSegment::N{ t: _, editor, ed_depth: _, cur_depth, cur_dist:_ }) = element.deref_mut() {
                             if let Some(e) = editor {
                                 let mut ce = e.write().unwrap();
                                 //\\//\\//\\//\\
@@ -193,7 +192,6 @@ impl TreeNav for ProductEditor {
                                                 TreeNavResult::Continue
                                             } else {
                                                 panic!("unplausible direction.y on exit");
-                                                TreeNavResult::Continue
                                             }
                                         } else if direction.y > 0 {
                                             // dn

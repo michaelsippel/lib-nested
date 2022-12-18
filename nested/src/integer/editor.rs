@@ -1,6 +1,6 @@
 use {
     crate::{
-        core::{OuterViewPort, ViewPort},
+        core::{OuterViewPort},
         list::{PTYListEditor},
         sequence::{SequenceView, SequenceViewExt, decorator::{PTYSeqDecorate, SeqDecorStyle}},
         singleton::{SingletonBuffer, SingletonView},
@@ -77,7 +77,7 @@ impl TerminalEditor for DigitEditor {
                     mb.insert_iter(vec![
                         (Point2::new(1, 0), make_label("invalid digit '")),
                         (Point2::new(2, 0), make_label(&format!("{}", *c))
-                         .map_item(|p,a| a.add_style_back(TerminalStyle::fg_color((140,140,250))))),
+                         .map_item(|_p,a| a.add_style_back(TerminalStyle::fg_color((140,140,250))))),
                         (Point2::new(3, 0), make_label("'"))
                     ]);
                     self.msg.push(crate::diagnostics::make_error(mb.get_port().flatten()));

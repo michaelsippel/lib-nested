@@ -1,27 +1,22 @@
 use {
     crate::{
-        core::{TypeTerm, TypeLadder, Context, OuterViewPort},
-        terminal::{TerminalView, TerminalEditor, TerminalEvent, TerminalEditorResult, make_label},
-        tree::{TreeNav},
+        core::{TypeTerm, Context},
         integer::PosIntEditor,
-        list::{ListEditor, PTYListEditor},
+        list::{PTYListEditor},
         sequence::{decorator::{SeqDecorStyle}},
-        product::editor::ProductEditor,
         sum::SumEditor,
         char_editor::CharEditor,
-        diagnostics::Diagnostics,
         Nested
     },
-    cgmath::{Vector2, Point2},
     std::sync::{Arc, RwLock},
 };
 
 pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
-    let mut ctx = Arc::new(RwLock::new(Context::with_parent(Some(parent))));
+    let ctx = Arc::new(RwLock::new(Context::with_parent(Some(parent))));
 
     ctx.write().unwrap().add_editor_ctor(
         "Char", Arc::new(
-            |ctx: Arc<RwLock<Context>>, ty: TypeTerm, _depth: usize| {
+            |ctx: Arc<RwLock<Context>>, _ty: TypeTerm, _depth: usize| {
                 Some(
                     Arc::new(RwLock::new(CharEditor::new_node(&ctx)))
                         as Arc<RwLock<dyn Nested + Send + Sync>>)
@@ -34,7 +29,7 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
             |ctx: Arc<RwLock<Context>>, ty: TypeTerm, depth: usize| {
                 match ty {
                     TypeTerm::Type {
-                        id, args
+                        id: _, args
                     } => {
                         if args.len() > 0 {
                             // todo: factor style out of type arGS
@@ -93,7 +88,7 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
 
     ctx.write().unwrap().add_editor_ctor(
         "Symbol", Arc::new(
-            |ctx: Arc<RwLock<Context>>, ty: TypeTerm, depth: usize| {
+            |ctx: Arc<RwLock<Context>>, _ty: TypeTerm, depth: usize| {
                 Context::make_editor(
                     ctx.clone(),
                     ctx.read().unwrap().type_term_from_str("( List Char 0 )").unwrap(),
@@ -105,7 +100,7 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
 
     ctx.write().unwrap().add_editor_ctor(
         "String", Arc::new(
-            |ctx: Arc<RwLock<Context>>, ty: TypeTerm, depth: usize| {
+            |ctx: Arc<RwLock<Context>>, _ty: TypeTerm, depth: usize| {
                 Context::make_editor(
                     ctx.clone(),
                     ctx.read().unwrap().type_term_from_str("( List Char 3 )").unwrap(),
@@ -117,7 +112,7 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
     
     ctx.write().unwrap().add_editor_ctor(
         "TypeTerm", Arc::new(
-            |ctx: Arc<RwLock<Context>>, ty: TypeTerm, depth: usize| {
+            |ctx: Arc<RwLock<Context>>, _ty: TypeTerm, depth: usize| {
                 let mut s = SumEditor::new(
                     vec![
                         Context::make_editor(ctx.clone(), ctx.read().unwrap().type_term_from_str("( Symbol )").unwrap(), depth+1).unwrap(),
@@ -140,17 +135,17 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
 }
 
 pub fn init_math_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
-    let mut ctx = Arc::new(RwLock::new(Context::with_parent(Some(parent))));
+    let ctx = Arc::new(RwLock::new(Context::with_parent(Some(parent))));
 
     ctx.write().unwrap().add_typename("MachineInt".into());
     ctx.write().unwrap().add_typename("Digit".into());
     ctx.write().unwrap().add_typename("BigEndian".into());
     ctx.write().unwrap().add_editor_ctor(
         "PosInt", Arc::new(
-            |ctx: Arc<RwLock<Context>>, ty: TypeTerm, _depth: usize| {
+            |_ctx: Arc<RwLock<Context>>, ty: TypeTerm, _depth: usize| {
                 match ty {
                     TypeTerm::Type {
-                        id, args
+                        id: _, args
                     } => {
                         if args.len() > 0 {
                             match args[0] {
@@ -176,11 +171,11 @@ pub fn init_math_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
 }
 
 pub fn init_os_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
-    let mut ctx = Arc::new(RwLock::new(Context::with_parent(Some(parent))));
+    let ctx = Arc::new(RwLock::new(Context::with_parent(Some(parent))));
 
     ctx.write().unwrap().add_editor_ctor(
         "PathSegment", Arc::new(
-            |ctx: Arc<RwLock<Context>>, ty: TypeTerm, depth: usize| {
+            |ctx: Arc<RwLock<Context>>, _ty: TypeTerm, depth: usize| {
                 Context::make_editor(
                     ctx.clone(),
                     ctx.read().unwrap().type_term_from_str("( List Char 0 )").unwrap(),
@@ -192,7 +187,7 @@ pub fn init_os_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
 
     ctx.write().unwrap().add_editor_ctor(
         "Path", Arc::new(
-            |ctx: Arc<RwLock<Context>>, ty: TypeTerm, depth: usize| {
+            |ctx: Arc<RwLock<Context>>, _ty: TypeTerm, depth: usize| {
                 Context::make_editor(
                     ctx.clone(),
                     ctx.read().unwrap().type_term_from_str("( List PathSegment 6 )").unwrap(),
