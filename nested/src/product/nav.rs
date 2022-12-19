@@ -14,7 +14,7 @@ impl TreeNav for ProductEditor {
     fn get_cursor(&self) -> TreeCursor {
         if let Some(i) = self.cursor {
             if let Some(e) = self.get_editor(i) {
-                let mut c = e.read().unwrap().get_cursor();
+                let mut c = e.get_cursor();
                 if c.tree_addr.len() == 0 {
                     c.leaf_mode = ListCursorMode::Select;
                 }
@@ -34,7 +34,7 @@ impl TreeNav for ProductEditor {
     fn get_cursor_warp(&self) -> TreeCursor {
         if let Some(i) = self.cursor {
             if let Some(e) = self.get_editor(i) {
-                let mut c = e.read().unwrap().get_cursor_warp();
+                let mut c = e.get_cursor_warp();
                 if c.tree_addr.len() == 0 {
                     c.leaf_mode = ListCursorMode::Select;
                 }
@@ -57,7 +57,6 @@ impl TreeNav for ProductEditor {
         if let Some(mut segment) = self.get_cur_segment_mut() {
             if let Some(ProductEditorSegment::N{ t: _t, editor, ed_depth: _, cur_depth: _, cur_dist:_ }) = segment.deref_mut() {
                 if let Some(e) = editor {
-                    let mut e = e.write().unwrap();
                     e.goto(TreeCursor::none());
                 }
             }
@@ -68,12 +67,11 @@ impl TreeNav for ProductEditor {
             if let Some(mut element) = self.get_cur_segment_mut() {
                 if let Some(ProductEditorSegment::N{ t, editor, ed_depth, cur_depth: _, cur_dist:_ }) = element.deref_mut() {
                     if let Some(e) = editor {
-                        e.write().unwrap().goto(c.clone());
+                        e.goto(c.clone());
                     } else if c.tree_addr.len() > 0 {
                         // create editor
-                        let e = Context::make_editor(self.ctx.clone(), t[0].clone(), *ed_depth+1).unwrap();
+                        let mut e = Context::make_editor(&self.ctx, t[0].clone(), *ed_depth+1).unwrap();
                         *editor = Some(e.clone());
-                        let mut e = e.write().unwrap();
                         e.goto(c.clone());
                     }
                 }
@@ -89,8 +87,8 @@ impl TreeNav for ProductEditor {
 
             TreeNavResult::Continue
         } else {
-            if let Some(ed) = self.get_cur_editor() {
-                ed.write().unwrap().goto(TreeCursor::none());
+            if let Some(mut ed) = self.get_cur_editor() {
+                ed.goto(TreeCursor::none());
             }
 
             self.cursor = None;
@@ -125,14 +123,12 @@ impl TreeNav for ProductEditor {
                     if let Some(mut element) = self.get_cur_segment_mut() {
                         if let Some(ProductEditorSegment::N{ t, editor, ed_depth, cur_depth: _, cur_dist:_ }) = element.deref_mut() {
                             if let Some(e) = editor {
-                                let mut e = e.write().unwrap();
                                 e.goby(direction);
                             } else {
                                 // create editor
 
-                                let e = Context::make_editor(self.ctx.clone(), t[0].clone(), *ed_depth+1).unwrap();
+                                let mut e = Context::make_editor(&self.ctx, t[0].clone(), *ed_depth+1).unwrap();
                                 *editor = Some(e.clone());
-                                let mut e = e.write().unwrap();
                                 e.goby(direction);
                             }
                         }
@@ -175,15 +171,13 @@ impl TreeNav for ProductEditor {
                 let nav_result =
                     if let Some(mut element) = self.get_cur_segment_mut() {
                         if let Some(ProductEditorSegment::N{ t: _, editor, ed_depth: _, cur_depth, cur_dist:_ }) = element.deref_mut() {
-                            if let Some(e) = editor {
-                                let mut ce = e.write().unwrap();
+                            if let Some(mut e) = editor.as_mut() {
                                 //\\//\\//\\//\\
                                 // horizontal //
                                 //\\//\\//\\//\\
-                                match ce.goby(direction) {
+                                match e.goby(direction) {
                                     TreeNavResult::Exit => {
                                        // *cur_depth = 1;
-                                        drop(ce);
                                         drop(e);
 
                                         if direction.y < 0 {

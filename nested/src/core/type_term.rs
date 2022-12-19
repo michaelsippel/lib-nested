@@ -126,7 +126,7 @@ impl TypeTerm {
 
 pub struct TypeDict {
     typenames: Bimap<String, u64>,
-    type_id_counter: u64,
+    type_id_counter: TypeID,
 }
 
 impl TypeDict {
@@ -137,10 +137,10 @@ impl TypeDict {
         }
     }
 
-    pub fn add_typename(&mut self, tn: String) -> u64 {
+    pub fn add_typename(&mut self, tn: String) -> TypeID {
         let tyid = self.type_id_counter;
-        self.typenames.insert(tn, tyid);
         self.type_id_counter += 1;
+        self.typenames.insert(tn, tyid);
         tyid
     }
 

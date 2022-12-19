@@ -2,11 +2,7 @@ use {
     crate::{
         core::{OuterViewPort, Context},
         singleton::{SingletonBuffer, SingletonView},
-        terminal::{
-            TerminalAtom,
-            TerminalEvent,
-            TerminalStyle
-        },
+        terminal::{TerminalAtom, TerminalEvent, TerminalStyle},
         tree::NestedNode, Commander
     },
     std::sync::Arc,
@@ -26,10 +22,12 @@ impl Commander for CharEditor {
             TerminalEvent::Input(Event::Key(Key::Char(c))) => {
                 self.data.set(Some(*c));
             }
+
             TerminalEvent::Input(Event::Key(Key::Backspace))
             | TerminalEvent::Input(Event::Key(Key::Delete)) => {
                 self.data.set(None);
             }
+
             _ => {}
         }
     }
@@ -65,7 +63,7 @@ impl CharEditor {
                       })
                       .to_grid()
             )
-            .with_cmd(
+            .set_cmd(
                 Arc::new(RwLock::new(CharEditor{ data }))
             )
     }

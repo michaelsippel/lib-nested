@@ -9,7 +9,8 @@ use {
         sum::SumEditor,
         char_editor::CharEditor,
         integer::PosIntEditor,
-        Nested
+        tree::NestedNode,
+        Commander, PtySegment
     },
     cgmath::{Vector2},
     termion::event::{Key},
@@ -27,128 +28,93 @@ enum TypeTermVar {
 }
 
 pub struct TypeTermEditor {
+    ctx: Arc<RwLock<Context>>,
     ty: TypeTermVar,
-    node: SumEditor,
+    sum_edit: Arc<RwLock<SumEditor>>
 }
 
 impl TypeTermEditor {
     pub fn new(ctx: Arc<RwLock<Context>>, depth: usize) -> Self {
         TypeTermEditor {
+            ctx: ctx.clone(),
             ty: TypeTermVar::Any,
-            node: SumEditor::new(
+            sum_edit: Arc::new(RwLock::new(SumEditor::new(
                 vec![
-                    Arc::new(RwLock::new(PTYListEditor::new(
-                        Box::new({
-                            let ctx = ctx.clone();
-                            move || {
-                                Arc::new(RwLock::new(TypeTermEditor::new(ctx.clone(), depth+1)))
-                            }
-                        }),
-                        SeqDecorStyle::HorizontalSexpr,
-                        Some(' '),
-                        depth
-                    ))),
-                    Arc::new(RwLock::new(PosIntEditor::new(10))),
-                    Arc::new(RwLock::new(PTYListEditor::new(
-                        Box::new({
-                            let ctx = ctx.clone();
-                            move || {
-                                Arc::new(RwLock::new(CharEditor::new_node(&ctx)))
-                            }
-                        }),
-                        SeqDecorStyle::Plain,
-                        None,
-                        depth
-                    ))),
-                ])
+                    Context::make_editor( &ctx, ctx.read().unwrap().type_term_from_str("( List TypeTerm 1 )").unwrap(), depth + 1).unwrap(),
+                    Context::make_editor( &ctx, ctx.read().unwrap().type_term_from_str("( PosInt 10 )").unwrap(), depth + 1 ).unwrap(),
+                    Context::make_editor( &ctx, ctx.read().unwrap().type_term_from_str("( Symbol )").unwrap(), depth + 1 ).unwrap()
+                ])))
         }
     }
-}
 
-impl TreeNav for TypeTermEditor {
-    fn get_cursor(&self) -> TreeCursor {
-        self.node.get_cursor()
-    }
-
-    fn get_cursor_warp(&self) -> TreeCursor {
-        self.node.get_cursor_warp()
-    }
-
-    fn goby(&mut self, direction: Vector2<isize>) -> TreeNavResult {
-        self.node.goby( direction )
-    }
-
-    fn goto(&mut self, new_cursor: TreeCursor) -> TreeNavResult {
-        self.node.goto( new_cursor )
+    pub fn into_node(self) -> NestedNode {
+        NestedNode::new()
+            .set_ctx(self.ctx.clone())
+            .set_nav(self.sum_edit.clone())
+            .set_cmd(self.sum_edit.clone())
+            .set_view(
+                self.sum_edit.read().unwrap().pty_view()
+            )
     }
 }
 
-impl TerminalEditor for TypeTermEditor {
-    fn get_term_view(&self) -> OuterViewPort<dyn TerminalView> {
-        self.node.get_term_view()
-    }
+impl Commander for TypeTermEditor {
+    type Cmd = TerminalEvent;
 
-    fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
+    fn send_cmd(&mut self, event: &TerminalEvent) {
         match event {
             TerminalEvent::Input( termion::event::Event::Key(Key::Char(c)) ) => {
                 match self.ty {
                     TypeTermVar::Any => {
                         self.ty =
                             if *c == '(' {
-                                self.node.select(0);
-                                self.dn();
+                                let mut se = self.sum_edit.write().unwrap();
+                                se.select(0);
+                                se.dn();
                                 TypeTermVar::List
                             } else if c.to_digit(10).is_some() {
-                                self.node.select(1);
-                                self.dn();
-                                self.node.handle_terminal_event( event );
+                                let mut se = self.sum_edit.write().unwrap();
+                                se.select(1);
+                                se.dn();
+                                se.send_cmd( event );
                                 TypeTermVar::Num
                             } else {
-                                self.node.select(2);
-                                self.dn();
-                                self.node.handle_terminal_event( event );
+                                let mut se = self.sum_edit.write().unwrap();
+                                se.select(2);
+                                se.dn();
+                                se.send_cmd( event );
                                 TypeTermVar::Symbol
                             };
-                        TerminalEditorResult::Continue
                     },
                     _ => {
                         if *c  == '(' {
                             let _child = Arc::new(RwLock::new(TypeTermEditor {
+                                ctx: self.ctx.clone(),
                                 ty: self.ty.clone(),
-                                node: SumEditor::new(
+                                sum_edit: Arc::new(RwLock::new(SumEditor::new(
                                     vec![
-                                        self.node.editors[0].clone(),
-                                        self.node.editors[1].clone(),
-                                        self.node.editors[2].clone(),
-                                    ])
+                                        self.sum_edit.read().unwrap().editors[0].clone(),
+                                        self.sum_edit.read().unwrap().editors[1].clone(),
+                                        self.sum_edit.read().unwrap().editors[2].clone(),
+                                    ])))
                             }));
-
                             self.ty = TypeTermVar::List;
-                            self.node.select(0);
+                            self.sum_edit.write().unwrap().select(0);
 /*
                             let l = self.node.editors[0].clone();
                             let l = l.downcast::<RwLock<PTYListEditor<TypeTermEditor>>>().unwrap();
                             l.write().unwrap().data.push(child);
                             */
-                            TerminalEditorResult::Continue
                         } else {
-                            self.node.handle_terminal_event( event )
+                            self.sum_edit.write().unwrap().send_cmd( event );
                         }
                     }
                 }
             },
             event => {
-                self.node.handle_terminal_event( event )
+                self.sum_edit.write().unwrap().send_cmd( event );
             }
         }
     }
 }
-
-impl Diagnostics for TypeTermEditor {
-    fn get_msg_port(&self) -> OuterViewPort<dyn SequenceView<Item = Message>> {
-        self.node.get_msg_port()
-    }
-}
-
-impl Nested for TypeTermEditor {}
 

@@ -13,7 +13,7 @@ use {
         tree::{TreeNav, TreeNavResult},
         diagnostics::{Diagnostics},
         terminal::{TerminalStyle},
-        Nested
+        tree::NestedNode
     },
     cgmath::{Point2},
     std::sync::{Arc, RwLock},
@@ -110,7 +110,7 @@ impl ProductEditor {
         Some(self.get_editor_segment_mut(self.cursor?))
     }
 
-    pub fn get_editor(&self, idx: isize) -> Option<Arc<RwLock<dyn Nested + Send + Sync>>> {
+    pub fn get_editor(&self, idx: isize) -> Option<NestedNode> {
         if let ProductEditorSegment::N{ t: _, editor, ed_depth: _, cur_depth: _, cur_dist: _ } = self.get_editor_segment(idx) {
             editor
         } else {
@@ -118,7 +118,7 @@ impl ProductEditor {
         }
     }
 
-    pub fn get_cur_editor(&self) -> Option<Arc<RwLock<dyn Nested + Send + Sync>>> {
+    pub fn get_cur_editor(&self) -> Option<NestedNode> {
         self.get_editor(self.cursor?)
     }
 
@@ -143,7 +143,7 @@ impl ProductEditor {
             };
 
             if let Some(e) = editor {
-                self.msg_buf.update(idx as usize, Some(e.read().unwrap().get_msg_port()));
+                self.msg_buf.update(idx as usize, Some(e.get_msg_port()));
             } else {
                 let mut b = VecBuffer::new();
                 b.push(crate::diagnostics::make_todo(crate::terminal::make_label(&format!("complete {}", self.ctx.read().unwrap().type_term_to_str(&t[0])))));
@@ -192,9 +192,8 @@ impl TerminalEditor for ProductEditor {
             if let Some(ProductEditorSegment::N{ t, editor, ed_depth, cur_depth, cur_dist: _ }) = segment.deref_mut() {
                 *cur_depth = self.get_cursor().tree_addr.len();
 
-                if let Some(e) = editor.clone() {
-                    let mut ce = e.write().unwrap();
-                    match ce.handle_terminal_event(event) {
+                if let Some(mut e) = editor.clone() {
+                    match e.handle_terminal_event(event) {
                         TerminalEditorResult::Exit =>
                             match event {
                                 TerminalEvent::Input(Event::Key(Key::Backspace)) => {
@@ -203,8 +202,7 @@ impl TerminalEditor for ProductEditor {
                                     TerminalEditorResult::Continue
                                 }
                                 _ => {
-                                    *cur_depth = ce.get_cursor().tree_addr.len();
-                                    drop(ce);
+                                    *cur_depth = e.get_cursor().tree_addr.len();
                                     match self.nexd() {
                                         TreeNavResult::Continue => TerminalEditorResult::Continue,
                                         TreeNavResult::Exit => TerminalEditorResult::Exit
@@ -212,17 +210,17 @@ impl TerminalEditor for ProductEditor {
                                 }
                             },
                         TerminalEditorResult::Continue => {
-                            *cur_depth = ce.get_cursor().tree_addr.len();
+                            *cur_depth = e.get_cursor().tree_addr.len();
                             TerminalEditorResult::Continue
                         }
                     }
                 } else {
-                    let e = Context::make_editor(self.ctx.clone(), t[0].clone(), *ed_depth+1).unwrap();
+                    let mut e = Context::make_editor(&self.ctx, t[0].clone(), *ed_depth+1).unwrap();
                     *editor = Some(e.clone());
                     update_segment = true;
 
-                    e.write().unwrap().dn();
-                    let x = e.write().unwrap().handle_terminal_event(event);
+                    e.dn();
+                    let x = e.handle_terminal_event(event);
                     x
                 }
             } else {

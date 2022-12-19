@@ -1,43 +1,44 @@
 use {
     crate::{
-        core::{OuterViewPort, ViewPort},
+        core::{OuterViewPort, ViewPort, Context, TypeTerm},
         list::{
             ListCursor,
-            ListSegment, ListSegmentSequence,
-            segment::PTYSegment
+            ListSegment,
+            ListSegmentSequence,
         },
         sequence::{SequenceView},
         singleton::{SingletonBuffer, SingletonView},
-        terminal::{
-            TerminalView,
-        },
-        Nested,
-        vec::VecBuffer
+        terminal::{TerminalView},
+        tree::NestedNode,
+        vec::{VecBuffer, MutableVecAccess},
+        PtySegment
     },
     std::sync::{Arc, RwLock},
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-pub struct ListEditor<ItemEditor>
-where ItemEditor: Nested + ?Sized + Send + Sync + 'static
-{
+pub struct ListEditor {
     pub(super) cursor: SingletonBuffer<ListCursor>,
-    pub(crate) data: VecBuffer<Arc<RwLock<ItemEditor>>>,
-    pub(super) make_item_editor: Box<dyn Fn() -> Arc<RwLock<ItemEditor>> + Send + Sync>,
+    pub(crate) data: VecBuffer<NestedNode>,
 
+    pub(crate) ctx: Arc<RwLock<Context>>,
+    pub(super) typ: TypeTerm,
     pub(super) depth: usize,
     pub(super) cur_dist: Arc<RwLock<usize>>,
 }
 
-impl<ItemEditor> ListEditor<ItemEditor>
-where ItemEditor: Nested + ?Sized + Send + Sync + 'static
-{
-    pub fn new(make_item_editor: impl Fn() -> Arc<RwLock<ItemEditor>> + Send + Sync + 'static, depth: usize) -> Self {
+impl ListEditor {
+    pub fn new(
+        ctx: Arc<RwLock<Context>>,
+        typ: TypeTerm,
+        depth: usize
+    ) -> Self {
         ListEditor {
             cursor: SingletonBuffer::new(ListCursor::default()),
-            data: VecBuffer::<Arc<RwLock<ItemEditor>>>::new(),
-            make_item_editor: Box::new(make_item_editor),
+            data: VecBuffer::<NestedNode>::new(),
+            ctx,
+            typ,
             depth,
             cur_dist: Arc::new(RwLock::new(0)),
         }
@@ -46,17 +47,16 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
     pub fn get_seg_seq_view(
         &self,
     ) -> OuterViewPort<dyn SequenceView<Item = OuterViewPort<dyn TerminalView>>> {
-        let segment_view_port = ViewPort::<dyn SequenceView<Item = ListSegment<ItemEditor>>>::new();
-        ListSegmentSequence::new(
+        let seg_seq = ListSegmentSequence::new(
             self.get_cursor_port(),
             self.get_data_port(),
-            segment_view_port.inner(),
             self.depth
         );
-        segment_view_port.into_outer().map(move |segment| segment.pty_view())
+        let se = seg_seq.read().unwrap();
+        se.get_view().map(move |segment| segment.pty_view())
     }
 
-    pub fn get_data_port(&self) -> OuterViewPort<dyn SequenceView<Item = Arc<RwLock<ItemEditor>>>> {
+    pub fn get_data_port(&self) -> OuterViewPort<dyn SequenceView<Item = NestedNode>> {
         self.data.get_port().to_sequence()
     }
 
@@ -64,11 +64,23 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
         self.cursor.get_port()
     }
 
-    pub fn get_item(&self) -> Option<Arc<RwLock<ItemEditor>>> {
+    pub fn get_item(&self) -> Option<NestedNode> {
         if let Some(idx) = self.cursor.get().idx {
             let idx = crate::modulo(idx as isize, self.data.len() as isize) as usize;
             if idx < self.data.len() {
                 Some(self.data.get(idx))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+    pub fn get_item_mut(&mut self) -> Option<MutableVecAccess<NestedNode>> {
+        if let Some(idx) = self.cursor.get().idx {
+            let idx = crate::modulo(idx as isize, self.data.len() as isize) as usize;
+            if idx < self.data.len() {
+                Some(self.data.get_mut(idx))
             } else {
                 None
             }

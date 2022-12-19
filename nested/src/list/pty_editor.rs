@@ -1,6 +1,6 @@
 use {
     crate::{
-        core::{OuterViewPort},
+        core::{OuterViewPort, Context, TypeTerm},
         list::{
             ListCursor, ListCursorMode,
             ListEditor
@@ -12,67 +12,99 @@ use {
         },
         tree::{TreeCursor, TreeNav, TreeNavResult},
         diagnostics::{Diagnostics},
-        Nested
+        tree::NestedNode, Nested,
+        Commander
     },
     std::sync::{Arc, RwLock},
     termion::event::{Event, Key},
     cgmath::Vector2
 };
 
-pub struct PTYListEditor<ItemEditor>
-where ItemEditor: Nested + ?Sized + Send + Sync + 'static
-{
-    pub editor: ListEditor<ItemEditor>,
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
+pub struct PTYListEditor {
+    pub editor: Arc<RwLock<ListEditor>>,
     split_char: Option<char>,
  
     style: SeqDecorStyle,
     depth: usize,
 
-    port: OuterViewPort<dyn TerminalView>
+    pub diag: OuterViewPort<dyn SequenceView<Item = crate::diagnostics::Message>>,
+    pub view: OuterViewPort<dyn TerminalView>
 }
 
-impl<ItemEditor> PTYListEditor<ItemEditor>
-where ItemEditor: Nested + ?Sized + Send + Sync + 'static
-{
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+
+impl PTYListEditor {
     pub fn new(
-        make_item_editor: impl Fn() -> Arc<RwLock<ItemEditor>> + Send + Sync + 'static,
+        ctx: Arc<RwLock<Context>>,
+        typ: TypeTerm,
         style: SeqDecorStyle,
         split_char: Option<char>,
         depth: usize
     ) -> Self {
-        Self::from_editor(ListEditor::new(make_item_editor, depth), style, split_char, depth)
+        Self::from_editor(
+            ListEditor::new(ctx, typ, depth), style, split_char, depth)
     }
 
     pub fn from_editor(
-        editor: ListEditor<ItemEditor>,
+        editor: ListEditor,
         style: SeqDecorStyle,
         split_char: Option<char>,
         depth: usize
     ) -> Self {
-        let port = editor
-            .get_seg_seq_view()
-            .pty_decorate(style, depth);
-
         PTYListEditor {
-            editor,
             split_char,
             style,
             depth,
-            port
+
+            view: editor.get_seg_seq_view().pty_decorate(style, depth),
+            diag: editor.get_data_port()
+                    .enumerate()
+                    .map(
+                        |(idx, item_editor)| {
+                            let idx = *idx;
+                            item_editor
+                                .get_msg_port()
+                                .map(
+                                    move |msg| {
+                                        let mut msg = msg.clone();
+                                        msg.addr.insert(0, idx);
+                                        msg
+                                    }
+                                )
+                        }
+                    )
+                    .flatten(),
+
+            editor: Arc::new(RwLock::new(editor)),
         } 
     }
 
-    pub fn get_data_port(&self) -> OuterViewPort<dyn SequenceView<Item = Arc<RwLock<ItemEditor>>>> {
-        self.editor.get_data_port()
+    pub fn into_node(self) -> NestedNode {
+        let editor = Arc::new(RwLock::new(self));
+
+        let ed = editor.read().unwrap();
+        let edd = ed.editor.read().unwrap();
+
+        NestedNode::new()
+            .set_cmd(editor.clone())
+            .set_nav(ed.editor.clone())
+            .set_ctx(edd.ctx.clone())
+            .set_diag(ed.diag.clone())
+            .set_view(ed.view.clone())
+    }
+    
+    pub fn get_data_port(&self) -> OuterViewPort<dyn SequenceView<Item = NestedNode>> {
+        self.editor.read().unwrap().get_data_port()
     }
     
     pub fn clear(&mut self) {
-        self.editor.clear();
+        self.editor.write().unwrap().clear();
     }
     
-    pub fn get_item(&self) -> Option<Arc<RwLock<ItemEditor>>> {
-        self.editor.get_item()
+    pub fn get_item(&self) -> Option<NestedNode> {
+        self.editor.read().unwrap().get_item()
     }
     
     pub fn set_depth(&mut self, depth: usize) {
@@ -84,95 +116,74 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
     }
 }
 
-impl<ItemEditor> TerminalEditor for PTYListEditor<ItemEditor>
-where ItemEditor: Nested + ?Sized + Send + Sync + 'static
-{
-    fn get_term_view(&self) -> OuterViewPort<dyn TerminalView> {
-        self.port.clone()
-    }
+impl Commander for PTYListEditor {
+    type Cmd = TerminalEvent;
 
-    fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
-        let mut cur = self.editor.cursor.get();
+    fn send_cmd(&mut self, event: &TerminalEvent) {
+        let mut e = self.editor.write().unwrap();
+
+        let mut cur = e.cursor.get();
         if let Some(idx) = cur.idx {
             match cur.mode {
                 ListCursorMode::Insert => match event {
                     TerminalEvent::Input(Event::Key(Key::Backspace)) => {
-                        if idx > 0 && idx <= self.editor.data.len() as isize {
+                        if idx > 0 && idx <= e.data.len() as isize {
                             cur.idx = Some(idx as isize - 1);
-                            self.editor.cursor.set(cur);
-                            self.editor.data.remove(idx as usize - 1);
-
-                            if self.editor.data.len() > 0 {
-                                TerminalEditorResult::Continue
-                            } else {
-                                TerminalEditorResult::Exit
-                            }
-                        } else {
-                            TerminalEditorResult::Exit
+                            e.cursor.set(cur);
+                            e.data.remove(idx as usize - 1);
                         }
                     }
                     TerminalEvent::Input(Event::Key(Key::Delete)) => {
-                        if idx < self.editor.data.len() as isize {
-                            self.editor.data.remove(idx as usize);
-                            TerminalEditorResult::Continue
-                        } else {
-                            TerminalEditorResult::Exit
+                        if idx < e.data.len() as isize {
+                            e.data.remove(idx as usize);
                         }
                     }
                     TerminalEvent::Input(Event::Key(Key::Char('\t')))
                     | TerminalEvent::Input(Event::Key(Key::Insert)) => {
-                        self.editor.set_leaf_mode(ListCursorMode::Select);
-                        TerminalEditorResult::Continue
+                        e.set_leaf_mode(ListCursorMode::Select);
                     }
                     TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {
-                        self.editor.goto(TreeCursor::none());
-                        TerminalEditorResult::Exit
+                        e.goto(TreeCursor::none());
                     }
                     _ => {
-                        let new_edit = (self.editor.make_item_editor)();
-                        self.editor.data.insert(idx as usize, new_edit.clone());
-                        self.editor.set_leaf_mode(ListCursorMode::Select);
+                        let mut new_edit = Context::make_editor(&e.ctx, e.typ.clone(), self.depth+1).unwrap();
+                        e.data.insert(idx as usize, new_edit.clone());
+                        e.set_leaf_mode(ListCursorMode::Select);
 
-                        let mut ne = new_edit.write().unwrap();
-                        ne.goto(TreeCursor::home());
-
-                        ne.handle_terminal_event(event);
+                        new_edit.goto(TreeCursor::home());
+                        new_edit.handle_terminal_event(event);
 
                         if self.split_char.is_none() {
-                            self.editor.cursor.set(ListCursor {
+                            e.cursor.set(ListCursor {
                                 mode: ListCursorMode::Insert,
                                 idx: Some(idx as isize + 1),
                             });
                         }
-
-                        TerminalEditorResult::Continue
                     }
                 },
                 ListCursorMode::Select => {
                     match event {
                         TerminalEvent::Input(Event::Key(Key::Char('\t')))
                             | TerminalEvent::Input(Event::Key(Key::Insert)) => {
-                                self.editor.set_leaf_mode(ListCursorMode::Insert);
-                                TerminalEditorResult::Continue
+                                e.set_leaf_mode(ListCursorMode::Insert);
                             }
 
                         TerminalEvent::Input(Event::Key(Key::Char(c))) => {
                             if Some(*c) == self.split_char {
-                                let c = self.editor.cursor.get();
-                                self.editor.goto(TreeCursor::none());
-                                self.editor.cursor.set(ListCursor {
+                                let c = e.cursor.get();
+                                e.goto(TreeCursor::none());
+                                e.cursor.set(ListCursor {
                                     mode: ListCursorMode::Insert,
                                     idx: Some(1 + c.idx.unwrap_or(0))
                                 });
-                                TerminalEditorResult::Continue
                             } else {
-                                if let Some(e) = self.editor.get_item() {
-                                    e.write().unwrap().handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Char(*c))));
+                                if let Some(mut ce) = e.get_item_mut() {
+                                    ce.handle_terminal_event(&TerminalEvent::Input(Event::Key(Key::Char(*c))));
                                     //match 
                                     if self.split_char.is_none() {
                                     //    TerminalEditorResult::Exit =>
                                         {
-                                            self.editor.cursor.set(ListCursor {
+                                            e.cursor.set(ListCursor {
                                                 mode: ListCursorMode::Insert,
                                                 idx: Some(idx as isize + 1),
                                             });
@@ -181,26 +192,21 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
                                       //  }
                                     }
                                 }
-                                TerminalEditorResult::Exit
                             }
                         }
                         ev => {
-                            if let Some(e) = self.editor.get_item() {
-                                match e.write().unwrap().handle_terminal_event(ev) {
-                                    TerminalEditorResult::Exit => {
-                                        match ev {
-                                            TerminalEvent::Input(Event::Key(Key::Ctrl('x'))) => {
-                                                return TerminalEditorResult::Exit
-                                            }
-                                            TerminalEvent::Input(Event::Key(Key::Backspace)) => {
-                                                self.editor.data.remove(idx as usize);
-                                                self.editor.cursor.set(ListCursor {
+                            if let Some(mut ce) = e.get_item_mut() {
+                                ce.handle_terminal_event(ev);
+/*
+                                TerminalEvent::Input(Event::Key(Key::Backspace)) => {
+                                                e.data.remove(idx as usize);
+                                                e.cursor.set(ListCursor {
                                                     mode: ListCursorMode::Insert,
                                                     idx: Some(idx as isize),
                                                 });                             
                                             }
                                             _ => {
-                                                self.editor.cursor.set(ListCursor {
+                                                e.cursor.set(ListCursor {
                                                     mode: ListCursorMode::Insert,
                                                     idx: Some(idx as isize + 1),
                                                 });                                                
@@ -210,90 +216,14 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
                                     TerminalEditorResult::Continue => {
                                         
                                     }
-                                }
                             }
-
-                            TerminalEditorResult::Continue
+                                */
+                            }
                         }
                     }
                 }
             }
-        } else {
-            TerminalEditorResult::Continue
         }
-    }
-}
-
-impl<ItemEditor> TreeNav for PTYListEditor<ItemEditor>
-where ItemEditor: Nested + ?Sized + Send + Sync + 'static
-{
-    fn get_cursor_warp(&self) -> TreeCursor {
-        self.editor.get_cursor_warp()
-    }
-
-    fn get_cursor(&self) -> TreeCursor {
-        self.editor.get_cursor()
-    }
-
-    fn goby(&mut self, direction: Vector2<isize>) -> TreeNavResult {
-        self.editor.goby(direction)
-    }
-
-    fn goto(&mut self, cursor: TreeCursor) -> TreeNavResult {
-        self.editor.goto(cursor)
-    }
-}
-
-impl<ItemEditor> Diagnostics for PTYListEditor<ItemEditor>
-where ItemEditor: Nested + ?Sized + Send + Sync + 'static
-{
-    fn get_msg_port(&self) -> OuterViewPort<dyn SequenceView<Item = crate::diagnostics::Message>> {
-        self.editor
-            .get_data_port()
-            .enumerate()
-            .map(
-                |(idx, item_editor)| {
-                    let idx = *idx;
-                    item_editor.read().unwrap()
-                        .get_msg_port()
-                        .map(
-                            move |msg| {
-                                let mut msg = msg.clone();
-                                msg.addr.insert(0, idx);
-                                msg
-                            }
-                        )
-                }
-            )
-            .flatten()
-    }
-}
-
-/*
-impl<ItemEditor> TreeType for PTYListEditor<ItemEditor>
-where ItemEditor: Nested + TreeType + ?Sized + Send + Sync + 'static
-{
-    fn get_type(&self, addr: &Vec<usize>) -> TypeTerm {
-        TypeTerm::new(0)
-    }
-}
-*/
-impl<ItemEditor> Nested for PTYListEditor<ItemEditor>
-where ItemEditor: Nested + ?Sized + Send + Sync + 'static
-{}
-
-use crate::{
-    sequence::SequenceViewExt,
-    StringGen
-};
-
-impl<ItemEditor: StringGen + Nested + Send + Sync> StringGen for PTYListEditor<ItemEditor> {
-
-   fn get_string(&self) -> String {
-        self.get_data_port()
-            .map(|ce| ce.read().unwrap().get_string())
-            .get_view().unwrap()
-            .iter().collect::<String>()
     }
 }
 

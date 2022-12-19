@@ -13,7 +13,7 @@ use {
         core::{port::UpdateTask, Observer, AnyOuterViewPort, ViewPort, Context, ReprTree},
         index::IndexArea,
         list::{ListCursorMode, PTYListEditor},
-        sequence::{decorator::{SeqDecorStyle}},
+        sequence::{decorator::{SeqDecorStyle, Separate}},
         terminal::{
             make_label, Terminal, TerminalAtom, TerminalCompositor, TerminalEditor,
             TerminalEditorResult, TerminalEvent, TerminalStyle,
@@ -21,7 +21,8 @@ use {
         tree::{TreeNav, TreeCursor, TreeNavResult},
         vec::VecBuffer,
         diagnostics::{Diagnostics},
-        index::{buffer::IndexBuffer}
+        index::{buffer::IndexBuffer},
+        Commander
     },
     std::sync::{Arc, RwLock},
     termion::event::{Event, Key},
@@ -60,7 +61,7 @@ async fn main() {
 
     let vb = VecBuffer::<char>::new();
     let rt_char = ReprTree::new_leaf(
-        ctx.read().unwrap().type_term_from_str("( List Char )").unwrap(),
+        ctx.read().unwrap().type_term_from_str("( List Char 0 )").unwrap(),
         AnyOuterViewPort::from(vb.get_port())
     );
     let rt_digit = ReprTree::upcast(&rt_char, ctx.read().unwrap().type_term_from_str("( List ( Digit 10 ) )").unwrap());
@@ -96,19 +97,16 @@ async fn main() {
     let c = ctx.clone();
     let mut process_list_editor =
         PTYListEditor::new(
-            Box::new( move || {
-                Arc::new(RwLock::new(nested::type_term_editor::TypeTermEditor::new(c.clone(), 1)))
-//                Arc::new(RwLock::new(CharEditor::new_node(&c)))
-                //Context::make_editor( c.clone(), c.read().unwrap().type_term_from_str("( String )").unwrap(), 1 ).unwrap()
-            }),
+            ctx.clone(),
+            c.read().unwrap().type_term_from_str("( List Path 1 )").unwrap(),
             SeqDecorStyle::Plain,
             Some('\n'),
-            0
-);
+            3
+        );
 
     async_std::task::spawn(async move {
         let mut table = nested::index::buffer::IndexBuffer::new();
-        
+
         let magic =
             make_label("<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>")
             .map_item(|pos, atom| {
@@ -131,7 +129,8 @@ async fn main() {
             (Point2::new(0, 2), magic.clone()),
             (Point2::new(0, 3), make_label(" ")),
             (Point2::new(0, 4),
-             process_list_editor.editor
+             process_list_editor
+             .editor.read().unwrap()
              .get_seg_seq_view()
              .enumerate()
              .map(
@@ -158,7 +157,6 @@ async fn main() {
                      buf.get_port()
                  }
              )
-             /*
              .separate({
                  let mut buf = IndexBuffer::new();
                  buf.insert(Point2::new(1,0),
@@ -169,9 +167,7 @@ async fn main() {
                             )
                  );
                  buf.get_port()
-             }
-            )
-             */
+             })
              .to_grid_vertical()
              .flatten()
              .flatten()
@@ -180,7 +176,7 @@ async fn main() {
             (Point2::new(0, 5), make_label(" ")),
             (Point2::new(0, 6), magic.clone()),
 
-            (Point2::new(0, 7), process_list_editor.get_msg_port().map(
+            (Point2::new(0, 7), process_list_editor.diag.map(
                 |entry| {
                     let mut b = VecBuffer::new();
                     b.push(
@@ -234,7 +230,7 @@ async fn main() {
             .unwrap()
             .push(table.get_port().flatten().offset(Vector2::new(3, 0)));
 
-        process_list_editor.goto(TreeCursor {
+        process_list_editor.editor.write().unwrap().goto(TreeCursor {
             leaf_mode: ListCursorMode::Insert,
             tree_addr: vec![0],
         });
@@ -269,54 +265,50 @@ async fn main() {
             match ev {
                 TerminalEvent::Input(Event::Key(Key::Ctrl('d'))) => break,
                 TerminalEvent::Input(Event::Key(Key::Ctrl('l'))) => {
-                    process_list_editor.goto(TreeCursor {
+                    process_list_editor.editor.write().unwrap().goto(TreeCursor {
                         leaf_mode: ListCursorMode::Insert,
                         tree_addr: vec![0],
                     });
                     //process_list_editor.clear();
                 }
                 TerminalEvent::Input(Event::Key(Key::Left)) => {
-                    process_list_editor.pxev();
+                    process_list_editor.editor.write().unwrap().pxev();
                 }
                 TerminalEvent::Input(Event::Key(Key::Right)) => {
-                    process_list_editor.nexd();
+                    process_list_editor.editor.write().unwrap().nexd();
                 }
                 TerminalEvent::Input(Event::Key(Key::Up)) => {
-                    if process_list_editor.up() == TreeNavResult::Exit {
-                        process_list_editor.dn();
+                    if process_list_editor.editor.write().unwrap().up() == TreeNavResult::Exit {
+                        process_list_editor.editor.write().unwrap().dn();
                     }
                 }
                 TerminalEvent::Input(Event::Key(Key::Down)) => {
-                    process_list_editor.dn();
+                    process_list_editor.editor.write().unwrap().dn();
                     // == TreeNavResult::Continue {
                         //process_list_editor.goto_home();
                     //}
                 }
                 TerminalEvent::Input(Event::Key(Key::Home)) => {
-                    process_list_editor.qpxev();
+                    process_list_editor.editor.write().unwrap().qpxev();
                 }
                 TerminalEvent::Input(Event::Key(Key::End)) => {
-                    process_list_editor.qnexd();
+                    process_list_editor.editor.write().unwrap().qnexd();
                 }
                 TerminalEvent::Input(Event::Key(Key::Char('\t'))) => {
-                    let mut c = process_list_editor.get_cursor();
+                    let mut c = process_list_editor.editor.read().unwrap().get_cursor();
                     c.leaf_mode = match c.leaf_mode {
                         ListCursorMode::Select => ListCursorMode::Insert,
                         ListCursorMode::Insert => ListCursorMode::Select
                     };
-                    process_list_editor.goto(c);
+                    process_list_editor.editor.write().unwrap().goto(c);
                 }
                 ev => {
-                    if let TerminalEditorResult::Exit =
-                        process_list_editor.handle_terminal_event(&ev)
-                    {
-                        //process_list_editor.nexd();
-                    }
+                    process_list_editor.send_cmd(&ev);
                 }
             }
 
             status_chars.clear();
-            let cur = process_list_editor.get_cursor();
+            let cur = process_list_editor.editor.read().unwrap().get_cursor();
 
             if cur.tree_addr.len() > 0 {
                 status_chars.push(TerminalAtom::new(

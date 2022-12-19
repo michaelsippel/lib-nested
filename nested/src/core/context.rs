@@ -4,7 +4,7 @@ use {
             type_term::{TypeDict, TypeTerm, TypeID},
             AnyOuterViewPort, OuterViewPort, View,
         },
-        Nested
+        tree::NestedNode
     },
     std::{
         collections::HashMap,
@@ -248,7 +248,7 @@ pub struct Context {
     objects: HashMap<String, Arc<RwLock<ReprTree>>>,
 
     /// editors
-    editor_ctors: HashMap<TypeID, Arc<dyn Fn(Arc<RwLock<Self>>, TypeTerm, usize) -> Option<Arc<RwLock<dyn Nested + Send + Sync>>> + Send + Sync>>,
+    editor_ctors: HashMap<TypeID, Arc<dyn Fn(Arc<RwLock<Self>>, TypeTerm, usize) -> Option<NestedNode> + Send + Sync>>,
 
     /// morphisms
     default_constructors: HashMap<TypeTerm, Box<dyn Fn() -> Arc<RwLock<ReprTree>> + Send + Sync>>,
@@ -281,6 +281,10 @@ impl Context {
         self.type_dict.write().unwrap().add_typename(tn);
     }
 
+    pub fn get_typeid(&self, tn: &str) -> Option<TypeID> {
+        self.type_dict.read().unwrap().get_typeid(&tn.into())
+    }
+
     pub fn type_term_from_str(&self, tn: &str) -> Option<TypeTerm> {
         self.type_dict.read().unwrap().type_term_from_str(&tn)
     }
@@ -289,13 +293,15 @@ impl Context {
         self.type_dict.read().unwrap().type_term_to_str(&t)
     }
 
-    pub fn add_editor_ctor(&mut self, tn: &str, mk_editor: Arc<dyn Fn(Arc<RwLock<Self>>, TypeTerm, usize) -> Option<Arc<RwLock<dyn Nested + Send + Sync>>> + Send + Sync>) {
+    pub fn add_editor_ctor(&mut self, tn: &str, mk_editor: Arc<dyn Fn(Arc<RwLock<Self>>, TypeTerm, usize) -> Option<NestedNode> + Send + Sync>) {
         let mut dict = self.type_dict.write().unwrap();
-        let tyid = dict.get_typeid(&tn.into()).unwrap_or( dict.add_typename(tn.into()) );
+        let tyid = dict
+            .get_typeid(&tn.into())
+            .unwrap_or( dict.add_typename(tn.into()) );
         self.editor_ctors.insert(tyid, mk_editor);
     }
 
-    pub fn get_editor_ctor(&self, ty: &TypeTerm) -> Option<Arc<dyn Fn(Arc<RwLock<Self>>, TypeTerm, usize) -> Option<Arc<RwLock<dyn Nested + Send + Sync>>> + Send + Sync>> {
+    pub fn get_editor_ctor(&self, ty: &TypeTerm) -> Option<Arc<dyn Fn(Arc<RwLock<Self>>, TypeTerm, usize) -> Option<NestedNode> + Send + Sync>> {
         if let TypeTerm::Type{ id, args: _ } = ty.clone() {
             if let Some(m) = self.editor_ctors.get(&id).cloned() {
                 Some(m)
@@ -309,9 +315,9 @@ impl Context {
         }
     }
 
-    pub fn make_editor(ctx: Arc<RwLock<Self>>, type_term: TypeTerm, depth: usize) -> Option<Arc<RwLock<dyn Nested + Send + Sync>>> {
+    pub fn make_editor(ctx: &Arc<RwLock<Self>>, type_term: TypeTerm, depth: usize) -> Option<NestedNode> {
         let mk_editor = ctx.read().unwrap().get_editor_ctor(&type_term)?;
-        mk_editor(ctx, type_term, depth)
+        mk_editor(ctx.clone(), type_term, depth)
     }
 
     pub fn add_morphism(

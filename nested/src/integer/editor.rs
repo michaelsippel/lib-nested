@@ -1,6 +1,6 @@
 use {
     crate::{
-        core::{OuterViewPort},
+        core::{OuterViewPort, Context, TypeTerm},
         list::{PTYListEditor},
         sequence::{SequenceView, SequenceViewExt, decorator::{PTYSeqDecorate, SeqDecorStyle}},
         singleton::{SingletonBuffer, SingletonView},
@@ -12,7 +12,9 @@ use {
         },
         tree::{TreeCursor, TreeNav, TreeNavResult},
         diagnostics::{Diagnostics, Message},
-        Nested
+        tree::NestedNode,
+        Nested,
+        Commander
     },
     std::sync::Arc,
     std::sync::RwLock,
@@ -23,51 +25,17 @@ use {
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub struct DigitEditor {
+    ctx: Arc<RwLock<Context>>,
     radix: u32,
     data: SingletonBuffer<Option<char>>,
     msg: VecBuffer<Message>,
 }
 
-impl DigitEditor {
-    pub fn new(radix: u32) -> Self {
-        DigitEditor {
-            radix,
-            data: SingletonBuffer::new(None),
-            msg: VecBuffer::new(),
-        }
-    }
+impl Commander for DigitEditor {
+    type Cmd = TerminalEvent;
 
-    pub fn get_data_port(&self) -> OuterViewPort<dyn SingletonView<Item = Option<u32>>> {
-        let radix = self.radix;
-        self.data.get_port().map(move |c| c?.to_digit(radix))
-    }
-}
-
-impl TreeNav for DigitEditor {}
-impl TerminalEditor for DigitEditor {
-    fn get_term_view(&self) -> OuterViewPort<dyn TerminalView> {
-        let radix = self.radix;
-        self.data
-            .get_port()
-            .map(move |c| {
-                TerminalAtom::new(
-                    c.unwrap_or('?'),
-                    if c.unwrap_or('?').to_digit(radix).is_some() {
-                        TerminalStyle::fg_color((100, 140, 100))
-                    } else {
-                        //TerminalStyle::bg_color((90, 10, 10))
-                        TerminalStyle::fg_color((200, 40, 40))
-                    },
-                )
-            })
-            .to_grid()
-    }
-
-    fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
+    fn send_cmd(&mut self, event: &TerminalEvent) {
         match event {
-            TerminalEvent::Input(Event::Key(Key::Ctrl('x')))
-            | TerminalEvent::Input(Event::Key(Key::Char(' ')))
-            | TerminalEvent::Input(Event::Key(Key::Char('\n'))) => TerminalEditorResult::Exit,
             TerminalEvent::Input(Event::Key(Key::Char(c))) => {
                 self.data.set(Some(*c));
 
@@ -82,50 +50,97 @@ impl TerminalEditor for DigitEditor {
                     ]);
                     self.msg.push(crate::diagnostics::make_error(mb.get_port().flatten()));
                 }
-
-                TerminalEditorResult::Exit
             }
             TerminalEvent::Input(Event::Key(Key::Backspace))
-            | TerminalEvent::Input(Event::Key(Key::Delete)) => {
-                self.data.set(None);
-                self.msg.clear();
-                self.msg.push(crate::diagnostics::make_warn(make_label("empty digit")));
-                TerminalEditorResult::Exit
-            }
-            _ => TerminalEditorResult::Continue,
+                | TerminalEvent::Input(Event::Key(Key::Delete)) => {
+                    self.data.set(None);
+                    self.msg.clear();
+                    self.msg.push(crate::diagnostics::make_warn(make_label("empty digit")));
+                }
+            _ => {}
         }
     }
 }
 
-impl Nested for DigitEditor {}
+impl DigitEditor {
+    pub fn new(ctx: Arc<RwLock<Context>>, radix: u32) -> Self {
+        DigitEditor {
+            ctx,
+            radix,
+            data: SingletonBuffer::new(None),
+            msg: VecBuffer::new(),
+        }
+    }
 
-impl Diagnostics for DigitEditor {
-    fn get_msg_port(&self) -> OuterViewPort<dyn SequenceView<Item = crate::diagnostics::Message>> {
-        self.msg.get_port().to_sequence()
+    pub fn into_node(self) -> NestedNode {
+        let editor = Arc::new(RwLock::new(self));
+        let ed = editor.read().unwrap();
+        let r = ed.radix;
+
+        NestedNode::new()
+            .set_ctx(ed.ctx.clone())
+            .set_cmd(editor.clone())
+            .set_view(
+                ed.data
+                    .get_port()
+                    .map(move |c| {
+                        TerminalAtom::new(
+                            c.unwrap_or('?'),
+                            if c.unwrap_or('?').to_digit(r).is_some() {
+                                TerminalStyle::fg_color((100, 140, 100))
+                            } else {
+                                //TerminalStyle::bg_color((90, 10, 10))
+                                TerminalStyle::fg_color((200, 40, 40))
+                            },
+                        )
+                    })
+                    .to_grid()
+            )
+            .set_diag(
+                ed.msg.get_port().to_sequence()
+            )
+    }
+
+    pub fn get_data_port(&self) -> OuterViewPort<dyn SingletonView<Item = Option<u32>>> {
+        let radix = self.radix;
+        self.data.get_port().map(move |c| c?.to_digit(radix))
     }
 }
 
 pub struct PosIntEditor {
     radix: u32,
-    digits_editor: PTYListEditor<DigitEditor>
+    digits: NestedNode
 }
 
 impl PosIntEditor {
-    pub fn new(radix: u32) -> Self {
+    pub fn new(ctx: Arc<RwLock<Context>>, radix: u32) -> Self {
         PosIntEditor {
             radix,
-            digits_editor: PTYListEditor::new(
-                Box::new(move || Arc::new(RwLock::new(DigitEditor::new(radix)))) as Box<dyn Fn() -> Arc<RwLock<DigitEditor>> + Send + Sync>,
-                SeqDecorStyle::Hex,
+            digits: PTYListEditor::new(
+                ctx.clone(),
+                TypeTerm::Type {
+                    id: ctx.read().unwrap().get_typeid("Digit").unwrap(),
+                    args: vec![
+                        TypeTerm::Num(radix as i64)
+                    ]
+                },
+                match radix {
+                    16 => SeqDecorStyle::Hex,
+                    _ => SeqDecorStyle::Plain
+                },
                 None,
                 0
-            ),
+            ).into_node()
         }
     }
 
+    pub fn into_node(self) -> NestedNode {
+        self.digits
+    }
+/*
     pub fn get_data_port(&self) -> OuterViewPort<dyn SequenceView<Item = u32>> {
         let radix = self.radix;
-        self.digits_editor.editor
+        self.digits
             .get_data_port()
             .filter_map(move |digit_editor| {
                 digit_editor.read().unwrap().data.get()?.to_digit(radix)
@@ -149,64 +164,7 @@ impl PosIntEditor {
         }
 
         value
-    }
 }
-
-impl Diagnostics for PosIntEditor {
-    fn get_msg_port(&self) -> OuterViewPort<dyn SequenceView<Item = crate::diagnostics::Message>> {
-        self.digits_editor.get_msg_port()
-    }
+*/
 }
-
-impl TreeNav for PosIntEditor {
-    fn get_cursor(&self) -> TreeCursor {
-        self.digits_editor.get_cursor()
-    }
-    fn get_cursor_warp(&self) -> TreeCursor {
-        self.digits_editor.get_cursor_warp()
-    }
-    fn goto(&mut self, cur: TreeCursor) -> TreeNavResult {
-        self.digits_editor.goto(cur)
-    }
-    fn goby(&mut self, cur: Vector2<isize>) -> TreeNavResult {
-        self.digits_editor.goby(cur)
-    }
-}
-
-impl TerminalEditor for PosIntEditor {
-    fn get_term_view(&self) -> OuterViewPort<dyn TerminalView> {
-        match self.radix {
-            10 => {
-                self.digits_editor.editor
-                    .get_seg_seq_view()
-                    .pty_decorate(SeqDecorStyle::Plain, 0)
-            },
-            16 => {
-                self.digits_editor.editor
-                    .get_seg_seq_view()
-                    .pty_decorate(SeqDecorStyle::Hex, 0)
-            }
-            _ => {
-                self.digits_editor.editor
-                    .get_seg_seq_view()
-                    .pty_decorate(SeqDecorStyle::Plain, 0)
-            }
-        }
-    }
-
-    fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
-        match event {
-            TerminalEvent::Input(Event::Key(Key::Ctrl('x')))
-            | TerminalEvent::Input(Event::Key(Key::Char(' ')))
-            | TerminalEvent::Input(Event::Key(Key::Char('\n'))) => {
-                self.digits_editor.up();
-                TerminalEditorResult::Exit
-            }
-
-            event => self.digits_editor.handle_terminal_event(event),
-        }
-    }
-}
-
-impl Nested for PosIntEditor {}
 

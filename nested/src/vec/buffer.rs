@@ -55,7 +55,7 @@ where
     pub fn new() -> Self {
         VecBuffer::with_port(ViewPort::new().into_inner())
     }
-    
+
     pub fn get_port(&self) -> OuterViewPort<RwLock<Vec<T>>> {
         self.port.0.outer()
     }

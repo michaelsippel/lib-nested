@@ -6,7 +6,7 @@ use {
             make_label
         },
         color::{bg_style_from_depth, fg_style_from_depth},
-        Nested
+        tree::{NestedNode, TreeNav}
     },
     std::{sync::{Arc, RwLock}},
 };
@@ -16,7 +16,7 @@ pub enum ProductEditorSegment {
     T( String, usize ),
     N {
         t: TypeLadder,
-        editor: Option<Arc<RwLock<dyn Nested + Send + Sync>>>,
+        editor: Option<NestedNode>,
         ed_depth: usize,
         cur_depth: usize,
         cur_dist: isize
@@ -36,15 +36,14 @@ impl ProductEditorSegment {
             ),
 
             ProductEditorSegment::N { t: _, editor: Some(e), ed_depth, cur_depth: _, cur_dist } =>
-                e.read().unwrap()
-                .get_term_view()
+                e.get_view()
                 .map_item({
                     let e = e.clone();
                     let d = *ed_depth;
                     let cur_dist = *cur_dist;
 
                     move |_i, x| {
-                        let c = e.read().unwrap().get_cursor();
+                        let c = e.get_cursor();
                         let cur_depth = c.tree_addr.len();
                         let select =
                             if cur_dist == 0 {

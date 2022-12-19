@@ -8,7 +8,9 @@ use {
         sequence::{SequenceView},
         tree::{TreeNav, TreeCursor, TreeNavResult},
         diagnostics::{Diagnostics, Message},
-        Nested
+        tree::NestedNode,
+        Commander,
+        PtySegment
     },
     cgmath::{Vector2},
     std::sync::{Arc, RwLock},
@@ -17,7 +19,7 @@ use {
 
 pub struct SumEditor {
     cur: usize,
-    pub editors: Vec< Arc<RwLock<dyn Nested + Send + Sync + 'static>> >,
+    pub editors: Vec< NestedNode >,
 
     port: ViewPort< dyn TerminalView >,
     diag_port: ViewPort< dyn SequenceView<Item = Message> >
@@ -25,7 +27,7 @@ pub struct SumEditor {
 
 impl SumEditor {
     pub fn new(
-        editors: Vec< Arc<RwLock<dyn Nested + Send + Sync + 'static>> >
+        editors: Vec< NestedNode >
     ) -> Self {
         let port = ViewPort::new();
         //let mut diag_buf = VecBuffer::new();
@@ -37,21 +39,30 @@ impl SumEditor {
             diag_port: ViewPort::new()//diag_buf.get_port().to_sequence()
         }
     }
-
-    pub fn get(&self) -> Arc<RwLock<dyn Nested + Send + Sync>> {
+/*
+    pub fn into_node(self) -> NestedNode {
+        let editor = Arc::new(RwLock::new(self));
+        NestedNode::new()
+            .set_view()
+            .set_cmd(editor.clone())
+            .set_nav(editor.clone())
+            .set_diag(editor.read().unwrap().diag.clone())
+    }
+*/
+    pub fn get(&self) -> NestedNode {
         self.editors[ self.cur ].clone()
     }
 
     pub fn select(&mut self, idx: usize) {
         self.cur = idx;
 
-        let tv = self.editors[ self.cur ].read().unwrap().get_term_view();
+        let tv = self.editors[ self.cur ].get_term_view();
         tv.add_observer( self.port.get_cast() );
         self.port.update_hooks.write().unwrap().clear();
         self.port.add_update_hook( Arc::new(tv.0.clone()) );
         self.port.set_view( Some(tv.get_view_arc()) );
 
-        let dv = self.editors[ self.cur ].read().unwrap().get_msg_port();
+        let dv = self.editors[ self.cur ].get_msg_port();
         dv.add_observer( self.diag_port.get_cast() );
         self.diag_port.update_hooks.write().unwrap().clear();
         self.diag_port.add_update_hook( Arc::new(dv.0.clone()) );
@@ -61,55 +72,48 @@ impl SumEditor {
 
 impl TreeNav for SumEditor {
     fn get_cursor(&self) -> TreeCursor {
-        self.editors[ self.cur ].write().unwrap().get_cursor()
+        self.editors[ self.cur ].get_cursor()
     }
 
     fn get_cursor_warp(&self) -> TreeCursor {
-        self.editors[ self.cur ].write().unwrap().get_cursor_warp()
+        self.editors[ self.cur ].get_cursor_warp()
     }
 
     fn goby(&mut self, direction: Vector2<isize>) -> TreeNavResult {
-        self.editors[ self.cur ].write().unwrap().goby( direction )
+        self.editors[ self.cur ].goby( direction )
     }
 
     fn goto(&mut self, new_cursor: TreeCursor) -> TreeNavResult {
-        self.editors[ self.cur ].write().unwrap().goto( new_cursor )
+        self.editors[ self.cur ].goto( new_cursor )
     }
 }
 
-impl TerminalEditor for SumEditor {
-    fn get_term_view(&self) -> OuterViewPort<dyn TerminalView> {
+impl PtySegment for SumEditor {
+    fn pty_view(&self) -> OuterViewPort<dyn TerminalView> {
         self.port.outer()
     }
+}
 
-    fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
+impl Commander for SumEditor {
+    type Cmd = TerminalEvent;
+
+    fn send_cmd(&mut self, event: &TerminalEvent) {
         match event {
             TerminalEvent::Input( termion::event::Event::Key(Key::Ctrl('x')) ) => {
-                let res = self.editors[ self.cur ].write().unwrap().handle_terminal_event( event );
+                let res = self.editors[ self.cur ].handle_terminal_event( event );
                 match res {
                     TerminalEditorResult::Exit => {
                         self.select( (self.cur + 1) % self.editors.len() );
-                        if self.editors[ self.cur ].read().unwrap().get_cursor().tree_addr.len() == 0 {
+                        if self.editors[ self.cur ].get_cursor().tree_addr.len() == 0 {
                             self.dn();
                         }
-                        TerminalEditorResult::Continue
                     },
-                    _ => TerminalEditorResult::Continue
+                    _ => {}
                 }
             },
             event => {
-                self.editors[ self.cur ].write().unwrap().handle_terminal_event( event )
+                self.editors[ self.cur ].handle_terminal_event( event );
             }
         }
     }
 }
-
-impl Diagnostics for SumEditor {
-    fn get_msg_port(&self) -> OuterViewPort<dyn SequenceView<Item = Message>> {
-        self.diag_port.outer()
-    }
-}
-
-impl Nested for SumEditor {}
-
-

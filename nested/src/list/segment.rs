@@ -1,35 +1,30 @@
 use {
     crate::{
-        core::{InnerViewPort, Observer, ObserverBroadcast, ObserverExt, OuterViewPort, View},
+        core::{InnerViewPort, Observer, ObserverBroadcast, ObserverExt, OuterViewPort, View, ViewPort},
         list::{ListCursor, ListCursorMode},
         projection::ProjectionHelper,
         sequence::SequenceView,
         singleton::SingletonView,
         terminal::{TerminalView, TerminalStyle, make_label},
-        Nested,
-        color::{bg_style_from_depth, fg_style_from_depth}
+        tree::{NestedNode, TreeNav},
+        color::{bg_style_from_depth, fg_style_from_depth},
+        PtySegment
     },
     std::sync::Arc,
     std::sync::RwLock,
 };
 
-pub enum ListSegment<ItemEditor>
-where ItemEditor: Nested + ?Sized + Send + Sync + 'static
+pub enum ListSegment
 {
     InsertCursor,
     Item {
-        editor: Arc<RwLock<ItemEditor>>,
+        editor: NestedNode,
         depth: usize,
         cur_dist: isize,
     }
 }
 
-pub trait PTYSegment {
-    fn pty_view(&self) -> OuterViewPort<dyn TerminalView>;
-}
-
-impl<ItemEditor> PTYSegment for ListSegment<ItemEditor>
-where ItemEditor: Nested + ?Sized + Send + Sync + 'static
+impl PtySegment for ListSegment
 {
     fn pty_view(&self) -> OuterViewPort<dyn TerminalView> {
         match self {
@@ -44,8 +39,8 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
                 let e = editor.clone();
                 let d = *depth;
                 let cur_dist = *cur_dist;
-                editor.read().unwrap().get_term_view().map_item(move |_pt, atom| {
-                    let c = e.read().unwrap().get_cursor();
+                editor.get_view().map_item(move |_pt, atom| {
+                    let c = e.get_cursor();
                     let cur_depth = c.tree_addr.len();
                     let select =
                         if cur_dist == 0 {
@@ -63,29 +58,27 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
     }
 }
 
-pub struct ListSegmentSequence<ItemEditor>
-where ItemEditor: Nested + ?Sized + Send + Sync + 'static
+pub struct ListSegmentSequence
 {
-    data: Arc<dyn SequenceView<Item = Arc<RwLock<ItemEditor>>>>,
+    data: Arc<dyn SequenceView<Item = NestedNode>>,
     cursor: Arc<dyn SingletonView<Item = ListCursor>>,
 
     depth: usize,
     cur_cursor: ListCursor,
 
-    cast: Arc<RwLock<ObserverBroadcast<dyn SequenceView<Item = ListSegment<ItemEditor>>>>>,
+    port: ViewPort<dyn SequenceView<Item = ListSegment>>,
+    cast: Arc<RwLock<ObserverBroadcast<dyn SequenceView<Item = ListSegment>>>>,
     proj_helper: ProjectionHelper<usize, Self>,
 }
 
-impl<ItemEditor> View for ListSegmentSequence<ItemEditor>
-where ItemEditor: Nested + ?Sized + Send + Sync + 'static
+impl View for ListSegmentSequence
 {
     type Msg = usize;
 }
 
-impl<ItemEditor> SequenceView for ListSegmentSequence<ItemEditor>
-where ItemEditor: Nested + ?Sized + Send + Sync + 'static
+impl SequenceView for ListSegmentSequence
 {
-    type Item = ListSegment<ItemEditor>;
+    type Item = ListSegment;
 
     fn len(&self) -> Option<usize> {
         match self.cur_cursor.mode {
@@ -135,18 +128,18 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
     }
 }
 
-impl<ItemEditor> ListSegmentSequence<ItemEditor>
-where ItemEditor: Nested + ?Sized + Send + Sync + 'static
+impl ListSegmentSequence
 {
     pub fn new(
         cursor_port: OuterViewPort<dyn SingletonView<Item = ListCursor>>,
-        data_port: OuterViewPort<dyn SequenceView<Item = Arc<RwLock<ItemEditor>>>>,
-        out_port: InnerViewPort<dyn SequenceView<Item = ListSegment<ItemEditor>>>,
+        data_port: OuterViewPort<dyn SequenceView<Item = NestedNode>>,
         depth: usize
     ) -> Arc<RwLock<Self>> {
-        let mut proj_helper = ProjectionHelper::new(out_port.0.update_hooks.clone());
+        let out_port = ViewPort::new();
+        let mut proj_helper = ProjectionHelper::new(out_port.update_hooks.clone());
         let proj = Arc::new(RwLock::new(ListSegmentSequence {
             cur_cursor: cursor_port.get_view().get(),
+            port: out_port.clone(),
             depth,
 
             cursor: proj_helper.new_singleton_arg(0, cursor_port, |s: &mut Self, _msg| {
@@ -175,13 +168,17 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
                     s.cast.notify(idx);
                 }
             }),
-            cast: out_port.get_broadcast(),
+            cast: out_port.inner().get_broadcast(),
             proj_helper,
         }));
 
         proj.write().unwrap().proj_helper.set_proj(&proj);
-        out_port.set_view(Some(proj.clone()));
+        out_port.inner().set_view(Some(proj.clone()));
 
         proj
+    }
+
+    pub fn get_view(&self) -> OuterViewPort<dyn SequenceView<Item = ListSegment>> {
+        self.port.outer()
     }
 }

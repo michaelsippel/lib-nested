@@ -72,7 +72,11 @@ pub trait StringGen {
 }
 
 use crate::terminal::TerminalEditor;
-use crate::{tree::{TreeNav}, diagnostics::Diagnostics};
+use crate::{tree::{TreeNav}, diagnostics::Diagnostics, terminal::TerminalView, core::{OuterViewPort}};
+
+pub trait PtySegment {
+    fn pty_view(&self) -> OuterViewPort<dyn TerminalView>;
+}
 
 pub trait Nested
     : TerminalEditor

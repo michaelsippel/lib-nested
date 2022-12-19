@@ -10,9 +10,9 @@ use {
     cgmath::Vector2
 };
 
-impl<ItemEditor> TreeNav for ListEditor<ItemEditor>
-where ItemEditor: Nested + ?Sized + Send + Sync + 'static
-{
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+
+impl TreeNav for ListEditor {
     fn get_cursor_warp(&self) -> TreeCursor {
         let cur = self.cursor.get();
         match cur.mode {
@@ -29,7 +29,7 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
             ListCursorMode::Select => {
                 if let Some(i) = cur.idx {
                     if i < self.data.len() as isize {
-                        let mut sub_cur = self.data.get(i as usize).read().unwrap().get_cursor_warp();
+                        let mut sub_cur = self.data.get(i as usize).get_cursor_warp();
                         sub_cur.tree_addr.insert(0, i as isize - self.data.len() as isize);
                         return sub_cur;
                     } else {
@@ -61,7 +61,7 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
             ListCursorMode::Select => {
                 if let Some(i) = cur.idx {
                     if i < self.data.len() as isize {
-                        let mut sub_cur = self.data.get(i as usize).read().unwrap().get_cursor();
+                        let mut sub_cur = self.data.get(i as usize).get_cursor();
                         if sub_cur.tree_addr.len() > 0 {
                             sub_cur.tree_addr.insert(0, i as isize);
                             return sub_cur;
@@ -85,9 +85,7 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
         let old_cur = self.cursor.get();
         if let Some(i) = old_cur.idx {
             if i < self.data.len() as isize {
-                let ce = self.data.get_mut(i as usize);
-                let mut cur_edit = ce.write().unwrap();
-                cur_edit.goto(TreeCursor::none());
+                self.data.get_mut(i as usize).goto(TreeCursor::none());
             }
         }
 
@@ -108,12 +106,12 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
                 });
 
                 if new_cur.leaf_mode == ListCursorMode::Select && self.data.len() > 0 {
-                    let item = self.data.get_mut(idx as usize);
-                    let mut item_edit = item.write().unwrap();
-                    item_edit.goto(TreeCursor {
-                        leaf_mode: ListCursorMode::Select,
-                        tree_addr: vec![]
-                    });
+                    self.data
+                        .get_mut(idx as usize)
+                        .goto(TreeCursor {
+                            leaf_mode: ListCursorMode::Select,
+                            tree_addr: vec![]
+                        });
                 }
 
                 TreeNavResult::Continue
@@ -127,12 +125,12 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
                         idx: Some(idx),
                     });
 
-                    let item = self.data.get_mut(idx as usize);
-                    let mut item_edit = item.write().unwrap();
-                    item_edit.goto(TreeCursor {
-                        leaf_mode: new_cur.leaf_mode,
-                        tree_addr: new_cur.tree_addr[1..].iter().cloned().collect(),
-                    });
+                    self.data
+                        .get_mut(idx as usize)
+                        .goto(TreeCursor {
+                            leaf_mode: new_cur.leaf_mode,
+                            tree_addr: new_cur.tree_addr[1..].iter().cloned().collect(),
+                        });
                 } else {
                     self.cursor.set(ListCursor::home());
                 }
@@ -175,15 +173,15 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
                 if direction.y > 0 {
                     // dn
                     if cur.tree_addr[0] < self.data.len() as isize {
-                        let item = self.data.get_mut(cur.tree_addr[0] as usize);
-                        let mut item_edit = item.write().unwrap();
-
-                        if item_edit.goby(Vector2::new(direction.x, direction.y)) == TreeNavResult::Continue {
-                            self.cursor.set(ListCursor {
-                                mode: ListCursorMode::Select,
-                                idx: Some(cur.tree_addr[0])
-                            })
-                        }
+                        if self.data
+                            .get_mut(cur.tree_addr[0] as usize)
+                            .goby(Vector2::new(direction.x, direction.y))
+                            == TreeNavResult::Continue {
+                                self.cursor.set(ListCursor {
+                                    mode: ListCursorMode::Select,
+                                    idx: Some(cur.tree_addr[0])
+                                })
+                            }
                     }
 
                     TreeNavResult::Continue
@@ -210,12 +208,12 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
                         });
 
                         if idx < self.data.len() as isize {
-                            let item = self.data.get_mut(idx as usize);
-                            let mut item_edit = item.write().unwrap();
-                            item_edit.goto(TreeCursor {
-                                leaf_mode: cur.leaf_mode,
-                                tree_addr: vec![]
-                            });
+                            self.data
+                                .get_mut(idx as usize)
+                                .goto(TreeCursor {
+                                    leaf_mode: cur.leaf_mode,
+                                    tree_addr: vec![]
+                                });
                         }
 
                         TreeNavResult::Continue
@@ -233,10 +231,10 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
                 // nested
 
                 if cur.tree_addr[0] < self.data.len() as isize {
-                    let item = self.data.get_mut(cur.tree_addr[0] as usize);
-                    let mut item_edit = item.write().unwrap();
-
-                    match item_edit.goby(direction) {
+                    match self.data
+                        .get_mut(cur.tree_addr[0] as usize)
+                        .goby(direction)
+                    {
                         TreeNavResult::Exit => {
                             if direction.y < 0 {
                                 // up
@@ -252,8 +250,6 @@ where ItemEditor: Nested + ?Sized + Send + Sync + 'static
                                 TreeNavResult::Continue
                             } else {
                                 // horizontal
-                                drop(item_edit);
-
                                 if (cur.tree_addr[0]+direction.x >= 0) &&
                                     (cur.tree_addr[0]+direction.x < self.data.len() as isize)
                                 {
