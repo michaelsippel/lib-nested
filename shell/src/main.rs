@@ -1,11 +1,10 @@
 extern crate portable_pty;
 
-mod ascii_box;
-mod monstera;
-//mod process;
 mod pty;
+
+// TODO rewrite process & command with incubator rules
+//mod process;
 //mod command;
-mod plot;
 
 use {
     cgmath::{Point2, Vector2},

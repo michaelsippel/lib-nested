@@ -1,0 +1,93 @@
+
+‹ShellTerm› :=
+    | Lit : "«String»" | "«Path»~«Sep Char '/'»~«Seq Char»~«TerminatedArray AsciiChar~Byte 0»"
+    | Var : $«ProcessArgument~ℕ~«PositionalInt 10 BigEndian»»
+    | Sub : $(«Process»)
+
+$PATH:›Sequence Path‹
+     :›SeparatedSequence Char '/' ‹
+     :›Sequence ›Sequence Char‹‹
+     :›‹
+     :‹SeparatedSequence Char ':'‹
+     :‹Sequence Char›
+     &‹OsString~›
+     ~‹List Char~Vec Byte›
+
+Seq
+Vec
+Sep
+read :: Sep -> Seq
+read (Sep xs) d -> 
+deco :: Style -> Seq  -> 
+
+ShellTerm::eval t:‹ShellTerm› -> ‹String› {
+    match t {
+        ShellTerm::Lit "s:«String»" -> {
+	    
+        }
+	ShellTerm::Var var:$
+    }
+}
+
+$PATH : ‹Sequence Path› ~ ‹SeparatedSequence Char ':'›
+
+ShellTerm::eval := «» -> «»
+«Path» :> «»
+
+‹Path› := [ PathSegment ] ~ ‹List ›
+
+[Char]
+  :separator '/'
+  :
+
+‹ a: Int x b: Int ›
+( a b )
+
+
+
+// Process is a Structure Type
+‹Process› := {
+    env   : ‹ Symbol -> ShellTerm ›
+    exe   : ‹ Path ›
+    args  : ‹ [ShellTerm] ›
+    stdin : ‹ Pipe ›
+}
+
+
+
+// OsString is an Abstraction Type
+[OsString] := [Sequence AsciiChar] ~ [Sequence Byte] ~ [TerminatedSequence Byte 0] ~ [Pointer Byte] ~ [MachineWord]
+
+execve := {
+    ‹ Process
+    ~ { env : Symbol, exe: Path~,  } ›
+    ->
+}
+
+precedence of operators: '~' < ':' < '[ ]' < '{ }'
+
+<Ls> := [ < ]
+
+
+
+‹Process exe=/bin/ls› : ‹Process› := {
+    args : ‹ [ProcessArgument] ~ []
+}
+
+	:> «PosixShellScript ~ String» { ... }
+        :> «TerminalView» { ... }
+
+
+»ProcessId«~»MachineInt«~»MachineWord«~»Register«
+«ProcessId»~«MachineInt»~«MachineWord»~«Register»
+
+Pipe::read = {
+    fd: const ( FileDescriptor ~ MachineInt ~ Register ~ EAX )
+    buf: ( Array Byte ~  )
+} -> 
+
+stdout := «ProcessId» -> «FileDescriptor»~«MachineInt»~«Register»~«EAX»
+
+
+poorly-written shell scripts often do not handle filenames with spaces.
+
