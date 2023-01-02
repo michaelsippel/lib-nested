@@ -8,10 +8,11 @@ use {
         tree::{TreeNav, TreeCursor, TreeNavResult},
         diagnostics::{Diagnostics, Message},
         sum::SumEditor,
-        char_editor::CharEditor,
+        char::CharEditor,
         integer::PosIntEditor,
         tree::NestedNode,
-        Commander, PtySegment
+        commander::Commander,
+        PtySegment
     },
     cgmath::{Vector2},
     termion::event::{Key},

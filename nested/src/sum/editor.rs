@@ -9,7 +9,7 @@ use {
         tree::{TreeNav, TreeCursor, TreeNavResult},
         diagnostics::{Diagnostics, Message},
         tree::NestedNode,
-        Commander,
+        commander::Commander,
         PtySegment
     },
     cgmath::{Vector2},

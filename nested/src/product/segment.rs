@@ -6,7 +6,7 @@ use {
             TerminalStyle, TerminalView,
             make_label
         },
-        color::{bg_style_from_depth, fg_style_from_depth},
+        utils::color::{bg_style_from_depth, fg_style_from_depth},
         tree::{NestedNode, TreeNav}
     },
     std::{sync::{Arc, RwLock}},

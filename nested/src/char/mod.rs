@@ -4,7 +4,8 @@ use {
         type_system::{Context},
         singleton::{SingletonBuffer, SingletonView},
         terminal::{TerminalAtom, TerminalEvent, TerminalStyle},
-        tree::NestedNode, Commander
+        tree::NestedNode,
+        commander::Commander
     },
     std::sync::Arc,
     std::sync::RwLock,

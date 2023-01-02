@@ -1,4 +1,4 @@
-use {crate::bimap::Bimap, std::collections::HashMap};
+use {crate::utils::Bimap, std::collections::HashMap};
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 

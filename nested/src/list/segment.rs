@@ -7,15 +7,14 @@ use {
         singleton::SingletonView,
         terminal::{TerminalView, TerminalStyle, make_label},
         tree::{NestedNode, TreeNav},
-        color::{bg_style_from_depth, fg_style_from_depth},
+        utils::color::{bg_style_from_depth, fg_style_from_depth},
         PtySegment
     },
     std::sync::Arc,
     std::sync::RwLock,
 };
 
-pub enum ListSegment
-{
+pub enum ListSegment {
     InsertCursor,
     Item {
         editor: NestedNode,
@@ -24,8 +23,7 @@ pub enum ListSegment
     }
 }
 
-impl PtySegment for ListSegment
-{
+impl PtySegment for ListSegment {
     fn pty_view(&self) -> OuterViewPort<dyn TerminalView> {
         match self {
             ListSegment::InsertCursor => {
@@ -58,8 +56,7 @@ impl PtySegment for ListSegment
     }
 }
 
-pub struct ListSegmentSequence
-{
+pub struct ListSegmentSequence {
     data: Arc<dyn SequenceView<Item = NestedNode>>,
     cursor: Arc<dyn SingletonView<Item = ListCursor>>,
 
@@ -71,13 +68,11 @@ pub struct ListSegmentSequence
     proj_helper: ProjectionHelper<usize, Self>,
 }
 
-impl View for ListSegmentSequence
-{
+impl View for ListSegmentSequence {
     type Msg = usize;
 }
 
-impl SequenceView for ListSegmentSequence
-{
+impl SequenceView for ListSegmentSequence {
     type Item = ListSegment;
 
     fn len(&self) -> Option<usize> {
@@ -128,8 +123,7 @@ impl SequenceView for ListSegmentSequence
     }
 }
 
-impl ListSegmentSequence
-{
+impl ListSegmentSequence {
     pub fn new(
         cursor_port: OuterViewPort<dyn SingletonView<Item = ListCursor>>,
         data_port: OuterViewPort<dyn SequenceView<Item = NestedNode>>,

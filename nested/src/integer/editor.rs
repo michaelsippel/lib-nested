@@ -15,7 +15,7 @@ use {
         diagnostics::{Diagnostics, Message},
         tree::NestedNode,
         Nested,
-        Commander
+        commander::Commander
     },
     std::sync::Arc,
     std::sync::RwLock,

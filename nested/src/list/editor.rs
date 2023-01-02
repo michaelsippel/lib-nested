@@ -67,7 +67,7 @@ impl ListEditor {
 
     pub fn get_item(&self) -> Option<NestedNode> {
         if let Some(idx) = self.cursor.get().idx {
-            let idx = crate::modulo(idx as isize, self.data.len() as isize) as usize;
+            let idx = crate::utils::modulo(idx as isize, self.data.len() as isize) as usize;
             if idx < self.data.len() {
                 Some(self.data.get(idx))
             } else {
@@ -79,7 +79,7 @@ impl ListEditor {
     }
     pub fn get_item_mut(&mut self) -> Option<MutableVecAccess<NestedNode>> {
         if let Some(idx) = self.cursor.get().idx {
-            let idx = crate::modulo(idx as isize, self.data.len() as isize) as usize;
+            let idx = crate::utils::modulo(idx as isize, self.data.len() as isize) as usize;
             if idx < self.data.len() {
                 Some(self.data.get_mut(idx))
             } else {
@@ -108,4 +108,3 @@ impl ListEditor {
         self.data.clear();
     }
 }
-

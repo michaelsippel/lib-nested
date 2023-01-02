@@ -63,7 +63,7 @@ impl TreeNav for ProductEditor {
         }
 
         if c.tree_addr.len() > 0 {
-            self.cursor = Some(crate::modulo(c.tree_addr.remove(0), self.n_indices.len() as isize));
+            self.cursor = Some(crate::utils::modulo(c.tree_addr.remove(0), self.n_indices.len() as isize));
             if let Some(mut element) = self.get_cur_segment_mut() {
                 if let Some(ProductEditorSegment::N{ t, editor, ed_depth, cur_depth: _, cur_dist:_ }) = element.deref_mut() {
                     if let Some(e) = editor {

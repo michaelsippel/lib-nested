@@ -1,6 +1,7 @@
 extern crate portable_pty;
 
 mod pty;
+mod incubator;
 
 // TODO rewrite process & command with incubator rules
 //mod process;
@@ -22,7 +23,7 @@ use {
         vec::VecBuffer,
         diagnostics::{Diagnostics},
         index::{buffer::IndexBuffer},
-        Commander
+        commander::Commander
     },
     std::sync::{Arc, RwLock},
     termion::event::{Event, Key},
@@ -55,10 +56,10 @@ async fn main() {
 
     // Type Context //
     let ctx = Arc::new(RwLock::new(Context::new()));
-    let ctx = nested::make_editor::init_mem_ctx(ctx);
-    let ctx = nested::make_editor::init_editor_ctx(ctx);
-    let ctx = nested::make_editor::init_math_ctx(ctx);
-    let ctx = nested::make_editor::init_os_ctx(ctx);
+    let ctx = nested::type_system::init_mem_ctx(ctx);
+    let ctx = nested::type_system::init_editor_ctx(ctx);
+    let ctx = nested::type_system::init_math_ctx(ctx);
+    let ctx = nested::type_system::init_os_ctx(ctx);
 
     let vb = VecBuffer::<char>::new();
     let rt_char = ReprTree::new_leaf(
@@ -237,7 +238,6 @@ async fn main() {
             tree_addr: vec![0],
         });
 
-
         loop {
             let ev = term.next_event().await;
             let _l = portmutex.write().unwrap();
@@ -247,7 +247,6 @@ async fn main() {
                 term_port.inner().get_broadcast().notify(&IndexArea::Full);
                 continue;
             }
-
 
 /*
             if let Some(process_editor) = process_list_editor.get_item() {

@@ -14,7 +14,7 @@ use {
         tree::{TreeCursor, TreeNav, TreeNavResult},
         diagnostics::{Diagnostics},
         tree::NestedNode, Nested,
-        Commander
+        commander::Commander
     },
     std::sync::{Arc, RwLock},
     termion::event::{Event, Key},

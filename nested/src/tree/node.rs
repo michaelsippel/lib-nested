@@ -9,7 +9,7 @@ use {
         terminal::{TerminalView, TerminalEvent, TerminalEditor, TerminalEditorResult},
         diagnostics::{Diagnostics, Message},
         tree::{TreeNav, TreeCursor, TreeNavResult},
-        ObjCommander,
+        commander::ObjCommander,
         Nested
     }
 };

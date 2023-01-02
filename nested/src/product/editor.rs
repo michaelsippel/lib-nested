@@ -86,7 +86,7 @@ impl ProductEditor {
     }
 
     pub fn get_editor_segment(&self, mut idx: isize) -> ProductEditorSegment {
-        idx = crate::modulo(idx, self.n_indices.len() as isize);
+        idx = crate::utils::modulo(idx, self.n_indices.len() as isize);
         if let Some(pos) = self.n_indices.get(idx as usize) {
             self.segments.get(pos).unwrap()
         } else {
@@ -95,7 +95,7 @@ impl ProductEditor {
     }
 
     pub fn get_editor_segment_mut(&mut self, mut idx: isize) -> MutableIndexAccess<Point2<i16>, ProductEditorSegment> {
-        idx = crate::modulo(idx, self.n_indices.len() as isize);
+        idx = crate::utils::modulo(idx, self.n_indices.len() as isize);
         if let Some(pos) = self.n_indices.get(idx as usize) {
             self.segments.get_mut(pos)
         } else {

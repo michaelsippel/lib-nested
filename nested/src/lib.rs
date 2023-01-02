@@ -4,10 +4,8 @@
 pub mod core;
 pub mod type_system;
 pub mod projection;
-pub mod bimap;
-pub mod modulo;
-pub use modulo::modulo;
-
+pub mod commander;
+pub mod utils;
 
 // semantics
 pub mod singleton;
@@ -26,47 +24,14 @@ pub mod tree;
 pub mod diagnostics;
 
 // high-level types
-pub mod char_editor;
+pub mod char;
 pub mod integer;
-pub mod make_editor;
-pub mod type_term_editor;
 
 // display
-pub mod color;
 pub mod terminal;
 
 pub fn magic_header() {
     eprintln!("<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>");
-}
-
-pub trait Commander {
-    type Cmd;
-
-    fn send_cmd(&mut self, cmd: &Self::Cmd);
-}
-
-use std::sync::{Arc, RwLock};
-use crate::{
-    type_system::ReprTree,
-    singleton::SingletonView
-};
-
-pub trait ObjCommander {
-    fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>);
-}
-
-//impl<Cmd: 'static, T: Commander<Cmd>> ObjCommander for T {
-impl<C: Commander> ObjCommander for C
-where C::Cmd: 'static
-{
-    fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) {
-        self.send_cmd(
-            &cmd_obj.read().unwrap()
-                .get_port::<dyn SingletonView<Item = C::Cmd>>().unwrap()
-                .get_view().unwrap()
-                .get()
-        );
-    }
 }
 
 pub trait StringGen {

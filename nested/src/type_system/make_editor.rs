@@ -5,8 +5,8 @@ use {
         list::{PTYListEditor},
         sequence::{decorator::{SeqDecorStyle}},
         sum::SumEditor,
-        char_editor::CharEditor,
-        type_term_editor::TypeTermEditor,
+        char::CharEditor,
+        type_system::TypeTermEditor,
         Nested
     },
     std::sync::{Arc, RwLock},

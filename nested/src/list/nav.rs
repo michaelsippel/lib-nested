@@ -98,7 +98,7 @@ impl TreeNav for ListEditor {
                 TreeNavResult::Continue
             }
             1 => {
-                let idx = crate::modulo(new_cur.tree_addr[0], if new_cur.leaf_mode == ListCursorMode::Insert { 1 } else { 0 } + self.data.len() as isize);
+                let idx = crate::utils::modulo(new_cur.tree_addr[0], if new_cur.leaf_mode == ListCursorMode::Insert { 1 } else { 0 } + self.data.len() as isize);
 
                 self.cursor.set(ListCursor {
                     mode: new_cur.leaf_mode,
@@ -118,7 +118,7 @@ impl TreeNav for ListEditor {
             }
             _ => {
                 if self.data.len() > 0 {
-                    let idx = crate::modulo(new_cur.tree_addr[0], self.data.len() as isize);
+                    let idx = crate::utils::modulo(new_cur.tree_addr[0], self.data.len() as isize);
 
                     self.cursor.set(ListCursor {
                         mode: ListCursorMode::Select,
