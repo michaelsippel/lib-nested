@@ -1,6 +1,7 @@
 use {
     crate::{
-        core::{OuterViewPort, Context, TypeTerm},
+        core::{OuterViewPort},
+        type_system::{Context, TypeTerm},
         list::{PTYListEditor},
         sequence::{SequenceView, SequenceViewExt, decorator::{PTYSeqDecorate, SeqDecorStyle}},
         singleton::{SingletonBuffer, SingletonView},

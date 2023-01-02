@@ -1,6 +1,7 @@
 use {
     crate::{
-        core::{OuterViewPort, TypeLadder, Context},
+        core::{OuterViewPort},
+        type_system::{TypeLadder, Context},
         terminal::{
             TerminalStyle, TerminalView,
             make_label

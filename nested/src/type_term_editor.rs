@@ -1,6 +1,7 @@
 use {
     crate::{
-        core::{OuterViewPort, Context},
+        core::{OuterViewPort},
+        type_system::{Context},
         terminal::{TerminalEvent, TerminalView, TerminalEditor, TerminalEditorResult},
         sequence::{SequenceView, decorator::SeqDecorStyle},
         list::{PTYListEditor},

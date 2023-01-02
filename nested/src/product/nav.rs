@@ -1,6 +1,6 @@
 use {
     crate::{
-        core::Context,
+        type_system::Context,
         list::ListCursorMode,
         tree::{TreeNav, TreeNavResult, TreeCursor},
         product::{segment::ProductEditorSegment, ProductEditor},

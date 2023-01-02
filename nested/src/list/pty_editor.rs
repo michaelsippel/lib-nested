@@ -1,6 +1,7 @@
 use {
     crate::{
-        core::{OuterViewPort, Context, TypeTerm},
+        core::{OuterViewPort},
+        type_system::{Context, TypeTerm},
         list::{
             ListCursor, ListCursorMode,
             ListEditor

@@ -1,6 +1,6 @@
 use {
     crate::{
-        core::{TypeTerm, Context},
+        type_system::{TypeTerm, Context},
         integer::{DigitEditor, PosIntEditor},
         list::{PTYListEditor},
         sequence::{decorator::{SeqDecorStyle}},
@@ -11,6 +11,14 @@ use {
     },
     std::sync::{Arc, RwLock},
 };
+
+pub fn init_mem_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
+    let ctx = Arc::new(RwLock::new(Context::with_parent(Some(parent))));
+
+    ctx.write().unwrap().add_typename("Vec".into());
+
+    ctx
+}
 
 pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
     let ctx = Arc::new(RwLock::new(Context::with_parent(Some(parent))));

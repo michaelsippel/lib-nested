@@ -2,7 +2,8 @@ use {
     std::sync::{Arc, RwLock},
     cgmath::Vector2,
     crate::{
-        core::{ViewPort, OuterViewPort, AnyOuterViewPort, context::ReprTree, Context},
+        core::{ViewPort, OuterViewPort, AnyOuterViewPort},
+        type_system::{ReprTree, Context},
         singleton::{SingletonBuffer},
         sequence::SequenceView,
         terminal::{TerminalView, TerminalEvent, TerminalEditor, TerminalEditorResult},
@@ -16,6 +17,8 @@ use {
 #[derive(Clone)]
 pub struct NestedNode {
     pub ctx: Option<Arc<RwLock<Context>>>,
+
+//    pub abs: Option<Arc<RwLock<ReprTree>>>,
     pub view: Option<OuterViewPort<dyn TerminalView>>,
     pub diag: Option<OuterViewPort<dyn SequenceView<Item = Message>>>,
     pub cmd: Option<Arc<RwLock<dyn ObjCommander + Send + Sync>>>,
@@ -49,7 +52,6 @@ impl TerminalEditor for NestedNode {
         TerminalEditorResult::Continue
     }
 }
-
 
 impl TreeNav for NestedNode {
     fn get_cursor(&self) -> TreeCursor {

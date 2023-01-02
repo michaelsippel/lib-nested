@@ -1,6 +1,7 @@
 use {
     crate::{
-        core::{OuterViewPort, Context},
+        core::{OuterViewPort},
+        type_system::{Context},
         singleton::{SingletonBuffer, SingletonView},
         terminal::{TerminalAtom, TerminalEvent, TerminalStyle},
         tree::NestedNode, Commander

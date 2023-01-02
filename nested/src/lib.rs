@@ -2,10 +2,12 @@
 
 // general
 pub mod core;
+pub mod type_system;
 pub mod projection;
 pub mod bimap;
 pub mod modulo;
 pub use modulo::modulo;
+
 
 // semantics
 pub mod singleton;
@@ -45,7 +47,7 @@ pub trait Commander {
 
 use std::sync::{Arc, RwLock};
 use crate::{
-    core::context::ReprTree,
+    type_system::ReprTree,
     singleton::SingletonView
 };
 

@@ -9,7 +9,8 @@ mod pty;
 use {
     cgmath::{Point2, Vector2},
     nested::{
-        core::{port::UpdateTask, Observer, AnyOuterViewPort, ViewPort, Context, ReprTree},
+        core::{port::UpdateTask, Observer, AnyOuterViewPort, ViewPort},
+        type_system::{Context, ReprTree},
         index::IndexArea,
         list::{ListCursorMode, PTYListEditor},
         sequence::{decorator::{SeqDecorStyle, Separate}},
@@ -54,19 +55,21 @@ async fn main() {
 
     // Type Context //
     let ctx = Arc::new(RwLock::new(Context::new()));
+    let ctx = nested::make_editor::init_mem_ctx(ctx);
     let ctx = nested::make_editor::init_editor_ctx(ctx);
     let ctx = nested::make_editor::init_math_ctx(ctx);
     let ctx = nested::make_editor::init_os_ctx(ctx);
 
     let vb = VecBuffer::<char>::new();
     let rt_char = ReprTree::new_leaf(
-        ctx.read().unwrap().type_term_from_str("( List Char 0 )").unwrap(),
+        ctx.read().unwrap().type_term_from_str("( Vec Char )").unwrap(),
         AnyOuterViewPort::from(vb.get_port())
     );
-    let rt_digit = ReprTree::upcast(&rt_char, ctx.read().unwrap().type_term_from_str("( List ( Digit 10 ) )").unwrap());
+
+    let rt_digit = ReprTree::ascend(&rt_char, ctx.read().unwrap().type_term_from_str("( List ( Digit 10 ) )").unwrap());
     rt_digit.write().unwrap().insert_branch(
         ReprTree::new_leaf(
-            ctx.read().unwrap().type_term_from_str("( List MachineInt )").unwrap(),
+            ctx.read().unwrap().type_term_from_str("( Vec MachineInt )").unwrap(),
             AnyOuterViewPort::from(
                 vb.get_port().to_sequence().map(
                     |c: &char| {
@@ -76,7 +79,7 @@ async fn main() {
             )
         )
     );
-    
+
 /*    
     ctx.write().unwrap().add_morphism(
         MorphismType{
