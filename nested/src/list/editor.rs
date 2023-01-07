@@ -66,18 +66,8 @@ impl ListEditor {
             addr_port: VecBuffer::<OuterViewPort<dyn SequenceView<Item = isize>>>::with_data(
                 vec![
                     cursor.get_port()
-                        .map(
-                            |x| {
-                                // todo implement this with filter_map
-                                let mut b = VecBuffer::new();
-                                if let Some(i) = x.idx {
-                                    b.push(i);
-                                }
-                                b.get_port().to_sequence()
-                            }
-                        )
                         .to_sequence()
-                        .flatten(),
+                        .filter_map(|cur| cur.idx),
                     cursor.get_port()
                         .map({
                             let data = data.clone();

@@ -51,8 +51,12 @@ where
 {
     type Item = SrcView::Item;
 
-    fn get(&self, _idx: &usize) -> Option<Self::Item> {
-        Some(self.src_view.as_ref()?.get())
+    fn get(&self, idx: &usize) -> Option<Self::Item> {
+        if *idx == 0 {
+            Some(self.src_view.as_ref()?.get())
+        } else {
+            None
+        }
     }
 
     fn len(&self) -> Option<usize> {
