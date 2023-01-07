@@ -1,10 +1,13 @@
 use {
     crate::{
+        core::{OuterViewPort},
+        sequence::{SequenceView},
         list::{
             ListCursor, ListCursorMode,
             ListEditor
         },
         tree::{TreeCursor, TreeNav, TreeNavResult},
+        singleton::SingletonView,
         Nested
     },
     cgmath::Vector2
@@ -13,6 +16,14 @@ use {
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 impl TreeNav for ListEditor {
+    fn get_addr_view(&self) -> OuterViewPort<dyn SequenceView<Item = isize>> {
+        self.addr_port.clone()
+    }
+
+    fn get_mode_view(&self) -> OuterViewPort<dyn SingletonView<Item = ListCursorMode>> {
+        self.mode_port.clone()
+    }
+
     fn get_cursor_warp(&self) -> TreeCursor {
         let cur = self.cursor.get();
         match cur.mode {

@@ -52,11 +52,11 @@ where
     type Item = SrcView::Item;
 
     fn get(&self, _idx: &usize) -> Option<Self::Item> {
-        Some(self.src_view.as_ref().unwrap().get())
+        Some(self.src_view.as_ref()?.get())
     }
 
     fn len(&self) -> Option<usize> {
-        Some(1)
+        Some(if self.src_view.is_some() { 1 } else { 0 })
     }
 }
 

@@ -13,6 +13,7 @@ use {
         core::{port::UpdateTask, Observer, AnyOuterViewPort, ViewPort},
         type_system::{Context, ReprTree},
         index::IndexArea,
+        singleton::{SingletonView, SingletonBuffer},
         list::{ListCursorMode, PTYListEditor},
         sequence::{decorator::{SeqDecorStyle, Separate}},
         terminal::{
@@ -121,14 +122,10 @@ async fn main() {
             });
 
         let mut cur_size = nested::singleton::SingletonBuffer::new(Vector2::new(10, 10));
-        let mut status_chars = VecBuffer::new();
-        
+
         table.insert_iter(vec![
             (Point2::new(0, 0), magic.clone()),
-            (
-                Point2::new(0, 1),
-                status_chars.get_port().to_sequence().to_grid_horizontal(),
-            ),
+            (Point2::new(0, 1), process_list_editor.editor.read().unwrap().get_cursor_widget()),
             (Point2::new(0, 2), magic.clone()),
             (Point2::new(0, 3), make_label(" ")),
             (Point2::new(0, 4),
@@ -162,12 +159,7 @@ async fn main() {
              )
              .separate({
                  let mut buf = IndexBuffer::new();
-                 buf.insert(Point2::new(1,0),
-                            make_label(" ~~  ~~  ~~  ~~  ~~  ~~  ~~  ~~  ~~  ~~")
-                            .map_item(
-                                |p,a|
-                                a.add_style_front(TerminalStyle::fg_color((40,40,40)))
-                            )
+                 buf.insert(Point2::new(1,0), make_label(" ~~  ~~  ~~  ~~  ~~  ~~  ~~  ~~  ~~  ~~").with_fg_color((40,40,40))
                  );
                  buf.get_port()
              })
@@ -183,17 +175,14 @@ async fn main() {
                 |entry| {
                     let mut b = VecBuffer::new();
                     b.push(
-                         make_label("@")
-                         .map_item(|_p,a| a
-                                   .add_style_back(TerminalStyle::bold(true))
-                                   .add_style_back(TerminalStyle::fg_color((120,120,0))))
+                         make_label("@").with_style(
+                             TerminalStyle::bold(true)
+                                 .add(TerminalStyle::fg_color((120,120,0))))
                     );
 
                     for x in entry.addr.iter() {
                         b.push(
-                            make_label(&format!("{}", x))
-                                .map_item(|_p,a| a
-                                          .add_style_back(TerminalStyle::fg_color((0, 100, 20))))
+                            make_label(&format!("{}", x)).with_fg_color((0, 100, 20))
                         );
                         b.push(
                             make_label(".")
@@ -220,14 +209,9 @@ async fn main() {
             ).to_grid_vertical().flatten())
 
         ]);
-
+        
         let (_w, _h) = termion::terminal_size().unwrap();
-/*
-        compositor
-            .write()
-            .unwrap()
-        .push(monstera::make_monstera().offset(Vector2::new(w as i16 - 38, 0)));
-*/
+
         compositor
             .write()
             .unwrap()
@@ -305,54 +289,6 @@ async fn main() {
                 }
                 ev => {
                     process_list_editor.send_cmd(&ev);
-                }
-            }
-
-            status_chars.clear();
-            let cur = process_list_editor.editor.read().unwrap().get_cursor();
-
-            if cur.tree_addr.len() > 0 {
-                status_chars.push(TerminalAtom::new(
-                    '@',
-                    TerminalStyle::fg_color((150, 80,230)).add(TerminalStyle::bold(true)),
-                ));
-                for x in cur.tree_addr {
-                    for c in format!("{}", x).chars() {
-                        status_chars
-                            .push(TerminalAtom::new(c, TerminalStyle::fg_color((0, 100, 20))));
-                    }
-                    status_chars.push(TerminalAtom::new(
-                        '.',
-                        TerminalStyle::fg_color((150, 80,230))
-                    ));
-                }
-
-                status_chars.push(TerminalAtom::new(
-                    ':',
-                    TerminalStyle::fg_color((150, 80,230)).add(TerminalStyle::bold(true)),
-                ));
-                for c in match cur.leaf_mode {
-                    ListCursorMode::Insert => "INSERT",
-                    ListCursorMode::Select => "SELECT"
-                }
-                .chars()
-                {
-                    status_chars.push(TerminalAtom::new(
-                        c,
-                        TerminalStyle::fg_color((200, 200, 20)),
-                    ));
-                }
-                status_chars.push(TerminalAtom::new(
-                    ':',
-                    TerminalStyle::fg_color((150, 80,230)).add(TerminalStyle::bold(true)),
-
-                ));
-            } else {
-                for c in "Press <DN> to enter".chars() {
-                    status_chars.push(TerminalAtom::new(
-                        c,
-                        TerminalStyle::fg_color((200, 200, 20)),
-                    ));
                 }
             }
         }

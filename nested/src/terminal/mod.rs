@@ -40,11 +40,9 @@ use {
 };
 
 pub fn make_label(s: &str) -> OuterViewPort<dyn TerminalView> {
-    let label_port = ViewPort::new();
-    let _label = VecBuffer::with_data(s.chars().collect(), label_port.inner());
+    let label = VecBuffer::with_data(s.chars().collect());
 
-    let v = label_port
-        .outer()
+    let v = label.get_port()
         .to_sequence()
         .map(|c| TerminalAtom::from(c))
         .to_index()
@@ -55,3 +53,21 @@ pub fn make_label(s: &str) -> OuterViewPort<dyn TerminalView> {
 
     v
 }
+
+impl OuterViewPort<dyn TerminalView> {
+    pub fn with_style(&self, style: TerminalStyle) -> OuterViewPort<dyn TerminalView> {
+        self.map_item(
+            move |_idx, a|
+            a.add_style_front(style)
+        )
+    }
+
+    pub fn with_fg_color(&self, col: (u8, u8, u8)) -> OuterViewPort<dyn TerminalView> {
+        self.with_style(TerminalStyle::fg_color(col))
+    }
+
+    pub fn with_bg_color(&self, col: (u8, u8, u8)) -> OuterViewPort<dyn TerminalView> {
+        self.with_style(TerminalStyle::bg_color(col))
+    }
+}
+

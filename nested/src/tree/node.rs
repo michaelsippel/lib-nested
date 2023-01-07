@@ -4,12 +4,14 @@ use {
     crate::{
         core::{ViewPort, OuterViewPort, AnyOuterViewPort},
         type_system::{ReprTree, Context},
-        singleton::{SingletonBuffer},
+        singleton::{SingletonBuffer, SingletonView},
         sequence::SequenceView,
         terminal::{TerminalView, TerminalEvent, TerminalEditor, TerminalEditorResult},
         diagnostics::{Diagnostics, Message},
         tree::{TreeNav, TreeCursor, TreeNavResult},
+        list::{ListCursorMode},
         commander::ObjCommander,
+        vec::VecBuffer,
         Nested
     }
 };
@@ -60,6 +62,22 @@ impl TreeNav for NestedNode {
         } else {
             TreeCursor::default()
         }
+    }
+
+    fn get_addr_view(&self) -> OuterViewPort<dyn SequenceView<Item = isize>> {
+        if let Some(tn) = self.tree_nav.as_ref() {
+            tn.read().unwrap().get_addr_view()
+        } else {
+            OuterViewPort::default()
+        }        
+    }
+
+    fn get_mode_view(&self) -> OuterViewPort<dyn SingletonView<Item = ListCursorMode>> {
+        if let Some(tn) = self.tree_nav.as_ref() {
+            tn.read().unwrap().get_mode_view()
+        } else {
+            OuterViewPort::default()
+        }        
     }
 
     fn get_cursor_warp(&self) -> TreeCursor {

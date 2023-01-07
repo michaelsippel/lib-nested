@@ -1,7 +1,15 @@
 use {
     crate::list::ListCursorMode,
     crate::tree::TreeCursor,
-    cgmath::Vector2
+    crate::vec::VecBuffer,
+    crate::core::{OuterViewPort},
+    crate::sequence::{SequenceView, decorator::Separate},
+    crate::singleton::{SingletonBuffer, SingletonView},
+    cgmath::Vector2,
+    crate::{
+        terminal::{TerminalView, TerminalStyle, make_label}
+        
+    }
 };
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -21,11 +29,21 @@ impl From<TreeNavResult> for TerminalEditorResult {
 }
  */
 
+
+
 pub trait TreeNav {
     /* CORE
     */
     fn get_cursor(&self) -> TreeCursor {
         TreeCursor::default()
+    }
+
+    fn get_addr_view(&self) -> OuterViewPort<dyn SequenceView<Item = isize>> {
+        VecBuffer::<isize>::new().get_port().to_sequence()
+    }
+
+    fn get_mode_view(&self) -> OuterViewPort<dyn SingletonView<Item = ListCursorMode>> {
+        SingletonBuffer::new(ListCursorMode::Select).get_port()
     }
 
     fn get_cursor_warp(&self) -> TreeCursor {
@@ -119,10 +137,40 @@ pub trait TreeNav {
                         }
                     }
                 }
-
+                
                 self.goto(c)
             }
         }
+    }
+
+    fn get_cursor_widget(&self) -> OuterViewPort<dyn TerminalView> {
+        VecBuffer::with_data(
+            vec![
+                make_label("@").with_fg_color((150, 80,230)),
+                self.get_addr_view()
+                    .map(|i|
+                        make_label(&format!("{}", i)).with_fg_color((0, 100, 20)))
+                    .separate(make_label(".").with_fg_color((150, 80,230)))
+                    .to_grid_horizontal()
+                    .flatten(),
+                make_label(":").with_fg_color((150, 80,230)),
+                self.get_mode_view()
+                    .map(|mode| {
+                        make_label(
+                            match mode {
+                                ListCursorMode::Insert => "INSERT",
+                                ListCursorMode::Select => "SELECT"
+                            })
+                            .with_fg_color((200, 200, 20))
+                    })
+                    .to_grid()
+                    .flatten(),
+                make_label(":").with_fg_color((150, 80,230))
+            ]
+        ).get_port()
+            .to_sequence()
+            .to_grid_horizontal()
+            .flatten()
     }
 }
 

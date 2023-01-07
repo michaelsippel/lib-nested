@@ -34,7 +34,7 @@ impl<T> VecBuffer<T>
 where
     T: Clone + Send + Sync + 'static,
 {
-    pub fn with_data(data: Vec<T>, port: InnerViewPort<RwLock<Vec<T>>>) -> Self {
+    pub fn with_data_port(data: Vec<T>, port: InnerViewPort<RwLock<Vec<T>>>) -> Self {
         let data = Arc::new(RwLock::new(data));
         port.set_view(Some(data.clone()));
 
@@ -48,8 +48,12 @@ where
         }
     }
 
+    pub fn with_data(data: Vec<T>) -> Self {
+        VecBuffer::with_data_port(data, ViewPort::new().into_inner())
+    }
+    
     pub fn with_port(port: InnerViewPort<RwLock<Vec<T>>>) -> Self {
-        VecBuffer::with_data(vec![], port)
+        VecBuffer::with_data_port(vec![], port)
     }
 
     pub fn new() -> Self {

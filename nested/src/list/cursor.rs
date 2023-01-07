@@ -4,6 +4,12 @@ pub enum ListCursorMode {
     Select
 }
 
+impl Default for ListCursorMode {
+    fn default() -> Self {
+        ListCursorMode::Select
+    }
+}
+
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct ListCursor {
     pub mode: ListCursorMode,

@@ -6,11 +6,12 @@ use {
             ListCursor,
             ListSegment,
             ListSegmentSequence,
+            ListCursorMode
         },
         sequence::{SequenceView},
         singleton::{SingletonBuffer, SingletonView},
         terminal::{TerminalView},
-        tree::NestedNode,
+        tree::{NestedNode, TreeNav},
         vec::{VecBuffer, MutableVecAccess},
         PtySegment
     },
@@ -22,6 +23,9 @@ use {
 pub struct ListEditor {
     pub(super) cursor: SingletonBuffer<ListCursor>,
     pub(crate) data: VecBuffer<NestedNode>,
+
+    pub(super) addr_port: OuterViewPort<dyn SequenceView<Item = isize>>,
+    pub(super) mode_port: OuterViewPort<dyn SingletonView<Item = ListCursorMode>>,
 
     pub(crate) ctx: Arc<RwLock<Context>>,
     pub(super) typ: TypeTerm,
@@ -35,16 +39,74 @@ impl ListEditor {
         typ: TypeTerm,
         depth: usize
     ) -> Self {
+        let mut cursor = SingletonBuffer::new(ListCursor::default());
+        let mut data = VecBuffer::<NestedNode>::new();
+
         ListEditor {
-            cursor: SingletonBuffer::new(ListCursor::default()),
-            data: VecBuffer::<NestedNode>::new(),
+            mode_port: cursor
+                .get_port()
+                .map({
+                    let data = data.clone();
+                    move |c| {
+                        let ip = SingletonBuffer::new(c.mode).get_port();
+                        match c.mode {
+                            ListCursorMode::Insert => ip,
+                            ListCursorMode::Select => {
+                                if let Some(idx) = c.idx {
+                                    data.get(idx as usize).get_mode_view()
+                                } else {
+                                    ip
+                                }
+                            }
+                        }
+                    }
+                })
+                .flatten(),
+
+            addr_port: VecBuffer::<OuterViewPort<dyn SequenceView<Item = isize>>>::with_data(
+                vec![
+                    cursor.get_port()
+                        .map(
+                            |x| {
+                                // todo implement this with filter_map
+                                let mut b = VecBuffer::new();
+                                if let Some(i) = x.idx {
+                                    b.push(i);
+                                }
+                                b.get_port().to_sequence()
+                            }
+                        )
+                        .to_sequence()
+                        .flatten(),
+                    cursor.get_port()
+                        .map({
+                            let data = data.clone();
+                            move |cur| {
+                                if cur.mode == ListCursorMode::Select {
+                                    if let Some(idx) = cur.idx {
+                                        if idx >= 0 && idx < data.len() as isize {
+                                            return data.get(idx as usize).get_addr_view();
+                                        }
+                                    }
+                                }
+                                OuterViewPort::default()
+                            }
+                        })
+                        .to_sequence()
+                        .flatten()                
+                ])
+                .get_port()
+                .to_sequence()
+                .flatten(),
+            cursor,
+            data,
             ctx,
             typ,
             depth,
             cur_dist: Arc::new(RwLock::new(0)),
         }
     }
-
+    
     pub fn get_seg_seq_view(
         &self,
     ) -> OuterViewPort<dyn SequenceView<Item = OuterViewPort<dyn TerminalView>>> {
@@ -77,6 +139,7 @@ impl ListEditor {
             None
         }
     }
+
     pub fn get_item_mut(&mut self) -> Option<MutableVecAccess<NestedNode>> {
         if let Some(idx) = self.cursor.get().idx {
             let idx = crate::utils::modulo(idx as isize, self.data.len() as isize) as usize;
