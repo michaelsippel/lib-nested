@@ -221,6 +221,14 @@ where
     }
 }
 
+impl<V: View + ?Sized> Default for OuterViewPort<V>
+where V::Msg: Clone
+{
+    fn default() -> Self {
+        ViewPort::new().into_outer()
+    }
+}
+
 /*
 impl<V: View + ?Sized + 'static> OuterViewPort<V>
 where V::Msg: Clone {

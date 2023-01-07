@@ -1,7 +1,8 @@
 pub mod buffer;
 pub mod map;
+pub mod flatten;
 pub mod to_index;
-//pub mod unwrap;
+pub mod to_sequence;
 
 use {
     crate::core::View,
