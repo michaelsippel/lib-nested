@@ -144,12 +144,12 @@ impl TypeDict {
         tyid
     }
 
+    pub fn get_typename(&self, tid: &u64) -> Option<String> {
+        self.typenames.my.get(tid).cloned()
+    }
+
     pub fn get_typeid(&self, tn: &String) -> Option<TypeID> {
-        if let Some(id) = self.typenames.mλ.get(tn) {
-            Some(*id)
-        } else {
-            None
-        }
+        self.typenames.mλ.get(tn).cloned()
     }
 
     pub fn type_term_from_str(&self, typename: &str) -> Option<TypeTerm> {
