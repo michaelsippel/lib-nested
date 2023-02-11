@@ -26,12 +26,7 @@ use {
 pub struct PTYListEditor {
     pub editor: Arc<RwLock<ListEditor>>,
     split_char: Option<char>,
- 
-    style: SeqDecorStyle,
-    depth: usize,
-
-    pub diag: OuterViewPort<dyn SequenceView<Item = crate::diagnostics::Message>>,
-    pub view: OuterViewPort<dyn TerminalView>
+    depth: usize
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
@@ -40,27 +35,38 @@ impl PTYListEditor {
     pub fn new(
         ctx: Arc<RwLock<Context>>,
         typ: TypeTerm,
-        style: SeqDecorStyle,
         split_char: Option<char>,
         depth: usize
     ) -> Self {
         Self::from_editor(
-            ListEditor::new(ctx, typ, depth), style, split_char, depth)
+            ListEditor::new(ctx, typ, depth), split_char, depth)
     }
 
     pub fn from_editor(
         editor: ListEditor,
-        style: SeqDecorStyle,
         split_char: Option<char>,
         depth: usize
     ) -> Self {
         PTYListEditor {
             split_char,
-            style,
             depth,
+            editor: Arc::new(RwLock::new(editor)),
+        } 
+    }
 
-            view: editor.get_seg_seq_view().pty_decorate(style, depth),
-            diag: editor.get_data_port()
+    pub fn into_node(self, style: SeqDecorStyle) -> NestedNode {
+        let editor = Arc::new(RwLock::new(self));
+
+        let ed = editor.read().unwrap();
+        let edd = ed.editor.read().unwrap();
+
+        NestedNode::new()
+            .set_cmd(editor.clone())
+            .set_nav(ed.editor.clone())
+            .set_ctx(edd.ctx.clone())
+            .set_view(edd.get_seg_seq_view().pty_decorate(style, ed.depth))
+            .set_diag(
+                edd.get_data_port()
                     .enumerate()
                     .map(
                         |(idx, item_editor)| {
@@ -76,44 +82,24 @@ impl PTYListEditor {
                                 )
                         }
                     )
-                    .flatten(),
-
-            editor: Arc::new(RwLock::new(editor)),
-        } 
+                    .flatten()
+            )
     }
 
-    pub fn into_node(self) -> NestedNode {
-        let editor = Arc::new(RwLock::new(self));
-
-        let ed = editor.read().unwrap();
-        let edd = ed.editor.read().unwrap();
-
-        NestedNode::new()
-            .set_cmd(editor.clone())
-            .set_nav(ed.editor.clone())
-            .set_ctx(edd.ctx.clone())
-            .set_diag(ed.diag.clone())
-            .set_view(ed.view.clone())
-    }
-    
     pub fn get_data_port(&self) -> OuterViewPort<dyn SequenceView<Item = NestedNode>> {
         self.editor.read().unwrap().get_data_port()
     }
-    
+
     pub fn clear(&mut self) {
         self.editor.write().unwrap().clear();
     }
-    
+
     pub fn get_item(&self) -> Option<NestedNode> {
         self.editor.read().unwrap().get_item()
     }
-    
+
     pub fn set_depth(&mut self, depth: usize) {
         self.depth = depth;
-    }
-
-    pub fn set_style(&mut self, style: SeqDecorStyle) {
-        self.style = style;
     }
 }
 

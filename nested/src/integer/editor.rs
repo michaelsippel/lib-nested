@@ -125,13 +125,14 @@ impl PosIntEditor {
                         TypeTerm::Num(radix as i64)
                     ]
                 },
+                None,
+                0
+            ).into_node(
                 match radix {
                     16 => SeqDecorStyle::Hex,
                     _ => SeqDecorStyle::Plain
-                },
-                None,
-                0
-            ).into_node()
+                }
+            )
         }
     }
 

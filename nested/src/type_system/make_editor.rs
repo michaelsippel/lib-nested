@@ -74,10 +74,9 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
                                 PTYListEditor::new(
                                     ctx.clone(),
                                     args[0].clone(),
-                                    style,
                                     delim,
                                     depth
-                                ).into_node()
+                                ).into_node(style)
                             )
                         } else {
                             None
