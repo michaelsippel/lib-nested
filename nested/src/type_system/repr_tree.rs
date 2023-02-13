@@ -1,8 +1,7 @@
 use {
+    r3vi::view::{AnyOuterViewPort, OuterViewPort, View},
     crate::{
-        core::{AnyOuterViewPort, OuterViewPort, View},
-        type_system::{TypeDict, TypeTerm, TypeID},
-        tree::NestedNode
+        type_system::{TypeTerm}
     },
     std::{
         collections::HashMap,
@@ -26,6 +25,10 @@ impl ReprTree {
             port: None,
             branches: HashMap::new(),
         }
+    }
+
+    pub fn get_type(&self) -> &TypeTerm {
+        &self.type_tag
     }
 
     pub fn new_leaf(type_tag: TypeTerm, port: AnyOuterViewPort) -> Arc<RwLock<Self>> {

@@ -7,9 +7,9 @@ pub trait Commander {
 
 use std::sync::{Arc, RwLock};
 use crate::{
-    type_system::ReprTree,
-    singleton::SingletonView
+    type_system::ReprTree
 };
+use r3vi::view::singleton::*;
 
 pub trait ObjCommander {
     fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>);

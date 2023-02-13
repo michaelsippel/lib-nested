@@ -1,15 +1,21 @@
 use {
+    r3vi::{
+        view::{
+            OuterViewPort,
+            sequence::*
+        }
+    },
     crate::{
-        core::{OuterViewPort},
         type_system::{Context},
         terminal::{TerminalEvent, TerminalView, TerminalEditor, TerminalEditorResult},
-        sequence::{SequenceView, decorator::SeqDecorStyle},
-        list::{PTYListEditor},
+        editors::{
+            list::*,
+            sum::*,
+            char::CharEditor,
+            integer::PosIntEditor,
+        },
         tree::{TreeNav, TreeCursor, TreeNavResult},
         diagnostics::{Diagnostics, Message},
-        sum::SumEditor,
-        char::CharEditor,
-        integer::PosIntEditor,
         tree::NestedNode,
         commander::Commander,
         PtySegment
@@ -42,7 +48,7 @@ impl TypeTermEditor {
             ty: TypeTermVar::Any,
             sum_edit: Arc::new(RwLock::new(SumEditor::new(
                 vec![
-                    Context::make_editor( &ctx, ctx.read().unwrap().type_term_from_str("( List TypeTerm 1 )").unwrap(), depth + 1).unwrap(),
+                    Context::make_editor( &ctx, ctx.read().unwrap().type_term_from_str("( List TypeTerm )").unwrap(), depth + 1).unwrap(),
                     Context::make_editor( &ctx, ctx.read().unwrap().type_term_from_str("( PosInt 10 )").unwrap(), depth + 1 ).unwrap(),
                     Context::make_editor( &ctx, ctx.read().unwrap().type_term_from_str("( Symbol )").unwrap(), depth + 1 ).unwrap()
                 ])))
@@ -50,19 +56,22 @@ impl TypeTermEditor {
     }
 
     pub fn into_node(self) -> NestedNode {
+        let ctx = self.ctx.clone();
+        let sum_edit = self.sum_edit.clone();
+        let view = sum_edit.read().unwrap().pty_view();
+        let editor = Arc::new(RwLock::new(self));
+
         NestedNode::new()
-            .set_ctx(self.ctx.clone())
-            .set_nav(self.sum_edit.clone())
-            .set_cmd(self.sum_edit.clone())
-            .set_view(
-                self.sum_edit.read().unwrap().pty_view()
-            )
+            .set_ctx(ctx)
+            .set_nav(sum_edit)
+            .set_cmd(editor.clone())
+            .set_view(view)
     }
 }
 
 impl Commander for TypeTermEditor {
     type Cmd = TerminalEvent;
-
+ 
     fn send_cmd(&mut self, event: &TerminalEvent) {
         match event {
             TerminalEvent::Input( termion::event::Event::Key(Key::Char(c)) ) => {
@@ -89,8 +98,9 @@ impl Commander for TypeTermEditor {
                             };
                     },
                     _ => {
+                        /*
                         if *c  == '(' {
-                            let _child = Arc::new(RwLock::new(TypeTermEditor {
+                            let child = TypeTermEditor {
                                 ctx: self.ctx.clone(),
                                 ty: self.ty.clone(),
                                 sum_edit: Arc::new(RwLock::new(SumEditor::new(
@@ -99,17 +109,18 @@ impl Commander for TypeTermEditor {
                                         self.sum_edit.read().unwrap().editors[1].clone(),
                                         self.sum_edit.read().unwrap().editors[2].clone(),
                                     ])))
-                            }));
+                            };
+
                             self.ty = TypeTermVar::List;
                             self.sum_edit.write().unwrap().select(0);
-/*
-                            let l = self.node.editors[0].clone();
-                            let l = l.downcast::<RwLock<PTYListEditor<TypeTermEditor>>>().unwrap();
-                            l.write().unwrap().data.push(child);
-                            */
-                        } else {
-                            self.sum_edit.write().unwrap().send_cmd( event );
-                        }
+
+                            let l = self.sum_edit.read().unwrap().editors[0].clone();
+                            let l = l.editor.clone().unwrap().downcast::<RwLock<ListEditor>>().unwrap();
+                            l.write().unwrap().insert(TypeTermEditor::new(self.ctx.clone(), 1).into_node());
+                    } else {
+                        */
+                        self.sum_edit.write().unwrap().send_cmd( event );
+                        //}
                     }
                 }
             },

@@ -1,40 +1,58 @@
 use {
-    std::sync::{Arc, RwLock},
+    std::{sync::{Arc, RwLock}, any::Any},
     cgmath::Vector2,
+    r3vi::{
+        view::{
+            ViewPort, OuterViewPort, AnyOuterViewPort,
+            singleton::*,
+            sequence::*
+        },
+        buffer::{singleton::*}
+    },
     crate::{
-        core::{ViewPort, OuterViewPort, AnyOuterViewPort},
         type_system::{ReprTree, Context},
-        singleton::{SingletonBuffer, SingletonView},
-        sequence::SequenceView,
         terminal::{TerminalView, TerminalEvent, TerminalEditor, TerminalEditorResult},
         diagnostics::{Diagnostics, Message},
         tree::{TreeNav, TreeCursor, TreeNavResult},
-        list::{ListCursorMode},
+        editors::list::{ListCursorMode},
         commander::ObjCommander,
-        vec::VecBuffer,
-        Nested
     }
 };
 
 #[derive(Clone)]
 pub struct NestedNode {
+    /// context
     pub ctx: Option<Arc<RwLock<Context>>>,
 
-//    pub abs: Option<Arc<RwLock<ReprTree>>>,
+    /// abstract editor
+    pub editor: Option<Arc<dyn Any + Send + Sync>>,
+
+    /// abstract data view
+    pub data: Option<Arc<RwLock<ReprTree>>>,
+
+    /// display view
     pub view: Option<OuterViewPort<dyn TerminalView>>,
+
+    /// diagnostics
     pub diag: Option<OuterViewPort<dyn SequenceView<Item = Message>>>,
+
+    /// commander
     pub cmd: Option<Arc<RwLock<dyn ObjCommander + Send + Sync>>>,
+
+    /// tree navigation
     pub tree_nav: Option<Arc<RwLock<dyn TreeNav + Send + Sync>>>,
 }
 
 impl ObjCommander for NestedNode {
     fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) {
         if let Some(cmd) = self.cmd.as_ref() {
+            // todo: filter out tree-nav cmds and send them to tree_nav
             cmd.write().unwrap().send_cmd_obj(cmd_obj);
         }
     }
 }
 
+// todo: remove that at some point
 impl TerminalEditor for NestedNode {
     fn get_term_view(&self) -> OuterViewPort<dyn TerminalView> {
         self.get_view()
@@ -109,13 +127,18 @@ impl TreeNav for NestedNode {
     }
 }
 
-impl Diagnostics for NestedNode {}
-impl Nested for NestedNode {}
+impl Diagnostics for NestedNode {
+    fn get_msg_port(&self) -> OuterViewPort<dyn SequenceView<Item = Message>> {
+        self.get_diag()
+    }
+}
 
 impl NestedNode {
     pub fn new() -> Self {
         NestedNode {
             ctx: None,
+            data: None,
+            editor: None,
             view: None,
             diag: None,
             cmd: None,
@@ -125,6 +148,16 @@ impl NestedNode {
 
     pub fn set_ctx(mut self, ctx: Arc<RwLock<Context>>) -> Self {
         self.ctx = Some(ctx);
+        self
+    }
+
+    pub fn set_data(mut self, data: Arc<RwLock<ReprTree>>) -> Self {
+        self.data = Some(data);
+        self
+    }
+
+    pub fn set_editor(mut self, editor: Arc<dyn Any + Send + Sync>) -> Self {
+        self.editor = Some(editor);
         self
     }
 

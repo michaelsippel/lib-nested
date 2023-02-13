@@ -1,5 +1,5 @@
 use {
-    crate::list::ListCursorMode
+    crate::editors::list::ListCursorMode
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>

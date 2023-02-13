@@ -1,15 +1,24 @@
 use {
-    crate::list::ListCursorMode,
-    crate::tree::TreeCursor,
-    crate::vec::VecBuffer,
-    crate::core::{OuterViewPort},
-    crate::sequence::{SequenceView, decorator::Separate},
-    crate::singleton::{SingletonBuffer, SingletonView},
-    cgmath::Vector2,
+    r3vi::{
+        view::{
+            OuterViewPort,
+            singleton::*,
+            sequence::*,
+        },
+        buffer::{
+            singleton::SingletonBuffer,
+            vec::VecBuffer
+        },
+        projection::{
+            decorate_sequence::*,
+        }
+    },
     crate::{
-        terminal::{TerminalView, TerminalStyle, make_label}
-        
-    }
+        editors::list::ListCursorMode,
+        tree::TreeCursor,
+        terminal::{TerminalView, TerminalProjections, make_label}
+    },
+    cgmath::Vector2,
 };
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -74,6 +83,21 @@ pub trait TreeNav {
         let mut c = self.get_cursor();
         c.leaf_mode = new_leaf_mode;
         self.goto(c)
+    }
+
+    fn get_leaf_mode(&mut self) -> ListCursorMode {
+        self.get_cursor().leaf_mode
+    }
+
+    fn toggle_leaf_mode(&mut self) -> TreeNavResult {
+        let old_mode = self.get_leaf_mode();
+        self.set_leaf_mode(
+            match old_mode {
+                ListCursorMode::Insert => ListCursorMode::Select,
+                ListCursorMode::Select => ListCursorMode::Insert
+            }
+        );
+        TreeNavResult::Continue
     }
 
     fn up(&mut self) -> TreeNavResult {

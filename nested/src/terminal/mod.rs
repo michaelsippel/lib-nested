@@ -11,7 +11,7 @@ pub use {
     terminal::{Terminal, TerminalEvent},
 };
 
-use crate::grid::GridView;
+use r3vi::view::grid::*;
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
@@ -32,9 +32,9 @@ pub trait TerminalEditor {
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 use {
-    crate::{
-        core::{OuterViewPort, ViewPort},
-        vec::VecBuffer,
+    r3vi::{
+        view::{OuterViewPort},
+        buffer::vec::*,
     },
     cgmath::Point2,
 };
@@ -54,19 +54,25 @@ pub fn make_label(s: &str) -> OuterViewPort<dyn TerminalView> {
     v
 }
 
-impl OuterViewPort<dyn TerminalView> {
-    pub fn with_style(&self, style: TerminalStyle) -> OuterViewPort<dyn TerminalView> {
+pub trait TerminalProjections {
+    fn with_style(&self, style: TerminalStyle) -> OuterViewPort<dyn TerminalView>;
+    fn with_fg_color(&self, col: (u8, u8, u8)) -> OuterViewPort<dyn TerminalView>;
+    fn with_bg_color(&self, col: (u8, u8, u8)) -> OuterViewPort<dyn TerminalView>;
+}
+
+impl TerminalProjections for OuterViewPort<dyn TerminalView> {
+    fn with_style(&self, style: TerminalStyle) -> OuterViewPort<dyn TerminalView> {
         self.map_item(
             move |_idx, a|
             a.add_style_front(style)
         )
     }
 
-    pub fn with_fg_color(&self, col: (u8, u8, u8)) -> OuterViewPort<dyn TerminalView> {
+    fn with_fg_color(&self, col: (u8, u8, u8)) -> OuterViewPort<dyn TerminalView> {
         self.with_style(TerminalStyle::fg_color(col))
     }
 
-    pub fn with_bg_color(&self, col: (u8, u8, u8)) -> OuterViewPort<dyn TerminalView> {
+    fn with_bg_color(&self, col: (u8, u8, u8)) -> OuterViewPort<dyn TerminalView> {
         self.with_style(TerminalStyle::bg_color(col))
     }
 }

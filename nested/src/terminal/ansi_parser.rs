@@ -1,10 +1,15 @@
 use {
     //async_std::{io::{Read, ReadExt}},
+    r3vi::{
+        view::{
+            InnerViewPort, Observer, ObserverBroadcast, OuterViewPort, View, ViewPort,
+            index::*,
+            singleton::*,
+        },
+        buffer::{singleton::*, index_hashmap::*},
+        projection::projection_helper::ProjectionHelper,
+    },
     crate::{
-        core::{InnerViewPort, Observer, ObserverBroadcast, OuterViewPort, View, ViewPort},
-        index::{buffer::IndexBuffer, IndexArea, IndexView},
-        projection::ProjectionHelper,
-        singleton::{SingletonBuffer, SingletonView},
         terminal::{TerminalAtom, TerminalStyle, TerminalView},
     },
     cgmath::{Point2, Vector2},

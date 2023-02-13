@@ -1,6 +1,5 @@
 use {
     crate::{
-        core::{AnyOuterViewPort, OuterViewPort, View},
         type_system::{TypeDict, TypeTerm, TypeID, ReprTree},
         tree::NestedNode
     },
@@ -50,6 +49,9 @@ pub struct Context {
     /// objects
     objects: HashMap<String, Arc<RwLock<ReprTree>>>,
 
+    /// types that can be edited as lists
+    list_types: Vec<TypeID>,
+
     /// editors
     editor_ctors: HashMap<TypeID, Arc<dyn Fn(Arc<RwLock<Self>>, TypeTerm, usize) -> Option<NestedNode> + Send + Sync>>,
 
@@ -72,6 +74,10 @@ impl Context {
             default_constructors: HashMap::new(),
             morphism_constructors: HashMap::new(),
             objects: HashMap::new(),
+            list_types: match parent.as_ref() {
+                Some(p) => p.read().unwrap().list_types.clone(),
+                None => Vec::new()
+            },
             parent,
         }
     }
@@ -80,8 +86,22 @@ impl Context {
         Context::with_parent(None)
     }
 
-    pub fn add_typename(&mut self, tn: String) {
-        self.type_dict.write().unwrap().add_typename(tn);
+    pub fn add_typename(&mut self, tn: String) -> TypeID {
+        self.type_dict.write().unwrap().add_typename(tn)
+    }
+
+    pub fn add_list_typename(&mut self, tn: String) {
+        let tid = self.add_typename(tn);
+        self.list_types.push( tid );
+    }
+
+    pub fn is_list_type(&self, t: &TypeTerm) -> bool {
+        match t {
+            TypeTerm::Type { id, args: _ } => {
+                self.list_types.contains(id)
+            }
+            _ => false
+        }
     }
 
     pub fn get_typeid(&self, tn: &str) -> Option<TypeID> {
@@ -98,9 +118,12 @@ impl Context {
 
     pub fn add_editor_ctor(&mut self, tn: &str, mk_editor: Arc<dyn Fn(Arc<RwLock<Self>>, TypeTerm, usize) -> Option<NestedNode> + Send + Sync>) {
         let mut dict = self.type_dict.write().unwrap();
-        let tyid = dict
-            .get_typeid(&tn.into())
-            .unwrap_or( dict.add_typename(tn.into()) );
+        let tyid =
+            if let Some(tyid) = dict.get_typeid(&tn.into()) {
+                tyid
+            } else {
+                dict.add_typename(tn.into())
+            };
         self.editor_ctors.insert(tyid, mk_editor);
     }
 
@@ -122,7 +145,20 @@ impl Context {
         let mk_editor = ctx.read().unwrap().get_editor_ctor(&type_term)?;
         mk_editor(ctx.clone(), type_term, depth)
     }
+/*
+    pub fn enrich_editor(
+        node: NestedNode,
+        typ: TypeTerm
+    ) -> NestedNode {
 
+        
+        // create view
+
+        // create commander
+        
+
+    }
+*/
     pub fn add_morphism(
         &mut self,
         morph_type: MorphismType,

@@ -1,9 +1,9 @@
 use {
+    r3vi::{
+        view::{OuterViewPort, sequence::*},
+        buffer::{vec::*, index_hashmap::*}
+    },
     crate::{
-        core::{OuterViewPort},
-        sequence::{SequenceView},
-        vec::{VecBuffer},
-        index::{buffer::IndexBuffer},
         terminal::{
             TerminalView, TerminalStyle, make_label
         }

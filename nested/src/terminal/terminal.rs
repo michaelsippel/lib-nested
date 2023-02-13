@@ -1,13 +1,13 @@
 use {
-    super::{TerminalStyle, TerminalView},
-    crate::{
-        core::{
+    r3vi::{
+        view::{
             channel::{queue_channel, set_channel, ChannelReceiver, ChannelSender},
             Observer, OuterViewPort,
-        },
-        grid::GridWindowIterator,
-        index::IndexArea,
+            grid::*,
+            index::*,
+        }
     },
+    super::{TerminalStyle, TerminalView},
     async_std::{stream::StreamExt, task},
     cgmath::{Point2, Vector2},
     signal_hook,

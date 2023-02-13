@@ -1,12 +1,10 @@
 [workspace]
 members = [
     "nested",
-    "terminal/display_server",
-    "terminal/ansi_parser",
-    "shell",
-    "sdf_editor",
-    "math/str2int",
-    "math/int2str",
-    "math/radix_transform",
-    "math/fib"
+#    "terminal/display_server",
+#    "terminal/ansi_parser",
+#    "math/str2int",
+#    "math/int2str",
+#    "math/radix_transform",
+#    "math/fib"
 ]

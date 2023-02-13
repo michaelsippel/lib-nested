@@ -1,15 +1,20 @@
 use {
     crate::{
-        type_system::{TypeTerm, Context},
-        integer::{DigitEditor, PosIntEditor},
-        list::{PTYListEditor},
-        sequence::{decorator::{SeqDecorStyle}},
-        sum::SumEditor,
-        char::CharEditor,
+        type_system::{Context, TypeTerm, ReprTree},
+        editors::{
+            char::*,
+            list::*,
+            integer::*,
+            product::*,
+            sum::*
+        },
+        tree::{NestedNode},        
+        terminal::{TerminalEditor},
+        diagnostics::{Diagnostics},
         type_system::TypeTermEditor,
-        Nested
     },
     std::sync::{Arc, RwLock},
+    cgmath::Point2
 };
 
 pub fn init_mem_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
@@ -30,7 +35,9 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
             }
         )
     );
+    ctx.write().unwrap().add_list_typename("Sequence".into());
 
+    ctx.write().unwrap().add_list_typename("List".into());
     ctx.write().unwrap().add_editor_ctor(
         "List", Arc::new(
             |ctx: Arc<RwLock<Context>>, ty: TypeTerm, depth: usize| {
@@ -39,44 +46,13 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
                         id: _, args
                     } => {
                         if args.len() > 0 {
-                            // todo: factor style out of type arGS
-                            let style = if args.len() > 1 {
-                                match args[1] {
-                                    TypeTerm::Num(0) => SeqDecorStyle::Plain,
-                                    TypeTerm::Num(1) => SeqDecorStyle::HorizontalSexpr,
-                                    TypeTerm::Num(2) => SeqDecorStyle::VerticalSexpr,
-                                    TypeTerm::Num(3) => SeqDecorStyle::DoubleQuote,
-                                    TypeTerm::Num(4) => SeqDecorStyle::Tuple,
-                                    TypeTerm::Num(5) => SeqDecorStyle::EnumSet,
-                                    TypeTerm::Num(6) => SeqDecorStyle::Path,
-                                    _ => SeqDecorStyle::HorizontalSexpr
-                                }
-                            } else {
-                                SeqDecorStyle::HorizontalSexpr
-                            };
-
-                            let delim = if args.len() > 1 {
-                                match args[1] {
-                                    TypeTerm::Num(0) => None,
-                                    TypeTerm::Num(1) => Some(' '),
-                                    TypeTerm::Num(2) => Some('\n'),
-                                    TypeTerm::Num(3) => None,
-                                    TypeTerm::Num(4) => Some(','),
-                                    TypeTerm::Num(5) => Some(','),
-                                    TypeTerm::Num(6) => Some('/'),
-                                    _ => None
-                                }
-                            }else {
-                                None
-                            };
-
                             Some(
                                 PTYListEditor::new(
-                                    ctx.clone(),
+                                    ctx,
                                     args[0].clone(),
-                                    delim,
-                                    depth
-                                ).into_node(style)
+                                    ListStyle::HorizontalSexpr,
+                                    depth + 1
+                                ).into_node()
                             )
                         } else {
                             None
@@ -88,30 +64,49 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
         )
     );
 
+    ctx.write().unwrap().add_list_typename("Symbol".into());
     ctx.write().unwrap().add_editor_ctor(
         "Symbol", Arc::new(
             |ctx: Arc<RwLock<Context>>, _ty: TypeTerm, depth: usize| {
-                Context::make_editor(
-                    &ctx,
-                    ctx.read().unwrap().type_term_from_str("( List Char 0 )").unwrap(),
-                    depth
-                )
+                let mut node = PTYListEditor::new(
+                    ctx.clone(),
+                    ctx.read().unwrap().type_term_from_str("( Char )").unwrap(),
+                    ListStyle::Plain,
+                    depth + 1
+                ).into_node();
+
+                node.data = Some(ReprTree::ascend(
+                    &node.data.unwrap(),
+                    ctx.read().unwrap().type_term_from_str("( Symbol )").unwrap()
+                ));
+
+                Some(node)
             }
         )
     );
 
+    ctx.write().unwrap().add_list_typename("String".into());
     ctx.write().unwrap().add_editor_ctor(
         "String", Arc::new(
             |ctx: Arc<RwLock<Context>>, _ty: TypeTerm, depth: usize| {
-                Context::make_editor(
-                    &ctx,
-                    ctx.read().unwrap().type_term_from_str("( List Char 3 )").unwrap(),
-                    depth
-                )
+                let mut node = PTYListEditor::new(
+                    ctx.clone(),
+                    ctx.read().unwrap().type_term_from_str("( Char )").unwrap(),
+                    ListStyle::DoubleQuote,
+                    depth + 1
+                ).into_node();
+
+                node.data = Some(ReprTree::ascend(
+                    &node.data.unwrap(),
+                    ctx.read().unwrap().type_term_from_str("( String )").unwrap()
+                ));
+
+                Some(node)
             }
         )
     );
-    
+
+    ctx.write().unwrap().add_list_typename("TypeTerm".into());
     ctx.write().unwrap().add_editor_ctor(
         "TypeTerm", Arc::new(
             |ctx: Arc<RwLock<Context>>, _ty: TypeTerm, depth: usize| {
@@ -120,7 +115,7 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
         )
     );
 
-    ctx.write().unwrap().add_typename("TerminalEvent".into());    
+    ctx.write().unwrap().add_typename("TerminalEvent".into());
     ctx
 }
 
@@ -128,9 +123,8 @@ pub fn init_math_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
     let ctx = Arc::new(RwLock::new(Context::with_parent(Some(parent))));
 
     ctx.write().unwrap().add_typename("MachineInt".into());
+    ctx.write().unwrap().add_typename("u32".into());
     ctx.write().unwrap().add_typename("BigEndian".into());
-
-    //ctx.write().unwrap().add_typename("Digit".into());
 
     ctx.write().unwrap().add_editor_ctor(
         "Digit", Arc::new(
@@ -142,8 +136,9 @@ pub fn init_math_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
                         if args.len() > 0 {
                             match args[0] {
                                 TypeTerm::Num(radix) => {
+                                    let node = DigitEditor::new(ctx.clone(), radix as u32).into_node();                                    
                                     Some(
-                                        DigitEditor::new(ctx.clone(), radix as u32).into_node()
+                                        node
                                     )
                                 },
                                 _ => None
@@ -157,7 +152,8 @@ pub fn init_math_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
             }
         )
     );
-    
+
+    ctx.write().unwrap().add_list_typename("PosInt".into());
     ctx.write().unwrap().add_editor_ctor(
         "PosInt", Arc::new(
             |ctx: Arc<RwLock<Context>>, ty: TypeTerm, _depth: usize| {
@@ -184,32 +180,88 @@ pub fn init_math_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
         )
     );    
 
+    ctx.write().unwrap().add_list_typename("RGB".into());
+    ctx.write().unwrap().add_editor_ctor(
+        "RGB", Arc::new(
+            |ctx: Arc<RwLock<Context>>, ty: TypeTerm, depth: usize| {
+                let editor = ProductEditor::new(depth, ctx.clone())
+                    .with_t(Point2::new(0, 0), "r: ")
+                    .with_n(Point2::new(1, 0),
+                        vec![
+                        ctx.read().unwrap().type_term_from_str("( PosInt 16 BigEndian )").unwrap()
+                        ])
+                    .with_t(Point2::new(0, 1), "g: ")
+                    .with_n(Point2::new(1, 1),
+                        vec![
+                        ctx.read().unwrap().type_term_from_str("( PosInt 16 BigEndian )").unwrap()
+                        ])
+                    .with_t(Point2::new(0, 2), "b: ")
+                    .with_n(Point2::new(1, 2),
+                        vec![
+                        ctx.read().unwrap().type_term_from_str("( PosInt 16 BigEndian )").unwrap()
+                        ]
+                    );
+
+                let view = editor.get_term_view();
+                let diag = editor.get_msg_port();
+                let editor = Arc::new(RwLock::new(editor));
+
+                let node = NestedNode::new()
+                    .set_ctx(ctx)
+                    .set_cmd(editor.clone())
+                    .set_nav(editor.clone())
+                    .set_view(view)
+                    .set_diag(diag)
+                    ;
+
+                Some(node)
+            }
+        ));
+    
     ctx
 }
 
 pub fn init_os_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
     let ctx = Arc::new(RwLock::new(Context::with_parent(Some(parent))));
 
+    ctx.write().unwrap().add_list_typename("PathSegment".into());
     ctx.write().unwrap().add_editor_ctor(
         "PathSegment", Arc::new(
             |ctx: Arc<RwLock<Context>>, _ty: TypeTerm, depth: usize| {
-                Context::make_editor(
-                    &ctx,
-                    ctx.read().unwrap().type_term_from_str("( List Char 0 )").unwrap(),
-                    depth
-                )
+                let mut node = PTYListEditor::new(
+                    ctx.clone(),
+                    ctx.read().unwrap().type_term_from_str("( Char )").unwrap(),
+                    ListStyle::Plain,
+                    depth + 1
+                ).into_node();
+
+                node.data = Some(ReprTree::ascend(
+                    &node.data.unwrap(),
+                    ctx.read().unwrap().type_term_from_str("( PathSegment )").unwrap()
+                ));
+
+                Some(node)
             }
         )
     );
 
+    ctx.write().unwrap().add_list_typename("Path".into());
     ctx.write().unwrap().add_editor_ctor(
         "Path", Arc::new(
             |ctx: Arc<RwLock<Context>>, _ty: TypeTerm, depth: usize| {
-                Context::make_editor(
-                    &ctx,
-                    ctx.read().unwrap().type_term_from_str("( List PathSegment 6 )").unwrap(),
-                    depth+1
-                )
+                let mut node = PTYListEditor::new(
+                    ctx.clone(),
+                    ctx.read().unwrap().type_term_from_str("( PathSegment )").unwrap(),
+                    ListStyle::Path,
+                    depth + 1
+                ).into_node();
+
+                node.data = Some(ReprTree::ascend(
+                    &node.data.unwrap(),
+                    ctx.read().unwrap().type_term_from_str("( Path )").unwrap()
+                ));
+
+                Some(node)
             }
         )
     );

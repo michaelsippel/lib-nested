@@ -1,10 +1,12 @@
 use {
-    crate::{
-        core::{InnerViewPort, Observer, ObserverBroadcast, OuterViewPort, View},
-        index::{IndexArea, IndexView},
-        projection::ProjectionHelper,
-        terminal::{TerminalAtom, TerminalView},
+    r3vi::{
+        view::{
+            InnerViewPort, Observer, ObserverBroadcast, OuterViewPort, View,
+            index::*,
+        },
+        projection::projection_helper::*,
     },
+    crate::{terminal::{TerminalAtom, TerminalView}},
     cgmath::Point2,
     std::sync::Arc,
     std::sync::RwLock,
