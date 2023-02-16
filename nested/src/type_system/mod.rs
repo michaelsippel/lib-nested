@@ -8,7 +8,7 @@ pub mod type_term_editor;
 pub use {
     repr_tree::{ReprTree},
     type_term::{TypeDict, TypeID, TypeTerm, TypeLadder},
-    context::{Context, MorphismMode, MorphismType},
+    context::{Context, MorphismMode, MorphismType, MorphismTypePattern},
     type_term_editor::TypeTermEditor,
     make_editor::*
 };

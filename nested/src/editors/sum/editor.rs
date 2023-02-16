@@ -3,9 +3,6 @@ use {
         view::{
             ViewPort, OuterViewPort,
             sequence::*,            
-        },
-        buffer::{
-            vec::*
         }
     },
     crate::{

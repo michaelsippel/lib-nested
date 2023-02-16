@@ -19,7 +19,7 @@ use {
             make_label
         },
         tree::{TreeCursor, TreeNav},
-        diagnostics::{Diagnostics, make_error},
+        diagnostics::{Diagnostics},
         tree::NestedNode,
         commander::Commander,
         PtySegment
@@ -179,7 +179,6 @@ impl PTYListEditor {
 
         let ed = editor.read().unwrap();
         let edd = ed.editor.read().unwrap();
-
    
         NestedNode::new()
             .set_data(edd.get_data())
@@ -354,7 +353,7 @@ impl Commander for PTYListEditor {
                                     e.delete_nexd();
                                 }
                                 _ => {
-                                    let mut new_edit = Context::make_editor(&e.ctx, e.typ.clone(), self.depth).unwrap();
+                                    let mut new_edit = Context::make_node(&e.ctx, e.typ.clone(), self.depth).unwrap();
                                     new_edit.goto(TreeCursor::home());
                                     new_edit.handle_terminal_event(event);
 

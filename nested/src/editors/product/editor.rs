@@ -235,7 +235,7 @@ impl TerminalEditor for ProductEditor {
                         }
                     }
                 } else {
-                    let mut e = Context::make_editor(&self.ctx, t[0].clone(), *ed_depth+1).unwrap();
+                    let mut e = Context::make_node(&self.ctx, t[0].clone(), *ed_depth+1).unwrap();
                     *editor = Some(e.clone());
                     update_segment = true;
 

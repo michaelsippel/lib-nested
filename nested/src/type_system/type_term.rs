@@ -7,7 +7,7 @@ pub type TypeLadder = Vec<TypeTerm>;
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TypeTerm {
     Type { id: TypeID, args: Vec<TypeTerm> },
     Num(i64),

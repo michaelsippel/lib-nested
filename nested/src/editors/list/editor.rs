@@ -103,7 +103,7 @@ impl ListEditor {
 
     pub fn get_seq_type(&self) -> TypeTerm {
         TypeTerm::Type {
-            id: self.ctx.read().unwrap().get_typeid("Sequence").unwrap(),
+            id: self.ctx.read().unwrap().get_typeid("List").unwrap(),
             args: vec![ self.get_item_type() ]
         }        
     }
@@ -277,4 +277,24 @@ impl ListEditor {
         }
     }
 }
+/*
+use crate::{
+    type_system::TypeLadder,
+    tree::{TreeType, TreeAddr}
+};
 
+impl TreeType for ListEditor {
+    fn get_type(&self, addr: &TreeAddr) -> TypeLadder {
+        let idx = crate::utils::modulo::modulo(addr.0[0] as isize, self.data.len() as isize) as usize;
+
+        let mut addr = addr.clone();
+        
+        if self.data.len() > 0 {
+            addr.0.remove(0);
+            self.data.get(idx).get_type(addr)
+        } else {
+            vec![]
+        }
+    }
+}
+*/

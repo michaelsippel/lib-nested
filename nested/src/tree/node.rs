@@ -52,6 +52,17 @@ impl ObjCommander for NestedNode {
     }
 }
 
+/*
+impl TreeType for NestedNode {
+    fn get_type(&self, addr: &TreeAddr) -> TypeLadder {
+        if let Some(editor) = self.editor {
+            editor.read().unwrap().get_type(addr)
+        } else {
+            vec![]
+        }
+    }
+}
+*/
 // todo: remove that at some point
 impl TerminalEditor for NestedNode {
     fn get_term_view(&self) -> OuterViewPort<dyn TerminalView> {

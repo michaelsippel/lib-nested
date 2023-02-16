@@ -1,26 +1,15 @@
 use {
-    r3vi::{
-        view::{
-            OuterViewPort,
-            sequence::*
-        }
-    },
     crate::{
         type_system::{Context},
-        terminal::{TerminalEvent, TerminalView, TerminalEditor, TerminalEditorResult},
+        terminal::{TerminalEvent},
         editors::{
-            list::*,
             sum::*,
-            char::CharEditor,
-            integer::PosIntEditor,
         },
-        tree::{TreeNav, TreeCursor, TreeNavResult},
-        diagnostics::{Diagnostics, Message},
+        tree::{TreeNav},
         tree::NestedNode,
         commander::Commander,
         PtySegment
     },
-    cgmath::{Vector2},
     termion::event::{Key},
     std::{
         sync::{Arc, RwLock}
@@ -48,9 +37,9 @@ impl TypeTermEditor {
             ty: TypeTermVar::Any,
             sum_edit: Arc::new(RwLock::new(SumEditor::new(
                 vec![
-                    Context::make_editor( &ctx, ctx.read().unwrap().type_term_from_str("( List TypeTerm )").unwrap(), depth + 1).unwrap(),
-                    Context::make_editor( &ctx, ctx.read().unwrap().type_term_from_str("( PosInt 10 )").unwrap(), depth + 1 ).unwrap(),
-                    Context::make_editor( &ctx, ctx.read().unwrap().type_term_from_str("( Symbol )").unwrap(), depth + 1 ).unwrap()
+                    Context::make_node( &ctx, ctx.read().unwrap().type_term_from_str("( List TypeTerm )").unwrap(), depth + 1).unwrap(),
+                    Context::make_node( &ctx, ctx.read().unwrap().type_term_from_str("( PosInt 10 )").unwrap(), depth + 1 ).unwrap(),
+                    Context::make_node( &ctx, ctx.read().unwrap().type_term_from_str("( Symbol )").unwrap(), depth + 1 ).unwrap()
                 ])))
         }
     }

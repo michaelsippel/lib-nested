@@ -35,9 +35,27 @@ pub enum MorphismMode {
 
 #[derive(Clone, Hash, PartialEq, Eq)]
 pub struct MorphismType {
-    pub mode: MorphismMode,
-    pub src_type: TypeTerm,
+//    pub mode: MorphismMode,
+    pub src_type: Option<TypeTerm>,
     pub dst_type: TypeTerm,
+}
+
+#[derive(Hash, Eq, PartialEq, Debug)]
+pub struct MorphismTypePattern {
+    pub src_type: Option<TypeTerm>,
+    pub dst_tyid: TypeID
+}
+
+impl From<MorphismType> for MorphismTypePattern {
+    fn from(value: MorphismType) -> MorphismTypePattern {
+        MorphismTypePattern {
+            src_type: value.src_type,
+            dst_tyid: match value.dst_type {
+                TypeTerm::Type { id, args: _ } => id,
+                _ => unreachable!()
+            }
+        }
+    }
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
@@ -46,18 +64,21 @@ pub struct Context {
     /// assigns a name to every type
     type_dict: Arc<RwLock<TypeDict>>,
 
-    /// objects
-    objects: HashMap<String, Arc<RwLock<ReprTree>>>,
+    /// vertices of the graph
+    nodes: HashMap< String, NestedNode >,
 
+    /// todo: beautify
     /// types that can be edited as lists
-    list_types: Vec<TypeID>,
+    list_types: Vec< TypeID >,
 
-    /// editors
-    editor_ctors: HashMap<TypeID, Arc<dyn Fn(Arc<RwLock<Self>>, TypeTerm, usize) -> Option<NestedNode> + Send + Sync>>,
-
-    /// morphisms
-    default_constructors: HashMap<TypeTerm, Box<dyn Fn() -> Arc<RwLock<ReprTree>> + Send + Sync>>,
-    morphism_constructors: HashMap<MorphismType, Box<dyn Fn(Arc<RwLock<ReprTree>>) -> Arc<RwLock<ReprTree>> + Send + Sync>>,
+    /// graph constructors
+    morphisms: HashMap<
+                   MorphismTypePattern,
+                   Arc<
+                           dyn Fn( NestedNode, TypeTerm, usize ) -> Option<NestedNode>
+                           + Send + Sync
+                   >
+               >,
 
     /// recursion
     parent: Option<Arc<RwLock<Context>>>,
@@ -70,10 +91,8 @@ impl Context {
                 Some(p) => p.read().unwrap().type_dict.clone(),
                 None => Arc::new(RwLock::new(TypeDict::new()))
             },
-            editor_ctors: HashMap::new(),
-            default_constructors: HashMap::new(),
-            morphism_constructors: HashMap::new(),
-            objects: HashMap::new(),
+            morphisms: HashMap::new(),
+            nodes: HashMap::new(),
             list_types: match parent.as_ref() {
                 Some(p) => p.read().unwrap().list_types.clone(),
                 None => Vec::new()
@@ -84,6 +103,14 @@ impl Context {
 
     pub fn new() -> Self {
         Context::with_parent(None)
+    }
+
+    pub fn depth(&self) -> usize {
+        if let Some(parent) = self.parent.as_ref() {
+            parent.read().unwrap().depth() + 1
+        } else {
+            0
+        }
     }
 
     pub fn add_typename(&mut self, tn: String) -> TypeID {
@@ -116,73 +143,97 @@ impl Context {
         self.type_dict.read().unwrap().type_term_to_str(&t)
     }
 
-    pub fn add_editor_ctor(&mut self, tn: &str, mk_editor: Arc<dyn Fn(Arc<RwLock<Self>>, TypeTerm, usize) -> Option<NestedNode> + Send + Sync>) {
-        let mut dict = self.type_dict.write().unwrap();
+    pub fn add_node_ctor(&mut self, tn: &str, mk_editor: Arc<dyn Fn(Arc<RwLock<Self>>, TypeTerm, usize) -> Option<NestedNode> + Send + Sync>) {
+        let dict = self.type_dict.clone();
+        let mut dict = dict.write().unwrap();
         let tyid =
             if let Some(tyid) = dict.get_typeid(&tn.into()) {
                 tyid
             } else {
                 dict.add_typename(tn.into())
             };
-        self.editor_ctors.insert(tyid, mk_editor);
+
+        let morphism_pattern = MorphismTypePattern {
+            src_type: None,
+            dst_tyid: tyid
+        };
+
+        self.add_morphism(morphism_pattern, Arc::new(move |node, dst_type, depth| {
+            let ctx = node.ctx.clone().unwrap();
+            mk_editor(ctx, dst_type, depth)
+        }));
     }
 
-    pub fn get_editor_ctor(&self, ty: &TypeTerm) -> Option<Arc<dyn Fn(Arc<RwLock<Self>>, TypeTerm, usize) -> Option<NestedNode> + Send + Sync>> {
-        if let TypeTerm::Type{ id, args: _ } = ty.clone() {
-            if let Some(m) = self.editor_ctors.get(&id).cloned() {
-                Some(m)
-            } else {
-                self.parent.as_ref()?
-                    .read().unwrap()
-                    .get_editor_ctor(&ty)
-            }
+    pub fn add_morphism(
+        &mut self,
+        morph_type_pattern: MorphismTypePattern,
+        morph_fn: Arc<
+                     dyn Fn( NestedNode, TypeTerm, usize ) -> Option<NestedNode>
+                     + Send + Sync
+                  >
+    ) {
+        self.morphisms.insert(morph_type_pattern, morph_fn);
+    }
+
+    pub fn get_morphism(&self, ty: MorphismType) -> Option<Arc<dyn Fn(NestedNode, TypeTerm, usize) -> Option<NestedNode> + Send + Sync>> {
+
+        let pattern = MorphismTypePattern::from(ty.clone());
+        if let Some(morphism) = self.morphisms.get( &pattern ) {
+            Some(morphism.clone())
         } else {
-            None
+            self.parent.as_ref()?
+                .read().unwrap()
+                .get_morphism(ty)
         }
     }
 
-    pub fn make_editor(ctx: &Arc<RwLock<Self>>, type_term: TypeTerm, depth: usize) -> Option<NestedNode> {
-        let mk_editor = ctx.read().unwrap().get_editor_ctor(&type_term)?;
-        mk_editor(ctx.clone(), type_term, depth)
+    pub fn make_node(ctx: &Arc<RwLock<Self>>, type_term: TypeTerm, depth: usize) -> Option<NestedNode> {
+        let mk_node = ctx.read().unwrap().get_morphism(MorphismType {
+            src_type: None,
+            dst_type: type_term.clone()
+        })?;
+
+        mk_node(NestedNode::new().set_ctx(ctx.clone()), type_term, depth)
     }
-/*
-    pub fn enrich_editor(
-        node: NestedNode,
-        typ: TypeTerm
-    ) -> NestedNode {
 
-        
-        // create view
+    pub fn morph_node(ctx: Arc<RwLock<Self>>, mut node: NestedNode, dst_type: TypeTerm) -> NestedNode {
+        let mut src_type = None;
 
-        // create commander
-        
+        if let Some(data) = node.data.clone() {
+            src_type = Some(data.read().unwrap().get_type().clone());
+            node = node.set_data(
+                ReprTree::ascend(
+                    &data,
+                    dst_type.clone()
+                )
+            );
+        }
 
-    }
-*/
-    pub fn add_morphism(
-        &mut self,
-        morph_type: MorphismType,
-        morph_fn: Box<dyn Fn(Arc<RwLock<ReprTree>>) -> Arc<RwLock<ReprTree>> + Send + Sync>,
-    ) {
-        self.morphism_constructors.insert(morph_type, morph_fn);
+        let pattern = MorphismType { src_type, dst_type: dst_type.clone() }.into();
+        if let Some(transform) = ctx.read().unwrap().get_morphism(pattern) {
+            if let Some(new_node) = transform(node.clone(), dst_type, 0) {
+                new_node
+            } else {
+                node.clone()
+            }
+        } else {
+            node
+        }
     }
 
     /// adds an object without any representations
-    pub fn add_obj(&mut self, name: String, typename: &str) {
-        let type_tag = self.type_dict.read().unwrap().type_term_from_str(typename).unwrap();
+    pub fn add_obj(ctx: Arc<RwLock<Context>>, name: String, typename: &str) {
+        let type_tag = ctx.read().unwrap()
+            .type_dict.read().unwrap()
+            .type_term_from_str(typename).unwrap();
 
-        self.objects.insert(
-            name,
-            if let Some(ctor) = self.default_constructors.get(&type_tag) {
-                ctor()
-            } else {
-                Arc::new(RwLock::new(ReprTree::new(type_tag)))
-            },
-        );
+        if let Some(node) = Context::make_node(&ctx, type_tag, 0) {
+            ctx.write().unwrap().nodes.insert(name, node);
+        }
     }
 
-    pub fn get_obj(&self, name: &String) -> Option<Arc<RwLock<ReprTree>>> {
-        if let Some(obj) = self.objects.get(name) {
+    pub fn get_obj(&self, name: &String) -> Option<NestedNode> {
+        if let Some(obj) = self.nodes.get(name) {
             Some(obj.clone())
         } else if let Some(parent) = self.parent.as_ref() {
             parent.read().unwrap().get_obj(name)
