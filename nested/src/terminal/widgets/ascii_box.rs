@@ -1,8 +1,12 @@
 use {
     cgmath::{Point2, Vector2},
-    nested::{
-        core::{InnerViewPort, Observer, ObserverBroadcast, OuterViewPort, View},
-        index::{IndexArea, IndexView},
+    r3vi::{
+        view::{
+            InnerViewPort, Observer, ObserverBroadcast, OuterViewPort, View,
+            index::*
+        },
+    },
+    crate::{
         terminal::{TerminalAtom, TerminalView},
     },
     std::sync::{Arc, RwLock},

@@ -200,8 +200,7 @@ impl ReprTree {
         _type_ladder: impl Iterator<Item = TypeTerm>,
         _morphism_constructors: &HashMap<MorphismType, Box<dyn Fn(Object) -> Object>>,
     ) {
-        // todo
-        
+        // todo        
 }
     */
 }

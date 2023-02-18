@@ -10,6 +10,6 @@ pub use {
     cursor::{ListCursor, ListCursorMode},
     editor::ListEditor,
     segment::{ListSegment, ListSegmentSequence},
-    pty_editor::{ListStyle, PTYListEditor}
+    pty_editor::{PTYListEditor}
 };
 

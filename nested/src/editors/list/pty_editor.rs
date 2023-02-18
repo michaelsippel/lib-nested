@@ -14,14 +14,13 @@ use {
             editor::ListEditor
         },
         terminal::{
-            TerminalEditor, TerminalEvent,
+            TerminalEvent,
             TerminalView,
             make_label
         },
         tree::{TreeCursor, TreeNav},
         diagnostics::{Diagnostics},
         tree::NestedNode,
-        commander::Commander,
         PtySegment
     },
     std::sync::{Arc, RwLock},
@@ -30,92 +29,9 @@ use {
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-#[derive(Clone, Copy)]
-pub enum ListStyle {
-    Plain,
-    HorizontalSexpr,
-    VerticalSexpr,
-    DoubleQuote,
-    Tuple,
-    EnumSet,
-    Path,
-    Hex
-}
-
-pub fn list_style_from_type(
-    ctx: &Arc<RwLock<Context>>,
-    typ: &TypeTerm
-) -> Option<ListStyle> {
-    let ctx = ctx.read().unwrap();
-
-    match typ {
-        TypeTerm::Type {
-            id, args
-        } => {
-            if *id == ctx.get_typeid("List").unwrap() {
-                Some(ListStyle::HorizontalSexpr)
-            } else if *id == ctx.get_typeid("String").unwrap() {
-                Some(ListStyle::DoubleQuote)
-            } else if *id == ctx.get_typeid("Symbol").unwrap() {
-                Some(ListStyle::Plain)
-            } else if *id == ctx.get_typeid("PathSegment").unwrap() {
-                Some(ListStyle::Plain)
-            } else if *id == ctx.get_typeid("Path").unwrap() {
-                Some(ListStyle::Path)
-            } else if *id == ctx.get_typeid("PosInt").unwrap() {
-                if args.len() > 0 {
-                    match args[0] {
-                        TypeTerm::Num(radix) => {
-                            match radix {
-                                16 => Some(ListStyle::Hex),
-                                _ => Some(ListStyle::Plain)
-                            }
-                        }
-                        _ => None
-                    }
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        }
-
-        _ => None
-    }
-}
-
-impl ListStyle {
-    fn get_split_char(&self) -> Option<char> {
-        match self {
-            ListStyle::Plain => None,
-            ListStyle::DoubleQuote => None,
-            ListStyle::HorizontalSexpr => Some(' '),
-            ListStyle::VerticalSexpr => Some('\n'),
-            ListStyle::Tuple => Some(','),
-            ListStyle::EnumSet => Some(','),
-            ListStyle::Path => Some('/'),
-            ListStyle::Hex => None
-        }
-    }
-
-    fn get_wrapper(&self) -> (&str, &str) {
-        match self {
-            ListStyle::Plain => ("", ""),
-            ListStyle::HorizontalSexpr => ("(", ")"),
-            ListStyle::VerticalSexpr => ("(", ")"),
-            ListStyle::DoubleQuote => ("\"", "\""),
-            ListStyle::Tuple => ("(", ")"),
-            ListStyle::EnumSet => ("{", "}"),
-            ListStyle::Path => ("<", ">"),
-            ListStyle::Hex => ("0x", "")
-        }
-    }
-}
-
 pub struct PTYListEditor {
     pub editor: Arc<RwLock<ListEditor>>,
-    style: ListStyle,
+    split_char: Option<char>,
     depth: usize
 }
 
@@ -125,20 +41,23 @@ impl PTYListEditor {
     pub fn new(
         ctx: Arc<RwLock<Context>>,
         typ: TypeTerm,
-        style: ListStyle,
+        split_char: Option<char>,
         depth: usize
     ) -> Self {
         Self::from_editor(
-            Arc::new(RwLock::new(ListEditor::new(ctx, typ))), style, depth)
+            Arc::new(RwLock::new(ListEditor::new(ctx, typ))),
+            split_char,
+            depth
+        )
     }
 
     pub fn from_editor(
         editor: Arc<RwLock<ListEditor>>,
-        style: ListStyle,
+        split_char: Option<char>,
         depth: usize
     ) -> Self {
         PTYListEditor {
-            style,
+            split_char,
             depth,
             editor,
         } 
@@ -154,7 +73,10 @@ impl PTYListEditor {
         se.get_view().map(move |segment| segment.pty_view())
     }
 
-    pub fn pty_view(&self) -> OuterViewPort<dyn TerminalView> {
+    pub fn pty_view(
+        &self,
+        display_style: (&str, &str, &str),
+    ) -> OuterViewPort<dyn TerminalView> {
         let editor = self.editor.read().unwrap();
 
         let seg_seq = ListSegmentSequence::new(
@@ -167,26 +89,25 @@ impl PTYListEditor {
         seg_seq
             .get_view()
             .map(move |segment| segment.pty_view())
-            .separate(make_label(&if let Some(c) = self.style.get_split_char() { format!("{}", c) } else { "".to_string() } ))
-            .wrap(make_label(self.style.get_wrapper().0), make_label(self.style.get_wrapper().1))
+            .separate(make_label(display_style.1))
+            .wrap(make_label(display_style.0), make_label(display_style.2))
             .to_grid_horizontal()
             .flatten()
     }
-
+    
     pub fn into_node(self) -> NestedNode {
-        let view = self.pty_view();        
+        let depth = self.depth;
         let editor = Arc::new(RwLock::new(self));
 
         let ed = editor.read().unwrap();
         let edd = ed.editor.read().unwrap();
    
-        NestedNode::new()
+        NestedNode::new(depth)
             .set_data(edd.get_data())
             .set_cmd(editor.clone())
             .set_editor(ed.editor.clone())
             .set_nav(ed.editor.clone())
             .set_ctx(edd.ctx.clone())
-            .set_view(view)
             .set_diag(
                 edd.get_data_port()
                     .enumerate()
@@ -224,16 +145,18 @@ impl PTYListEditor {
         self.depth = depth;
     }
 
-    pub fn split(e: &mut ListEditor, depth: usize) {
+    pub fn split(e: &mut ListEditor) {
         let cur = e.get_cursor();
         if let Some(item) = e.get_item_mut() {
+            let depth = item.depth;
+
             if let Some(head_editor) = item.editor.clone() {
 
                 let head = head_editor.downcast::<RwLock<ListEditor>>().unwrap();
                 let mut head = head.write().unwrap();
 
                 if cur.tree_addr.len() > 2 {
-                    PTYListEditor::split(&mut head, depth+1);
+                    PTYListEditor::split(&mut head);
                 }
 
                 let mut tail = head.split();
@@ -259,27 +182,11 @@ impl PTYListEditor {
                         None
                     };
 
-                let style =
-                    if let Some(item_type) = &item_type {
-                        list_style_from_type(&tail.ctx, item_type)
-                            .unwrap_or(
-                                ListStyle::HorizontalSexpr
-                            )
-                    } else {
-                        ListStyle::HorizontalSexpr
-                    };
-
-                let mut tail_node = PTYListEditor::from_editor(
-                    Arc::new(RwLock::new(tail)),
-                    style,
-                    depth+1
-                ).into_node();
+                let mut tail_node = tail.into_node(depth);
+                tail_node = tail_node.set_ctx(item.ctx.clone().unwrap());
 
                 if let Some(item_type) = item_type {
-                    tail_node.data = Some(ReprTree::ascend(
-                        &tail_node.data.unwrap(),
-                        item_type.clone()
-                    ));
+                    tail_node = tail_node.morph(item_type);
                 }
                 
                 e.insert(
@@ -328,102 +235,152 @@ impl PTYListEditor {
     }
 }
 
-impl Commander for PTYListEditor {
-    type Cmd = TerminalEvent;
+use r3vi::view::singleton::SingletonView;
+use crate::commander::ObjCommander;
 
-    fn send_cmd(&mut self, event: &TerminalEvent) {
+impl ObjCommander for PTYListEditor {
+    fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) {
         let mut e = self.editor.write().unwrap();
+        let cur = e.cursor.get();
 
-        match event {
-            TerminalEvent::Input(Event::Key(Key::Char('\t')))
-                | TerminalEvent::Input(Event::Key(Key::Insert)) => {
-                    e.toggle_leaf_mode();
-                    e.set_leaf_mode(ListCursorMode::Select);
-                }
-            _ => {
-                let cur = e.cursor.get();
-                if let Some(idx) = cur.idx {
-                    match cur.mode {
-                        ListCursorMode::Insert => {
-                            match event {
-                                TerminalEvent::Input(Event::Key(Key::Backspace)) => {
-                                    e.delete_pxev();
-                                }
-                                TerminalEvent::Input(Event::Key(Key::Delete)) => {
-                                    e.delete_nexd();
-                                }
-                                _ => {
-                                    let mut new_edit = Context::make_node(&e.ctx, e.typ.clone(), self.depth).unwrap();
-                                    new_edit.goto(TreeCursor::home());
-                                    new_edit.handle_terminal_event(event);
+        let ctx = e.ctx.clone();
+        let ctx = ctx.read().unwrap();
 
-                                    e.insert(new_edit);
-                                }
-                            }
-                        },
-                        ListCursorMode::Select => {
-                            if let Some(mut item) = e.get_item().clone() {
-                                if e.is_listlist() {
+        let co = cmd_obj.read().unwrap();
+        let cmd_type = co.get_type().clone();
+        let term_event_type = ctx.type_term_from_str("( TerminalEvent )").unwrap();
+        let char_type = ctx.type_term_from_str("( Char )").unwrap();
+
+        if cmd_type == term_event_type {
+            if let Some(te_view) = co.get_view::<dyn SingletonView<Item = TerminalEvent>>() {
+                drop(co);
+                let event = te_view.get();
+
+                match event {
+                    TerminalEvent::Input(Event::Key(Key::Char('\t')))
+                        | TerminalEvent::Input(Event::Key(Key::Insert)) => {
+                            e.toggle_leaf_mode();
+                            e.set_leaf_mode(ListCursorMode::Select);
+                        }
+                    _ => {
+                        if let Some(idx) = cur.idx {
+                            match cur.mode {
+                                ListCursorMode::Insert => {
                                     match event {
                                         TerminalEvent::Input(Event::Key(Key::Backspace)) => {
-                                            let item_cur = item.get_cursor();
-
-                                            if idx > 0
-                                                && item_cur.tree_addr.iter().fold(
-                                                    true,
-                                                    |is_zero, x| is_zero && (*x == 0)
-                                                )
-                                            {
-                                                PTYListEditor::join_pxev(&mut e, idx, &item);
-/*
-                                                if item_cur.tree_addr.len() > 1 {
-                                                    let mut item = e.get_item_mut().unwrap();
-                                                    item.handle_terminal_event(event);
-                                            }
-                                                */
-                                            } else {
-                                                item.handle_terminal_event(event);
-                                            }
+                                            e.delete_pxev();
                                         }
                                         TerminalEvent::Input(Event::Key(Key::Delete)) => {
-                                            let item_cur = item.get_cursor_warp();
-                                            let next_idx = idx as usize + 1;
-
-                                            if next_idx < e.data.len()
-                                                && item_cur.tree_addr.iter().fold(
-                                                    true,
-                                                    |is_end, x| is_end && (*x == -1)
-                                                )
-                                            {
-                                                PTYListEditor::join_nexd(&mut e, next_idx, &item);
-/*
-                                                if item_cur.tree_addr.len() > 1 {
-                                                    let mut item = e.get_item_mut().unwrap();
-                                                    item.handle_terminal_event(event);
-                                            }
-                                                */
-                                            } else {
-                                                item.handle_terminal_event(event);   
-                                            }
-                                        }
-
-                                        TerminalEvent::Input(Event::Key(Key::Char(c))) => {
-                                            if Some(*c) == self.style.get_split_char() {
-                                                PTYListEditor::split(&mut e, self.depth);
-                                            } else {
-                                                item.handle_terminal_event(event);
-                                            }
+                                            e.delete_nexd();
                                         }
                                         _ => {
-                                            item.handle_terminal_event(event);
+                                            let mut new_edit = Context::make_node(&e.ctx, e.typ.clone(), self.depth).unwrap();
+                                            new_edit.goto(TreeCursor::home());
+                                            new_edit.send_cmd_obj(cmd_obj);
+
+                                            e.insert(new_edit);
                                         }
                                     }
-                                } else {
-                                    item.handle_terminal_event(event);
+                                },
+                                ListCursorMode::Select => {
+                                    if let Some(mut item) = e.get_item().clone() {
+                                        if e.is_listlist() {
+                                            match event {
+                                                TerminalEvent::Input(Event::Key(Key::Backspace)) => {
+                                                    let item_cur = item.get_cursor();
+
+                                                    if idx > 0
+                                                        && item_cur.tree_addr.iter().fold(
+                                                            true,
+                                                            |is_zero, x| is_zero && (*x == 0)
+                                                        )
+                                                    {
+                                                        PTYListEditor::join_pxev(&mut e, idx, &item);
+
+                                                        /* Optional: recursive joining
+                                                        
+                                                        if item_cur.tree_addr.len() > 1 {
+                                                        let mut item = e.get_item_mut().unwrap();
+                                                        item.handle_terminal_event(event);
+                                                    }
+                                                         */
+                                                    } else {
+                                                        item.send_cmd_obj(cmd_obj);
+                                                    }
+                                                }
+                                                TerminalEvent::Input(Event::Key(Key::Delete)) => {
+                                                    let item_cur = item.get_cursor_warp();
+                                                    let next_idx = idx as usize + 1;
+
+                                                    if next_idx < e.data.len()
+                                                        && item_cur.tree_addr.iter().fold(
+                                                            true,
+                                                            |is_end, x| is_end && (*x == -1)
+                                                        )
+                                                    {
+                                                        PTYListEditor::join_nexd(&mut e, next_idx, &item);
+
+                                                        /* Optional: recursive joining
+
+                                                        if item_cur.tree_addr.len() > 1 {
+                                                        let mut item = e.get_item_mut().unwrap();
+                                                        item.handle_terminal_event(event);
+                                                    }
+                                                         */
+                                                    } else {
+                                                        item.send_cmd_obj(cmd_obj);
+                                                    }
+                                                }
+
+                                                TerminalEvent::Input(Event::Key(Key::Char(c))) => {
+                                                    if Some(c) == self.split_char {
+                                                        PTYListEditor::split(&mut e);
+                                                    } else {
+                                                        item.send_cmd_obj(cmd_obj);
+                                                    }
+                                                }
+                                                _ => {
+                                                    item.send_cmd_obj(cmd_obj);
+                                                }
+                                            }
+                                        } else {
+                                            item.send_cmd_obj(cmd_obj);
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
+                }       
+            }
+        } else if cmd_type == char_type && cur.mode == ListCursorMode::Select {
+            if let Some(cmd_view) = co.get_view::<dyn SingletonView<Item = char>>() {
+                drop(co);
+                let c = cmd_view.get();
+
+                if Some(c) == self.split_char {
+                    PTYListEditor::split(&mut e);
+                } else {
+                    if let Some(mut item) = e.get_item_mut() {
+                        item.send_cmd_obj(cmd_obj);
+                    }
+                }
+            }
+        } else {
+            drop(co);
+
+            match cur.mode {
+                ListCursorMode::Insert => {
+                    let mut new_edit = Context::make_node(&e.ctx, e.typ.clone(), self.depth).unwrap();
+                    new_edit.goto(TreeCursor::home());
+                    new_edit.send_cmd_obj(cmd_obj);
+
+                    e.insert(new_edit);                    
+                },
+                ListCursorMode::Select => {
+                    if let Some(mut item) = e.get_item_mut() {
+                        item.send_cmd_obj(cmd_obj);
+                    }                    
                 }
             }
         }

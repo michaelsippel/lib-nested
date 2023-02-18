@@ -97,6 +97,37 @@ impl ListEditor {
         }
     }
 
+    pub fn into_node(self, depth: usize) -> NestedNode {
+        let data = self.get_data();
+        let ctx = self.ctx.clone();
+        let editor = Arc::new(RwLock::new(self));
+
+        NestedNode::new(depth)
+            .set_ctx(ctx)
+            .set_data(data)
+            .set_editor(editor.clone())
+            .set_nav(editor.clone())
+//            .set_cmd(editor.clone())
+    }
+
+    pub fn new_node(
+        node: NestedNode,
+        item_type: TypeTerm
+    ) -> NestedNode {
+        let ctx = node.ctx.clone().unwrap();
+
+        let editor = ListEditor::new(
+            ctx.clone(),
+            item_type,
+        );
+        let data = editor.get_data();
+        let editor = Arc::new(RwLock::new(editor));
+
+        node.set_data(data)
+            .set_editor(editor.clone())
+            .set_nav(editor.clone())
+    }
+
     pub fn get_item_type(&self) -> TypeTerm {
         self.typ.clone()
     }
@@ -106,17 +137,6 @@ impl ListEditor {
             id: self.ctx.read().unwrap().get_typeid("List").unwrap(),
             args: vec![ self.get_item_type() ]
         }        
-    }
-
-    pub fn into_node(self) -> NestedNode {
-        let data = self.get_data();
-        let editor = Arc::new(RwLock::new(self));
-
-        NestedNode::new()
-            .set_data(data)
-            .set_editor(editor.clone())
-            .set_nav(editor.clone())
-//            .set_cmd(editor.clone())
     }
 
     pub fn get_cursor_port(&self) -> OuterViewPort<dyn SingletonView<Item = ListCursor>> {

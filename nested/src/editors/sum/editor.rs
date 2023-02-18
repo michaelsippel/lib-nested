@@ -47,7 +47,7 @@ impl SumEditor {
     pub fn into_node(self, ctx: Arc<RwLock<Context>>) -> NestedNode {
         let view = self.pty_view();
         let editor = Arc::new(RwLock::new(self));
-        NestedNode::new()
+        NestedNode::new(0)
             .set_ctx(ctx)
             .set_view(view)
             .set_cmd(editor.clone())

@@ -44,13 +44,13 @@ impl TypeTermEditor {
         }
     }
 
-    pub fn into_node(self) -> NestedNode {
+    pub fn into_node(self, depth: usize) -> NestedNode {
         let ctx = self.ctx.clone();
         let sum_edit = self.sum_edit.clone();
         let view = sum_edit.read().unwrap().pty_view();
         let editor = Arc::new(RwLock::new(self));
 
-        NestedNode::new()
+        NestedNode::new(depth)
             .set_ctx(ctx)
             .set_nav(sum_edit)
             .set_cmd(editor.clone())

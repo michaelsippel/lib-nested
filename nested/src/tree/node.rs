@@ -10,7 +10,7 @@ use {
         buffer::{singleton::*}
     },
     crate::{
-        type_system::{ReprTree, Context},
+        type_system::{ReprTree, Context, TypeTerm},
         terminal::{TerminalView, TerminalEvent, TerminalEditor, TerminalEditorResult},
         diagnostics::{Diagnostics, Message},
         tree::{TreeNav, TreeCursor, TreeNavResult},
@@ -21,6 +21,9 @@ use {
 
 #[derive(Clone)]
 pub struct NestedNode {
+    /// depth
+    pub depth: usize,
+    
     /// context
     pub ctx: Option<Arc<RwLock<Context>>>,
 
@@ -145,8 +148,9 @@ impl Diagnostics for NestedNode {
 }
 
 impl NestedNode {
-    pub fn new() -> Self {
+    pub fn new(depth: usize) -> Self {
         NestedNode {
+            depth,
             ctx: None,
             data: None,
             editor: None,
@@ -198,6 +202,10 @@ impl NestedNode {
     
     pub fn get_view(&self) -> OuterViewPort<dyn TerminalView> {
         self.view.clone().unwrap_or(ViewPort::new().into_outer())
+    }
+
+    pub fn morph(self, ty: TypeTerm) -> NestedNode {
+        Context::morph_node(self, ty)
     }
 }
 

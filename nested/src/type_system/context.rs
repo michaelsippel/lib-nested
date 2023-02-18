@@ -75,7 +75,7 @@ pub struct Context {
     morphisms: HashMap<
                    MorphismTypePattern,
                    Arc<
-                           dyn Fn( NestedNode, TypeTerm, usize ) -> Option<NestedNode>
+                           dyn Fn( NestedNode, TypeTerm ) -> Option<NestedNode>
                            + Send + Sync
                    >
                >,
@@ -158,8 +158,9 @@ impl Context {
             dst_tyid: tyid
         };
 
-        self.add_morphism(morphism_pattern, Arc::new(move |node, dst_type, depth| {
+        self.add_morphism(morphism_pattern, Arc::new(move |node, dst_type| {
             let ctx = node.ctx.clone().unwrap();
+            let depth = node.depth;
             mk_editor(ctx, dst_type, depth)
         }));
     }
@@ -168,15 +169,14 @@ impl Context {
         &mut self,
         morph_type_pattern: MorphismTypePattern,
         morph_fn: Arc<
-                     dyn Fn( NestedNode, TypeTerm, usize ) -> Option<NestedNode>
+                     dyn Fn( NestedNode, TypeTerm ) -> Option<NestedNode>
                      + Send + Sync
                   >
     ) {
         self.morphisms.insert(morph_type_pattern, morph_fn);
     }
 
-    pub fn get_morphism(&self, ty: MorphismType) -> Option<Arc<dyn Fn(NestedNode, TypeTerm, usize) -> Option<NestedNode> + Send + Sync>> {
-
+    pub fn get_morphism(&self, ty: MorphismType) -> Option<Arc<dyn Fn(NestedNode, TypeTerm) -> Option<NestedNode> + Send + Sync>> {
         let pattern = MorphismTypePattern::from(ty.clone());
         if let Some(morphism) = self.morphisms.get( &pattern ) {
             Some(morphism.clone())
@@ -193,10 +193,11 @@ impl Context {
             dst_type: type_term.clone()
         })?;
 
-        mk_node(NestedNode::new().set_ctx(ctx.clone()), type_term, depth)
+        mk_node(NestedNode::new(depth).set_ctx(ctx.clone()), type_term)
     }
 
-    pub fn morph_node(ctx: Arc<RwLock<Self>>, mut node: NestedNode, dst_type: TypeTerm) -> NestedNode {
+    pub fn morph_node(mut node: NestedNode, dst_type: TypeTerm) -> NestedNode {
+        let ctx = node.ctx.clone().unwrap();
         let mut src_type = None;
 
         if let Some(data) = node.data.clone() {
@@ -210,8 +211,9 @@ impl Context {
         }
 
         let pattern = MorphismType { src_type, dst_type: dst_type.clone() }.into();
-        if let Some(transform) = ctx.read().unwrap().get_morphism(pattern) {
-            if let Some(new_node) = transform(node.clone(), dst_type, 0) {
+        let ctx = ctx.read().unwrap();
+        if let Some(transform) = ctx.get_morphism(pattern) {
+            if let Some(new_node) = transform(node.clone(), dst_type) {
                 new_node
             } else {
                 node.clone()

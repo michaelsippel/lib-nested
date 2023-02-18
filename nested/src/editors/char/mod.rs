@@ -7,10 +7,10 @@ use {
         buffer::singleton::*
     },
     crate::{
-        type_system::{Context},
+        type_system::{Context, ReprTree},
         terminal::{TerminalAtom, TerminalEvent, TerminalStyle},
         tree::NestedNode,
-        commander::Commander
+        commander::{ObjCommander}
     },
     std::sync::Arc,
     std::sync::RwLock,
@@ -18,31 +18,52 @@ use {
 };
 
 pub struct CharEditor {
+    ctx: Arc<RwLock<Context>>,
     data: SingletonBuffer<Option<char>>
 }
 
-impl Commander for CharEditor {
-    type Cmd = TerminalEvent;
+impl ObjCommander for CharEditor {
+    fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) {
+        let ctx = self.ctx.read().unwrap();
 
-    fn send_cmd(&mut self, event: &TerminalEvent) {
-        match event {
-            TerminalEvent::Input(Event::Key(Key::Char(c))) => {
-                self.data.set(Some(*c));
+        let cmd_obj = cmd_obj.read().unwrap();
+        let cmd_type = cmd_obj.get_type().clone();
+
+        let char_type = ctx.type_term_from_str("( Char )").unwrap();
+        let term_event_type = ctx.type_term_from_str("( TerminalEvent )").unwrap();
+
+        if cmd_type == char_type {
+            if let Some(cmd_view) = cmd_obj.get_view::<dyn SingletonView<Item = char>>() {
+                let value = cmd_view.get();
+                self.data.set(Some(value));
             }
-
-            TerminalEvent::Input(Event::Key(Key::Backspace))
-            | TerminalEvent::Input(Event::Key(Key::Delete)) => {
-                self.data.set(None);
-            }
-
-            _ => {}
         }
+/*
+        if cmd_type == term_event_type {
+            if let Some(te_view) = cmd_obj.get_view::<dyn SingletonView<Item = TerminalEvent>>() {
+                let event = te_view.get();
+                match event {
+                    TerminalEvent::Input(Event::Key(Key::Char(c))) => {
+                        self.data.set(Some(c));
+                    }
+
+                    TerminalEvent::Input(Event::Key(Key::Backspace))
+                        | TerminalEvent::Input(Event::Key(Key::Delete)) => {
+                            self.data.set(None);
+                        }
+
+                    _ => {}
+                }                
+            }
+    }
+        */
     }
 }
 
 impl CharEditor {
-    pub fn new() -> Self {
+    pub fn new(ctx: Arc<RwLock<Context>>) -> Self {
         CharEditor {
+            ctx,
             data: SingletonBuffer::new(None)
         }
     }
@@ -55,11 +76,19 @@ impl CharEditor {
         self.get_port().get_view().unwrap().get().unwrap_or('?')
     }
 
-    pub fn new_node(ctx: &Arc<RwLock<Context>>) -> NestedNode {
+    pub fn new_node(ctx0: Arc<RwLock<Context>>) -> NestedNode {
         let data = SingletonBuffer::new(None);
 
-        NestedNode::new()
-            .set_ctx(ctx.clone())
+        let ctx = ctx0.clone();
+        
+        NestedNode::new(0)
+            .set_ctx(ctx0.clone())
+            .set_data(
+                ReprTree::new_leaf(
+                    ctx0.read().unwrap().type_term_from_str("( Char )").unwrap(),
+                    data.get_port().into()   
+                )
+            )
             .set_view(data
                       .get_port()
                       .map(move |c| {
@@ -71,7 +100,7 @@ impl CharEditor {
                       .to_grid()
             )
             .set_cmd(
-                Arc::new(RwLock::new(CharEditor{ data }))
+                Arc::new(RwLock::new(CharEditor{ ctx, data }))
             )
     }
 }

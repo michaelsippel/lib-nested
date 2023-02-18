@@ -12,7 +12,7 @@ use {
     },
     crate::{
         type_system::{Context, TypeTerm, ReprTree},
-        editors::list::{PTYListEditor, ListStyle},
+        editors::list::{PTYListEditor},
         terminal::{
             TerminalAtom, TerminalEvent, TerminalStyle, make_label
         },
@@ -76,13 +76,13 @@ impl DigitEditor {
         }
     }
 
-    pub fn into_node(self) -> NestedNode {
+    pub fn into_node(self, depth: usize) -> NestedNode {
         let data = self.get_data();        
         let editor = Arc::new(RwLock::new(self));
         let mut ed = editor.write().unwrap();
         let r = ed.radix;
 
-        NestedNode::new()
+        NestedNode::new(depth)
             .set_ctx(ed.ctx.clone())
             .set_cmd(editor.clone())
             .set_data(data)
@@ -140,7 +140,7 @@ pub struct PosIntEditor {
 
 impl PosIntEditor {
     pub fn new(ctx: Arc<RwLock<Context>>, radix: u32) -> Self {
-        let mut node = PTYListEditor::new(
+        let mut editor = PTYListEditor::new(
             ctx.clone(),
             TypeTerm::Type {
                 id: ctx.read().unwrap().get_typeid("Digit").unwrap(),
@@ -148,12 +148,19 @@ impl PosIntEditor {
                     TypeTerm::Num(radix as i64)
                 ]
             },
-            match radix {
-                16 => ListStyle::Hex,
-                _ => ListStyle::Plain
-            },
+            None,
             0
-        ).into_node();
+        );
+
+            let view = editor.pty_view((
+                match radix {
+                    2 => "0d".into(),
+                    16 => "0x".into(),
+                    _ => "".into()
+                },
+                "".into(),
+                "".into()));
+            let mut node = editor.into_node().set_view(view);
 
         // Set Type
         let data = node.data.clone().unwrap();

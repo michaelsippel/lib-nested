@@ -3,6 +3,7 @@ pub mod atom;
 pub mod compositor;
 pub mod style;
 pub mod terminal;
+pub mod widgets;
 
 pub use {
     atom::TerminalAtom,
