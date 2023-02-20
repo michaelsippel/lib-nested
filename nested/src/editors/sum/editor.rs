@@ -2,6 +2,7 @@ use {
     r3vi::{
         view::{
             ViewPort, OuterViewPort,
+            singleton::*,
             sequence::*,            
         }
     },
@@ -10,11 +11,12 @@ use {
             TerminalEditor, TerminalEditorResult,
             TerminalEvent, TerminalView
         },
-        type_system::{Context},
+        editors::list::ListCursorMode,
+        type_system::{Context, ReprTree},
         tree::{TreeNav, TreeCursor, TreeNavResult},
         diagnostics::{Diagnostics, Message},
         tree::NestedNode,
-        commander::Commander,
+        commander::{ObjCommander},
         PtySegment
     },
     cgmath::{Vector2},
@@ -25,6 +27,9 @@ use {
 pub struct SumEditor {
     cur: usize,
     pub editors: Vec< NestedNode >,
+
+    addr_port: ViewPort< dyn SequenceView<Item = isize> >,
+    mode_port: ViewPort< dyn SingletonView<Item = ListCursorMode> >,
 
     port: ViewPort< dyn TerminalView >,
     diag_port: ViewPort< dyn SequenceView<Item = Message> >
@@ -40,7 +45,11 @@ impl SumEditor {
             cur: 0,
             editors,
             port,
-            diag_port: ViewPort::new()
+            diag_port: ViewPort::new(),
+
+
+            addr_port: ViewPort::new(),
+            mode_port: ViewPort::new()
         }
     }
 
@@ -50,6 +59,7 @@ impl SumEditor {
         NestedNode::new(0)
             .set_ctx(ctx)
             .set_view(view)
+            .set_editor(editor.clone())
             .set_cmd(editor.clone())
             .set_nav(editor.clone())
 //            .set_diag(editor.read().unwrap().diag.clone())
@@ -62,7 +72,7 @@ impl SumEditor {
     pub fn select(&mut self, idx: usize) {
         self.cur = idx;
 
-        let tv = self.editors[ self.cur ].get_term_view();
+        let tv = self.editors[ self.cur ].get_view();
         tv.add_observer( self.port.get_cast() );
         self.port.update_hooks.write().unwrap().clear();
         self.port.add_update_hook( Arc::new(tv.0.clone()) );
@@ -73,6 +83,18 @@ impl SumEditor {
         self.diag_port.update_hooks.write().unwrap().clear();
         self.diag_port.add_update_hook( Arc::new(dv.0.clone()) );
         self.diag_port.set_view( Some(dv.get_view_arc()) );
+
+        let dv = self.editors[ self.cur ].get_addr_view();
+        dv.add_observer( self.addr_port.get_cast() );
+        self.addr_port.update_hooks.write().unwrap().clear();
+        self.addr_port.add_update_hook( Arc::new(dv.0.clone()) );
+        self.addr_port.set_view( Some(dv.get_view_arc()) );
+        
+        let dv = self.editors[ self.cur ].get_mode_view();
+        dv.add_observer( self.mode_port.get_cast() );
+        self.mode_port.update_hooks.write().unwrap().clear();
+        self.mode_port.add_update_hook( Arc::new(dv.0.clone()) );
+        self.mode_port.set_view( Some(dv.get_view_arc()) );
     }
 }
 
@@ -92,6 +114,14 @@ impl TreeNav for SumEditor {
     fn goto(&mut self, new_cursor: TreeCursor) -> TreeNavResult {
         self.editors[ self.cur ].goto( new_cursor )
     }
+
+    fn get_addr_view(&self) -> OuterViewPort<dyn SequenceView<Item = isize>> {
+        self.addr_port.outer()
+    }
+
+    fn get_mode_view(&self) -> OuterViewPort<dyn SingletonView<Item = ListCursorMode>> {
+        self.mode_port.outer()
+    }
 }
 
 impl PtySegment for SumEditor {
@@ -100,26 +130,8 @@ impl PtySegment for SumEditor {
     }
 }
 
-impl Commander for SumEditor {
-    type Cmd = TerminalEvent;
-
-    fn send_cmd(&mut self, event: &TerminalEvent) {
-        match event {
-            TerminalEvent::Input( termion::event::Event::Key(Key::Ctrl('x')) ) => {
-                let res = self.editors[ self.cur ].handle_terminal_event( event );
-                match res {
-                    TerminalEditorResult::Exit => {
-                        self.select( (self.cur + 1) % self.editors.len() );
-                        if self.editors[ self.cur ].get_cursor().tree_addr.len() == 0 {
-                            self.dn();
-                        }
-                    },
-                    _ => {}
-                }
-            },
-            event => {
-                self.editors[ self.cur ].handle_terminal_event( event );
-            }
-        }
+impl ObjCommander for SumEditor {
+    fn send_cmd_obj(&mut self, obj: Arc<RwLock<ReprTree>>) {
+        self.editors[ self.cur ].send_cmd_obj( obj );
     }
 }

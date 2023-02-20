@@ -1,23 +1,12 @@
 use {
     r3vi::{
-        view::{
-            OuterViewPort,
-            sequence::*,
-        },
+        view::{OuterViewPort, sequence::*},
         projection::decorate_sequence::*,
     },
     crate::{
         type_system::{Context, TypeTerm, ReprTree},
-        editors::list::{
-            ListCursor, ListCursorMode,
-            segment::{ListSegmentSequence},
-            editor::ListEditor
-        },
-        terminal::{
-            TerminalEvent,
-            TerminalView,
-            make_label
-        },
+        editors::list::*,
+        terminal::{TerminalEvent, TerminalView, make_label},
         tree::{TreeCursor, TreeNav},
         diagnostics::{Diagnostics},
         tree::NestedNode,
@@ -274,11 +263,21 @@ impl ObjCommander for PTYListEditor {
                                             e.delete_nexd();
                                         }
                                         _ => {
-                                            let mut new_edit = Context::make_node(&e.ctx, e.typ.clone(), self.depth).unwrap();
-                                            new_edit.goto(TreeCursor::home());
-                                            new_edit.send_cmd_obj(cmd_obj);
+                                            let mut node = Context::make_node(&e.ctx, e.typ.clone(), self.depth).unwrap();
+                                            node.goto(TreeCursor::home());
+                                            node.send_cmd_obj(cmd_obj);
+/*
+                                            if e.is_listlist() {
+                                                if let Some(new_edit) = node.get_edit::<ListEditor>() {
+                                                    if new_edit.data.len() == 0 {
+                                                        remove = true;
+                                                    }
+                                                }
+                                            }
 
-                                            e.insert(new_edit);
+                                            if ! remove {
+                                            */
+                                            e.insert(node);
                                         }
                                     }
                                 },
@@ -302,7 +301,7 @@ impl ObjCommander for PTYListEditor {
                                                         if item_cur.tree_addr.len() > 1 {
                                                         let mut item = e.get_item_mut().unwrap();
                                                         item.handle_terminal_event(event);
-                                                    }
+                                                        }
                                                          */
                                                     } else {
                                                         item.send_cmd_obj(cmd_obj);

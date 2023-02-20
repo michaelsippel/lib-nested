@@ -79,7 +79,7 @@ impl DigitEditor {
     pub fn into_node(self, depth: usize) -> NestedNode {
         let data = self.get_data();        
         let editor = Arc::new(RwLock::new(self));
-        let mut ed = editor.write().unwrap();
+        let ed = editor.write().unwrap();
         let r = ed.radix;
 
         NestedNode::new(depth)
@@ -140,7 +140,7 @@ pub struct PosIntEditor {
 
 impl PosIntEditor {
     pub fn new(ctx: Arc<RwLock<Context>>, radix: u32) -> Self {
-        let mut editor = PTYListEditor::new(
+        let editor = PTYListEditor::new(
             ctx.clone(),
             TypeTerm::Type {
                 id: ctx.read().unwrap().get_typeid("Digit").unwrap(),

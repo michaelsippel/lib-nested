@@ -172,7 +172,7 @@ impl TreeNav for ProductEditor {
                 let nav_result =
                     if let Some(mut element) = self.get_cur_segment_mut() {
                         if let Some(ProductEditorSegment::N{ t: _, editor, ed_depth: _, cur_depth, cur_dist:_ }) = element.deref_mut() {
-                            if let Some(mut e) = editor.as_mut() {
+                            if let Some(e) = editor.as_mut() {
                                 //\\//\\//\\//\\
                                 // horizontal //
                                 //\\//\\//\\//\\

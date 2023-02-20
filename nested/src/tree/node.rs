@@ -1,17 +1,13 @@
 use {
     std::{sync::{Arc, RwLock}, any::Any},
-    cgmath::Vector2,
+    cgmath::{Vector2, Point2},
     r3vi::{
-        view::{
-            ViewPort, OuterViewPort, AnyOuterViewPort,
-            singleton::*,
-            sequence::*
-        },
+        view::{View, ViewPort, OuterViewPort, AnyOuterViewPort, singleton::*, sequence::*},
         buffer::{singleton::*}
     },
     crate::{
         type_system::{ReprTree, Context, TypeTerm},
-        terminal::{TerminalView, TerminalEvent, TerminalEditor, TerminalEditorResult},
+        terminal::{TerminalView, TerminalEvent, TerminalEditor, TerminalEditorResult, TerminalAtom},
         diagnostics::{Diagnostics, Message},
         tree::{TreeNav, TreeCursor, TreeNavResult},
         editors::list::{ListCursorMode},
@@ -101,7 +97,7 @@ impl TreeNav for NestedNode {
             tn.read().unwrap().get_addr_view()
         } else {
             OuterViewPort::default()
-        }        
+        }
     }
 
     fn get_mode_view(&self) -> OuterViewPort<dyn SingletonView<Item = ListCursorMode>> {
@@ -161,6 +157,31 @@ impl NestedNode {
         }
     }
 
+    pub fn from_char(ctx: Arc<RwLock<Context>>, c: char) -> NestedNode {
+        let buf = r3vi::buffer::singleton::SingletonBuffer::<char>::new(c);
+
+        NestedNode::new(0)
+            .set_view(buf.get_port()
+                      .map(|c| TerminalAtom::from(c))
+                      .to_index()
+                      .map_key(
+                          |x| {
+                              Point2::new(0, 0)
+                          },
+                          |p| {
+                              if *p == Point2::new(0,0) { Some(()) } else { None }
+                          })
+            )
+            .set_data(
+                ReprTree::new_leaf(
+                    (&ctx, "( Char )"),
+                    buf.get_port().into()
+                )
+            )
+            .set_editor(Arc::new(RwLock::new(buf)))
+            .set_ctx(ctx)
+    }
+
     pub fn set_ctx(mut self, ctx: Arc<RwLock<Context>>) -> Self {
         self.ctx = Some(ctx);
         self
@@ -206,6 +227,37 @@ impl NestedNode {
 
     pub fn morph(self, ty: TypeTerm) -> NestedNode {
         Context::morph_node(self, ty)
+    }
+
+    pub fn get_data_view<'a, V: View + ?Sized + 'static>(&'a self, type_str: impl Iterator<Item = &'a str>) -> Option<Arc<V>>
+    where V::Msg: Clone {
+        if let Some(ctx) = self.ctx.clone() {
+            if let Some(data) = self.data.clone() {
+                let type_ladder = type_str.map(|s| ((&ctx, s)).into());
+
+                let repr_tree = ReprTree::descend_ladder(&data, type_ladder)?;
+                repr_tree.clone().read().unwrap()
+                    .get_view::<V>().clone()
+            } else {
+                eprintln!("get_data(): no data port");
+                None
+            }
+        } else {
+            eprintln!("get_data(): no ctx");
+            None
+        }
+    }
+
+    pub fn get_edit<T: Send + Sync + 'static>(&self) -> Option<Arc<RwLock<T>>> {
+        if let Some(edit) = self.editor.clone() {
+            if let Ok(edit) = edit.downcast::<RwLock<T>>() {
+                Some(edit)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
     }
 }
 

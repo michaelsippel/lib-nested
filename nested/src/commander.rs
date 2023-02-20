@@ -7,12 +7,18 @@ pub trait Commander {
 
 use std::sync::{Arc, RwLock};
 use crate::{
-    type_system::ReprTree
+    type_system::ReprTree,
+    tree::{nav::TreeNavResult, NestedNode}
 };
 
 //use r3vi::view::singleton::*;
 
 pub trait ObjCommander {
+
+    fn send_cmd_node(&mut self, node: NestedNode) -> TreeNavResult {
+        TreeNavResult::Continue
+    }
+
     fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>);
 }
 
@@ -20,7 +26,7 @@ pub trait ObjCommander {
 impl<C: Commander> ObjCommander for C
 where C::Cmd: 'static
 {
-    fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) {
+    fn send_cmd_obj(&mut self, _cmd_obj: Arc<RwLock<ReprTree>>) {
         /*
         self.send_cmd(
             &cmd_obj.read().unwrap()

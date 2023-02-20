@@ -11,6 +11,7 @@ pub type TypeLadder = Vec<TypeTerm>;
 pub enum TypeTerm {
     Type { id: TypeID, args: Vec<TypeTerm> },
     Num(i64),
+//    Var(u64),
 }
 
 impl TypeTerm {

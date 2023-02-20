@@ -19,9 +19,9 @@ pub struct ReprTree {
 }
 
 impl ReprTree {
-    pub fn new(type_tag: TypeTerm) -> Self {
+    pub fn new(type_tag: impl Into<TypeTerm>) -> Self {
         ReprTree {
-            type_tag,
+            type_tag: type_tag.into(),
             port: None,
             branches: HashMap::new(),
         }
@@ -31,8 +31,8 @@ impl ReprTree {
         &self.type_tag
     }
 
-    pub fn new_leaf(type_tag: TypeTerm, port: AnyOuterViewPort) -> Arc<RwLock<Self>> {
-        let mut tree = ReprTree::new(type_tag);
+    pub fn new_leaf(type_tag: impl Into<TypeTerm>, port: AnyOuterViewPort) -> Arc<RwLock<Self>> {
+        let mut tree = ReprTree::new(type_tag.into());
         tree.insert_leaf(vec![].into_iter(), port);
         Arc::new(RwLock::new(tree))
     }
@@ -82,18 +82,22 @@ impl ReprTree {
                 .get_view()
     }
 
-    pub fn descend(&self, dst_type: &TypeTerm) -> Option<Arc<RwLock<ReprTree>>> {
-        self.branches.get(dst_type).cloned()
+    pub fn descend(&self, dst_type: impl Into<TypeTerm>) -> Option<Arc<RwLock<ReprTree>>> {
+        self.branches.get(&dst_type.into()).cloned()
     }
 
-    pub fn descend_ladder(&self, mut repr_ladder: impl Iterator<Item = TypeTerm>) -> Option<Arc<RwLock<ReprTree>>> {
-        let first = repr_ladder.next()?;
-        repr_ladder.fold(
-            self.descend(&first),
-            |s, t| s?.read().unwrap().descend(&t))
+    pub fn descend_ladder(rt: &Arc<RwLock<Self>>, mut repr_ladder: impl Iterator<Item = TypeTerm>) -> Option<Arc<RwLock<ReprTree>>> {
+        if let Some(first) = repr_ladder.next() {
+            let rt = rt.read().unwrap();
+            repr_ladder.fold(
+                rt.descend(first),
+                |s, t| s?.read().unwrap().descend(t))
+        } else {
+            Some(rt.clone())
+        }
     }
 
-    pub fn ascend(rt: &Arc<RwLock<Self>>, type_term: TypeTerm) -> Arc<RwLock<ReprTree>> {
+    pub fn ascend(rt: &Arc<RwLock<Self>>, type_term: impl Into<TypeTerm>) -> Arc<RwLock<ReprTree>> {
         let mut n = Self::new(type_term);
         n.insert_branch(rt.clone());
         Arc::new(RwLock::new(n))

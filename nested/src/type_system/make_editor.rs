@@ -5,13 +5,12 @@ use {
             char::*,
             list::*,
             integer::*,
-            product::*,
-            sum::*
+            product::*
         },
         tree::{NestedNode},        
         terminal::{TerminalEditor},
         diagnostics::{Diagnostics},
-        type_system::{TypeTermEditor, MorphismTypePattern},
+        type_system::{MorphismTypePattern},
     },
     std::sync::{Arc, RwLock},
     cgmath::Point2
@@ -28,7 +27,7 @@ pub fn init_mem_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
                         id: _, args
                     } => {
                         if args.len() > 0 {
-                            let mut buf = r3vi::buffer::vec::VecBuffer::<char>::new();
+                            let buf = r3vi::buffer::vec::VecBuffer::<char>::new();
                             let data = ReprTree::new_leaf(
                                 ctx.read().unwrap().type_term_from_str("( Char )").unwrap(),
                                 buf.get_port().into()
@@ -105,7 +104,7 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
 
     ctx.write().unwrap().add_list_typename("Symbol".into());
     let pattern = MorphismTypePattern {
-        src_type: ctx.read().unwrap().type_term_from_str("( List Char )"),
+        src_tyid: ctx.read().unwrap().get_typeid("List"),
         dst_tyid: ctx.read().unwrap().get_typeid("Symbol").unwrap()
     };
     ctx.write().unwrap().add_morphism(pattern,
@@ -151,7 +150,7 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
 
     ctx.write().unwrap().add_list_typename("String".into());
     let pattern = MorphismTypePattern {
-        src_type: ctx.read().unwrap().type_term_from_str("( List Char )"),
+        src_tyid: ctx.read().unwrap().get_typeid("List"),
         dst_tyid: ctx.read().unwrap().get_typeid("String").unwrap()
     };
     ctx.write().unwrap().add_morphism(pattern,
@@ -196,7 +195,7 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
             }
         )
     );
-
+/*
     ctx.write().unwrap().add_list_typename("TypeTerm".into());
     ctx.write().unwrap().add_node_ctor(
         "TypeTerm", Arc::new(
@@ -205,7 +204,7 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
             }
         )
     );
-
+*/
     ctx.write().unwrap().add_typename("TerminalEvent".into());
     ctx
 }
@@ -246,7 +245,7 @@ pub fn init_math_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
 
     ctx.write().unwrap().add_list_typename("PosInt".into());
     let pattern = MorphismTypePattern {
-        src_type: ctx.read().unwrap().type_term_from_str("( List ( Digit 10 ) )"),
+        src_tyid: ctx.read().unwrap().get_typeid("List"),
         dst_tyid: ctx.read().unwrap().get_typeid("PosInt").unwrap()
     };
     ctx.write().unwrap().add_morphism(pattern,
@@ -255,13 +254,15 @@ pub fn init_math_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
                 let depth = node.depth;
                 let editor = node.editor.clone().unwrap().downcast::<RwLock<ListEditor>>().unwrap();
 
+                // todo: check src_type parameter to be ( Digit radix )
+                
                 match dst_type {
                     TypeTerm::Type {
                         id: _, args
                     } => {
                         if args.len() > 0 {
                             match args[0] {
-                                TypeTerm::Num(radix) => {
+                                TypeTerm::Num(_radix) => {
                                     let pty_editor = PTYListEditor::from_editor(
                                         editor,
                                         Some(','),

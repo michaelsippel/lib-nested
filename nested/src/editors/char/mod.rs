@@ -8,13 +8,12 @@ use {
     },
     crate::{
         type_system::{Context, ReprTree},
-        terminal::{TerminalAtom, TerminalEvent, TerminalStyle},
+        terminal::{TerminalAtom, TerminalStyle},
         tree::NestedNode,
         commander::{ObjCommander}
     },
     std::sync::Arc,
-    std::sync::RwLock,
-    termion::event::{Event, Key}
+    std::sync::RwLock
 };
 
 pub struct CharEditor {
@@ -24,13 +23,11 @@ pub struct CharEditor {
 
 impl ObjCommander for CharEditor {
     fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) {
-        let ctx = self.ctx.read().unwrap();
-
         let cmd_obj = cmd_obj.read().unwrap();
         let cmd_type = cmd_obj.get_type().clone();
 
-        let char_type = ctx.type_term_from_str("( Char )").unwrap();
-        let term_event_type = ctx.type_term_from_str("( TerminalEvent )").unwrap();
+        let char_type = (&self.ctx, "( Char )").into();
+        //let _term_event_type = (&ctx, "( TerminalEvent )").into();
 
         if cmd_type == char_type {
             if let Some(cmd_view) = cmd_obj.get_view::<dyn SingletonView<Item = char>>() {

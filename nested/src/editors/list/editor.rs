@@ -1,24 +1,14 @@
 use {
     r3vi::{
-        view::{
-            OuterViewPort,
-            singleton::*,
-            sequence::*,
-        },
-        buffer::{
-            singleton::*,
-            vec::*,
-        }
+        view::{OuterViewPort, singleton::*, sequence::*},
+        buffer::{singleton::*, vec::*}
     },
     crate::{
         type_system::{Context, TypeTerm, ReprTree},
-        editors::list::{
-            ListCursor,
-            ListCursorMode
-        },
+        editors::list::{ListCursor, ListCursorMode},
         tree::{NestedNode, TreeNav}
     },
-    std::sync::{Arc, RwLock},
+    std::sync::{Arc, RwLock}
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
@@ -246,7 +236,7 @@ impl ListEditor {
             self.cursor.set(cur);
         }
     }
-    
+
     /// split the list off at the current cursor position and return the second half
     pub fn split(&mut self) -> ListEditor {
         let mut le = ListEditor::new(self.ctx.clone(), self.typ.clone());
@@ -257,6 +247,35 @@ impl ListEditor {
             for _ in idx .. self.data.len() {
                 le.data.push( self.data.get(idx) );
                 self.data.remove(idx);
+            }
+
+            if self.is_listlist() {
+                if idx > 0 && idx < self.data.len() {
+                    let prev_idx = idx - 1;
+                    let prev_node = self.data.get(prev_idx);
+
+                    if let Some(prev_editor) = prev_node.editor.clone() {
+                        eprintln!("prev prev editor");
+                        let mut prev_editor = prev_editor.downcast::<RwLock<ListEditor>>().unwrap();
+                        let mut prev_editor = prev_editor.write().unwrap();
+                        if prev_editor.get_data_port().get_view().unwrap()
+                            .iter().filter(
+                                |x|
+                                /*
+                                if let Some(data) = x.data.clone() {
+                                    let data = data.;
+                                    data.read().unwrap().is_some()
+                                } else {
+                                    false
+                            }
+                                */ true
+                            ).count() == 0
+                        {
+                            drop(prev_editor);
+                            self.data.remove(prev_idx);
+                        }
+                    }
+                }
             }
         }
 

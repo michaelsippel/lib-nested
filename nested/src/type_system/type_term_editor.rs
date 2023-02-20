@@ -2,9 +2,7 @@ use {
     crate::{
         type_system::{Context},
         terminal::{TerminalEvent},
-        editors::{
-            sum::*,
-        },
+        editors::{sum::*},
         tree::{TreeNav},
         tree::NestedNode,
         commander::Commander,
@@ -37,9 +35,9 @@ impl TypeTermEditor {
             ty: TypeTermVar::Any,
             sum_edit: Arc::new(RwLock::new(SumEditor::new(
                 vec![
-                    Context::make_node( &ctx, ctx.read().unwrap().type_term_from_str("( List TypeTerm )").unwrap(), depth + 1).unwrap(),
-                    Context::make_node( &ctx, ctx.read().unwrap().type_term_from_str("( PosInt 10 )").unwrap(), depth + 1 ).unwrap(),
-                    Context::make_node( &ctx, ctx.read().unwrap().type_term_from_str("( Symbol )").unwrap(), depth + 1 ).unwrap()
+                    Context::make_node( &ctx, (&ctx, "( List TypeTerm )").into(), depth + 1).unwrap(),
+                    Context::make_node( &ctx, (&ctx, "( PosInt 10 )").into(), depth + 1 ).unwrap(),
+                    Context::make_node( &ctx, (&ctx, "( Symbol )").into(), depth + 1 ).unwrap()
                 ])))
         }
     }

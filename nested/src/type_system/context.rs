@@ -42,14 +42,18 @@ pub struct MorphismType {
 
 #[derive(Hash, Eq, PartialEq, Debug)]
 pub struct MorphismTypePattern {
-    pub src_type: Option<TypeTerm>,
+    pub src_tyid: Option<TypeID>,
     pub dst_tyid: TypeID
 }
 
 impl From<MorphismType> for MorphismTypePattern {
     fn from(value: MorphismType) -> MorphismTypePattern {
         MorphismTypePattern {
-            src_type: value.src_type,
+            src_tyid: match value.src_type {
+                Some(TypeTerm::Type { id, args: _ }) => Some(id),
+                _ => None,
+            },
+
             dst_tyid: match value.dst_type {
                 TypeTerm::Type { id, args: _ } => id,
                 _ => unreachable!()
@@ -82,6 +86,12 @@ pub struct Context {
 
     /// recursion
     parent: Option<Arc<RwLock<Context>>>,
+}
+
+impl Into<TypeTerm> for (&Arc<RwLock<Context>>, &str) {
+    fn into(self) -> TypeTerm {
+        self.0.read().unwrap().type_term_from_str(self.1).unwrap()
+    }
 }
 
 impl Context {
@@ -154,7 +164,7 @@ impl Context {
             };
 
         let morphism_pattern = MorphismTypePattern {
-            src_type: None,
+            src_tyid: None,
             dst_tyid: tyid
         };
 
