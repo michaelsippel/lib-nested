@@ -91,7 +91,7 @@ impl CharEditor {
                       .map(move |c| {
                           match c {
                               Some(c) => TerminalAtom::from(c),
-                              None => TerminalAtom::new('*', TerminalStyle::fg_color((255,0,0)))
+                              None => TerminalAtom::new(' ', TerminalStyle::bg_color((255,0,0)))
                           }
                       })
                       .to_grid()

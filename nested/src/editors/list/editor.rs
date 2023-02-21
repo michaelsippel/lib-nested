@@ -250,26 +250,16 @@ impl ListEditor {
             }
 
             if self.is_listlist() {
-                if idx > 0 && idx < self.data.len() {
-                    let prev_idx = idx - 1;
+                if idx > 0 && idx < self.data.len()+1 {
+                    let prev_idx = idx - 1; // we are in insert mode, last element before cursor
                     let prev_node = self.data.get(prev_idx);
 
                     if let Some(prev_editor) = prev_node.editor.clone() {
-                        eprintln!("prev prev editor");
                         let mut prev_editor = prev_editor.downcast::<RwLock<ListEditor>>().unwrap();
                         let mut prev_editor = prev_editor.write().unwrap();
-                        if prev_editor.get_data_port().get_view().unwrap()
-                            .iter().filter(
-                                |x|
-                                /*
-                                if let Some(data) = x.data.clone() {
-                                    let data = data.;
-                                    data.read().unwrap().is_some()
-                                } else {
-                                    false
-                            }
-                                */ true
-                            ).count() == 0
+
+                        if prev_editor.get_data_port().get_view().unwrap().iter()
+                            .filter_map(|x| x.get_data_view::<dyn SingletonView<Item = Option<char>>>(vec![].into_iter())?.get()).count() == 0
                         {
                             drop(prev_editor);
                             self.data.remove(prev_idx);

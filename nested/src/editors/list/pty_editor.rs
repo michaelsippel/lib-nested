@@ -144,43 +144,46 @@ impl PTYListEditor {
                 let head = head_editor.downcast::<RwLock<ListEditor>>().unwrap();
                 let mut head = head.write().unwrap();
 
-                if cur.tree_addr.len() > 2 {
-                    PTYListEditor::split(&mut head);
-                }
+                if head.data.len() > 0 {
 
-                let mut tail = head.split();
-
-                head.goto(TreeCursor::none());
-
-                tail.cursor.set(
-                    ListCursor {
-                        idx: Some(0),
-                        mode: if cur.tree_addr.len() > 2 {
-                            ListCursorMode::Select
-                        } else {
-                            ListCursorMode::Insert
-                        }
+                    if cur.tree_addr.len() > 2 {
+                        PTYListEditor::split(&mut head);
                     }
-                );
 
-                let item_type =
-                    if let Some(data) = item.data.clone() {
-                        let data = data.read().unwrap();
-                        Some(data.get_type().clone())
-                    } else {
-                        None
-                    };
+                    let mut tail = head.split();
 
-                let mut tail_node = tail.into_node(depth);
-                tail_node = tail_node.set_ctx(item.ctx.clone().unwrap());
+                    head.goto(TreeCursor::none());
 
-                if let Some(item_type) = item_type {
-                    tail_node = tail_node.morph(item_type);
+                    tail.cursor.set(
+                        ListCursor {
+                            idx: Some(0),
+                            mode: if cur.tree_addr.len() > 2 {
+                                ListCursorMode::Select
+                            } else {
+                                ListCursorMode::Insert
+                            }
+                        }
+                    );
+
+                    let item_type =
+                        if let Some(data) = item.data.clone() {
+                            let data = data.read().unwrap();
+                            Some(data.get_type().clone())
+                        } else {
+                            None
+                        };
+
+                    let mut tail_node = tail.into_node(depth);
+                    tail_node = tail_node.set_ctx(item.ctx.clone().unwrap());
+
+                    if let Some(item_type) = item_type {
+                        tail_node = tail_node.morph(item_type);
+                    }
+                    
+                    e.insert(
+                        tail_node
+                    );
                 }
-                
-                e.insert(
-                    tail_node
-                );
             }
         }
     }

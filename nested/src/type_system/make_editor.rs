@@ -73,21 +73,13 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
                         id: _, args
                     } => {
                         if args.len() > 0 {
-
                             let editor = PTYListEditor::new(
                                 ctx,
                                 args[0].clone(),
                                 Some(','),
                                 depth + 1
                             );
-
-                            let view = editor.pty_view(
-                                    (
-                                        "{".into(),
-                                        ", ".into(),
-                                        "}".into()
-                                    )                                
-                            );
+                            let view = editor.pty_view(("{",", ", "}"));
 
                             Some(editor
                                     .into_node()
