@@ -65,7 +65,7 @@ pub fn read_ansi_from<R: Read + Unpin>(
 
     loop {
         match ansi_reader.read(&mut buf) {
-            //Ok(0) => break,
+            Ok(0) => break,
             Ok(n) => {
                 for byte in &buf[..n] {
                     statemachine.advance(&mut performer, *byte);
