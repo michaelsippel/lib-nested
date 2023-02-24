@@ -165,7 +165,7 @@ impl NestedNode {
                       .map(|c| TerminalAtom::from(c))
                       .to_index()
                       .map_key(
-                          |x| {
+                          |_x| {
                               Point2::new(0, 0)
                           },
                           |p| {
@@ -220,7 +220,7 @@ impl NestedNode {
     pub fn get_diag(&self) -> OuterViewPort<dyn SequenceView<Item = Message>> {
         self.diag.clone().unwrap_or(ViewPort::new().into_outer())
     }
-    
+
     pub fn get_view(&self) -> OuterViewPort<dyn TerminalView> {
         self.view.clone().unwrap_or(ViewPort::new().into_outer())
     }
@@ -229,7 +229,7 @@ impl NestedNode {
         Context::morph_node(self, ty)
     }
 
-    pub fn get_data_view<'a, V: View + ?Sized + 'static>(&'a self, type_str: impl Iterator<Item = &'a str>) -> Option<Arc<V>>
+    pub fn get_data_port<'a, V: View + ?Sized + 'static>(&'a self, type_str: impl Iterator<Item = &'a str>) -> Option<OuterViewPort<V>>
     where V::Msg: Clone {
         if let Some(ctx) = self.ctx.clone() {
             if let Some(data) = self.data.clone() {
@@ -237,7 +237,7 @@ impl NestedNode {
 
                 let repr_tree = ReprTree::descend_ladder(&data, type_ladder)?;
                 repr_tree.clone().read().unwrap()
-                    .get_view::<V>().clone()
+                    .get_port::<V>().clone()
             } else {
                 eprintln!("get_data(): no data port");
                 None
@@ -248,6 +248,21 @@ impl NestedNode {
         }
     }
 
+    pub fn get_data_view<'a, V: View + ?Sized + 'static>(&'a self, type_str: impl Iterator<Item = &'a str>) -> Option<Arc<V>>
+    where V::Msg: Clone {
+        self.get_data_port::<V>(type_str)?.get_view()
+    }
+/*
+    pub fn get_seq_view<'a, T: Clone>(&self, type_str: impl Iterator<Item = &'a str>) -> Option<OuterViewPort<dyn SingletonView<Item = T>>> {
+        self.get_data_view::<dyn SequenceView<Item = NestedNode>>(type_str)
+            .unwrap()
+            .map({
+                move |node| {
+                    node.get_data_view::<dyn SingletonView<Item = T>>().get()
+                }
+            })
+    }
+*/
     pub fn get_edit<T: Send + Sync + 'static>(&self) -> Option<Arc<RwLock<T>>> {
         if let Some(edit) = self.editor.clone() {
             if let Ok(edit) = edit.downcast::<RwLock<T>>() {

@@ -15,7 +15,7 @@ use {
 
 pub struct ListEditor {
     pub(super) cursor: SingletonBuffer<ListCursor>,
-    pub(crate) data: VecBuffer<NestedNode>,
+    pub data: VecBuffer<NestedNode>,
 
     pub(super) addr_port: OuterViewPort<dyn SequenceView<Item = isize>>,
     pub(super) mode_port: OuterViewPort<dyn SingletonView<Item = ListCursorMode>>,
