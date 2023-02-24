@@ -68,7 +68,7 @@ pub struct Context {
     /// assigns a name to every type
     type_dict: Arc<RwLock<TypeDict>>,
 
-    /// vertices of the graph
+    /// named vertices of the graph
     nodes: HashMap< String, NestedNode >,
 
     /// todo: beautify

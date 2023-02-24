@@ -110,9 +110,7 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
                     depth
                 );
 
-                node.view = Some(pty_editor.pty_view(
-                    ("".into(), "".into(), "".into())
-                ));
+                node.view = Some(pty_editor.pty_view(("", "", "")));
                 node.cmd = Some(Arc::new(RwLock::new(pty_editor)));
                 Some(node)                
             }
