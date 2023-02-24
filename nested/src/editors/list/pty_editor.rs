@@ -7,7 +7,7 @@ use {
         type_system::{Context, TypeTerm, ReprTree},
         editors::list::*,
         terminal::{TerminalEvent, TerminalView, make_label},
-        tree::{TreeCursor, TreeNav},
+        tree::{TreeCursor, TreeNav, TreeNavResult},
         diagnostics::{Diagnostics},
         tree::NestedNode,
         PtySegment
@@ -231,7 +231,7 @@ use r3vi::view::singleton::SingletonView;
 use crate::commander::ObjCommander;
 
 impl ObjCommander for PTYListEditor {
-    fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) {
+    fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
         let mut e = self.editor.write().unwrap();
         let cur = e.cursor.get();
 
@@ -253,6 +253,8 @@ impl ObjCommander for PTYListEditor {
                         | TerminalEvent::Input(Event::Key(Key::Insert)) => {
                             e.toggle_leaf_mode();
                             e.set_leaf_mode(ListCursorMode::Select);
+
+                            TreeNavResult::Continue
                         }
                     _ => {
                         if let Some(idx) = cur.idx {
@@ -261,9 +263,11 @@ impl ObjCommander for PTYListEditor {
                                     match event {
                                         TerminalEvent::Input(Event::Key(Key::Backspace)) => {
                                             e.delete_pxev();
+                                            TreeNavResult::Continue
                                         }
                                         TerminalEvent::Input(Event::Key(Key::Delete)) => {
                                             e.delete_nexd();
+                                            TreeNavResult::Continue
                                         }
                                         _ => {
                                             let mut node = Context::make_node(&e.ctx, e.typ.clone(), self.depth).unwrap();
@@ -281,6 +285,8 @@ impl ObjCommander for PTYListEditor {
                                             if ! remove {
                                             */
                                             e.insert(node);
+
+                                            TreeNavResult::Continue
                                         }
                                     }
                                 },
@@ -306,8 +312,9 @@ impl ObjCommander for PTYListEditor {
                                                         item.handle_terminal_event(event);
                                                         }
                                                          */
+                                                        TreeNavResult::Continue
                                                     } else {
-                                                        item.send_cmd_obj(cmd_obj);
+                                                        item.send_cmd_obj(cmd_obj)
                                                     }
                                                 }
                                                 TerminalEvent::Input(Event::Key(Key::Delete)) => {
@@ -329,31 +336,40 @@ impl ObjCommander for PTYListEditor {
                                                         item.handle_terminal_event(event);
                                                     }
                                                          */
+
+                                                        TreeNavResult::Continue
                                                     } else {
-                                                        item.send_cmd_obj(cmd_obj);
+                                                        item.send_cmd_obj(cmd_obj)
                                                     }
                                                 }
 
                                                 TerminalEvent::Input(Event::Key(Key::Char(c))) => {
                                                     if Some(c) == self.split_char {
                                                         PTYListEditor::split(&mut e);
+                                                        TreeNavResult::Continue
                                                     } else {
-                                                        item.send_cmd_obj(cmd_obj);
+                                                        item.send_cmd_obj(cmd_obj)
                                                     }
                                                 }
                                                 _ => {
-                                                    item.send_cmd_obj(cmd_obj);
+                                                    item.send_cmd_obj(cmd_obj)
                                                 }
                                             }
                                         } else {
-                                            item.send_cmd_obj(cmd_obj);
+                                            item.send_cmd_obj(cmd_obj)
                                         }
+                                    } else {
+                                        TreeNavResult::Exit
                                     }
                                 }
                             }
+                        } else {
+                            TreeNavResult::Exit
                         }
                     }
-                }       
+                }
+            } else {
+                TreeNavResult::Exit
             }
         } else if cmd_type == char_type && cur.mode == ListCursorMode::Select {
             if let Some(cmd_view) = co.get_view::<dyn SingletonView<Item = char>>() {
@@ -362,11 +378,27 @@ impl ObjCommander for PTYListEditor {
 
                 if Some(c) == self.split_char {
                     PTYListEditor::split(&mut e);
+                    TreeNavResult::Continue
                 } else {
                     if let Some(mut item) = e.get_item_mut() {
-                        item.send_cmd_obj(cmd_obj);
+                        match item.send_cmd_obj(cmd_obj) {
+                            TreeNavResult::Continue => TreeNavResult::Continue,
+                            TreeNavResult::Exit => {
+                                item.goto(TreeCursor::none());
+                                e.cursor.set(ListCursor {
+                                    mode: ListCursorMode::Insert,
+                                    idx: Some(cur.idx.unwrap_or(0)+1)
+                                });
+
+                                TreeNavResult::Continue
+                            }
+                        }
+                    } else {
+                        TreeNavResult::Exit
                     }
                 }
+            } else {
+                TreeNavResult::Exit
             }
         } else {
             drop(co);
@@ -377,12 +409,16 @@ impl ObjCommander for PTYListEditor {
                     new_edit.goto(TreeCursor::home());
                     new_edit.send_cmd_obj(cmd_obj);
 
-                    e.insert(new_edit);                    
+                    e.insert(new_edit);
+
+                    TreeNavResult::Continue
                 },
                 ListCursorMode::Select => {
                     if let Some(mut item) = e.get_item_mut() {
-                        item.send_cmd_obj(cmd_obj);
-                    }                    
+                        item.send_cmd_obj(cmd_obj)
+                    } else {
+                        TreeNavResult::Exit
+                    }
                 }
             }
         }

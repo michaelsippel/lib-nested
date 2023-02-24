@@ -255,8 +255,8 @@ impl ListEditor {
                     let prev_node = self.data.get(prev_idx);
 
                     if let Some(prev_editor) = prev_node.editor.clone() {
-                        let mut prev_editor = prev_editor.downcast::<RwLock<ListEditor>>().unwrap();
-                        let mut prev_editor = prev_editor.write().unwrap();
+                        let prev_editor = prev_editor.downcast::<RwLock<ListEditor>>().unwrap();
+                        let prev_editor = prev_editor.write().unwrap();
 
                         if prev_editor.get_data_port().get_view().unwrap().iter()
                             .filter_map(|x| x.get_data_view::<dyn SingletonView<Item = Option<char>>>(vec![].into_iter())?.get()).count() == 0

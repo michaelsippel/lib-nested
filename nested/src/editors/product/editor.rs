@@ -199,7 +199,7 @@ use r3vi::view::singleton::SingletonView;
 use crate::{commander::ObjCommander, type_system::ReprTree};
 
 impl ObjCommander for ProductEditor {
-    fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) {
+    fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
         let co = cmd_obj.read().unwrap();
         let cmd_type = co.get_type().clone();
         let term_event_type = (&self.ctx, "( TerminalEvent )").into();
@@ -257,10 +257,14 @@ impl ObjCommander for ProductEditor {
                     self.update_cur_segment();
                 }
             }
+
+            TreeNavResult::Continue
         } else {
             drop(co);
             if let Some(mut node) = self.get_cur_editor() {
-                node.send_cmd_obj(cmd_obj);
+                node.send_cmd_obj(cmd_obj)
+            } else {
+                TreeNavResult::Exit
             }
         }
     }

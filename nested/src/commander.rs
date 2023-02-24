@@ -8,25 +8,20 @@ pub trait Commander {
 use std::sync::{Arc, RwLock};
 use crate::{
     type_system::ReprTree,
-    tree::{nav::TreeNavResult, NestedNode}
+    tree::{nav::TreeNavResult}
 };
 
 //use r3vi::view::singleton::*;
 
 pub trait ObjCommander {
-
-    fn send_cmd_node(&mut self, node: NestedNode) -> TreeNavResult {
-        TreeNavResult::Continue
-    }
-
-    fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>);
+    fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult;
 }
-
+/*
 //impl<Cmd: 'static, T: Commander<Cmd>> ObjCommander for T {
 impl<C: Commander> ObjCommander for C
 where C::Cmd: 'static
 {
-    fn send_cmd_obj(&mut self, _cmd_obj: Arc<RwLock<ReprTree>>) {
+    fn send_cmd_obj(&mut self, _cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult{
         /*
         self.send_cmd(
             &cmd_obj.read().unwrap()
@@ -41,8 +36,9 @@ where C::Cmd: 'static
 impl<T: Clone + Send + Sync> Commander for r3vi::buffer::vec::VecBuffer<T> {
     type Cmd = r3vi::buffer::vec::VecDiff<T>;
 
-    fn send_cmd(&mut self, cmd: &Self::Cmd) {
+    fn send_cmd(&mut self, cmd: &Self::Cmd) -> TreeNavResult {
         self.apply_diff(cmd.clone());
+        TreeNavResult::
     }
 }
-
+*/

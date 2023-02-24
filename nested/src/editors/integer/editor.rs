@@ -17,8 +17,8 @@ use {
             TerminalAtom, TerminalEvent, TerminalStyle, make_label
         },
         diagnostics::{Message},
-        tree::NestedNode,
-        commander::Commander
+        tree::{NestedNode, TreeNavResult},
+        commander::ObjCommander
     },
     std::sync::Arc,
     std::sync::RwLock,
@@ -35,34 +35,34 @@ pub struct DigitEditor {
     msg: VecBuffer<Message>,
 }
 
-impl Commander for DigitEditor {
-    type Cmd = TerminalEvent;
+impl ObjCommander for DigitEditor {
+    fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
+        let cmd_obj = cmd_obj.read().unwrap();
+        let cmd_type = cmd_obj.get_type().clone();
 
-    fn send_cmd(&mut self, event: &TerminalEvent) {
-        match event {
-            TerminalEvent::Input(Event::Key(Key::Char(c))) => {
-                self.data.set(Some(*c));
+        let char_type = (&self.ctx, "( Char )").into();
+        //let _term_event_type = (&ctx, "( TerminalEvent )").into();
+
+        if cmd_type == char_type {
+            if let Some(cmd_view) = cmd_obj.get_view::<dyn SingletonView<Item = char>>() {
+                let c = cmd_view.get();
+                self.data.set(Some(c));
 
                 self.msg.clear();
                 if c.to_digit(self.radix).is_none() {
                     let mut mb = IndexBuffer::new();
                     mb.insert_iter(vec![
                         (Point2::new(1, 0), make_label("invalid digit '")),
-                        (Point2::new(2, 0), make_label(&format!("{}", *c))
+                        (Point2::new(2, 0), make_label(&format!("{}", c))
                          .map_item(|_p,a| a.add_style_back(TerminalStyle::fg_color((140,140,250))))),
                         (Point2::new(3, 0), make_label("'"))
                     ]);
                     self.msg.push(crate::diagnostics::make_error(mb.get_port().flatten()));
                 }
             }
-            TerminalEvent::Input(Event::Key(Key::Backspace))
-                | TerminalEvent::Input(Event::Key(Key::Delete)) => {
-                    self.data.set(None);
-                    self.msg.clear();
-                    self.msg.push(crate::diagnostics::make_warn(make_label("empty digit")));
-                }
-            _ => {}
         }
+
+        TreeNavResult::Continue
     }
 }
 

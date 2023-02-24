@@ -7,8 +7,7 @@ use {
             integer::*,
             product::*
         },
-        tree::{NestedNode},        
-        terminal::{TerminalEditor},
+        tree::{NestedNode},
         diagnostics::{Diagnostics},
         type_system::{MorphismTypePattern},
     },

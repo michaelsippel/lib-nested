@@ -7,10 +7,7 @@ use {
         }
     },
     crate::{
-        terminal::{
-            TerminalEditor, TerminalEditorResult,
-            TerminalEvent, TerminalView
-        },
+        terminal::TerminalView,
         editors::list::ListCursorMode,
         type_system::{Context, ReprTree},
         tree::{TreeNav, TreeCursor, TreeNavResult},
@@ -20,8 +17,7 @@ use {
         PtySegment
     },
     cgmath::{Vector2},
-    std::sync::{Arc, RwLock},
-    termion::event::{Key}
+    std::sync::{Arc, RwLock}
 };
 
 pub struct SumEditor {
@@ -131,7 +127,7 @@ impl PtySegment for SumEditor {
 }
 
 impl ObjCommander for SumEditor {
-    fn send_cmd_obj(&mut self, obj: Arc<RwLock<ReprTree>>) {
-        self.editors[ self.cur ].send_cmd_obj( obj );
+    fn send_cmd_obj(&mut self, obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
+        self.editors[ self.cur ].send_cmd_obj( obj )
     }
 }

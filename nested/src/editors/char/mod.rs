@@ -9,7 +9,7 @@ use {
     crate::{
         type_system::{Context, ReprTree},
         terminal::{TerminalAtom, TerminalStyle},
-        tree::NestedNode,
+        tree::{NestedNode, TreeNavResult},
         commander::{ObjCommander}
     },
     std::sync::Arc,
@@ -22,7 +22,7 @@ pub struct CharEditor {
 }
 
 impl ObjCommander for CharEditor {
-    fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) {
+    fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
         let cmd_obj = cmd_obj.read().unwrap();
         let cmd_type = cmd_obj.get_type().clone();
 
@@ -35,25 +35,8 @@ impl ObjCommander for CharEditor {
                 self.data.set(Some(value));
             }
         }
-/*
-        if cmd_type == term_event_type {
-            if let Some(te_view) = cmd_obj.get_view::<dyn SingletonView<Item = TerminalEvent>>() {
-                let event = te_view.get();
-                match event {
-                    TerminalEvent::Input(Event::Key(Key::Char(c))) => {
-                        self.data.set(Some(c));
-                    }
 
-                    TerminalEvent::Input(Event::Key(Key::Backspace))
-                        | TerminalEvent::Input(Event::Key(Key::Delete)) => {
-                            self.data.set(None);
-                        }
-
-                    _ => {}
-                }                
-            }
-    }
-        */
+        TreeNavResult::Continue
     }
 }
 

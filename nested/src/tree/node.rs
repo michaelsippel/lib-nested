@@ -43,10 +43,12 @@ pub struct NestedNode {
 }
 
 impl ObjCommander for NestedNode {
-    fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) {
+    fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
         if let Some(cmd) = self.cmd.as_ref() {
             // todo: filter out tree-nav cmds and send them to tree_nav
-            cmd.write().unwrap().send_cmd_obj(cmd_obj);
+            cmd.write().unwrap().send_cmd_obj(cmd_obj)
+        } else {
+            TreeNavResult::Exit
         }
     }
 }
