@@ -89,3 +89,25 @@ pub fn make_todo(msg: OuterViewPort<dyn TerminalView>) -> Message {
     }
 }
 
+pub fn make_info(msg: OuterViewPort<dyn TerminalView>) -> Message {
+    let mut mb = IndexBuffer::new();
+    mb.insert_iter(vec![
+        (Point2::new(0, 0),
+         make_label("info: ")
+         .map_item(|_p,a| a
+                   .add_style_back(TerminalStyle::bold(true))
+                   .add_style_back(TerminalStyle::fg_color((180,180,250))))
+        ),
+        (Point2::new(1, 0),
+         msg
+         .map_item(|_p,a| a
+                   .add_style_back(TerminalStyle::fg_color((180,180,180))))
+        )
+    ]);
+
+    Message {
+        addr: vec![],
+        port: mb.get_port().flatten()
+    }
+}
+
