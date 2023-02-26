@@ -71,7 +71,7 @@ impl TreeNav for ProductEditor {
                         e.goto(c.clone());
                     } else if c.tree_addr.len() > 0 {
                         // create editor
-                        let mut e = Context::make_node(&self.ctx, t[0].clone(), *ed_depth+1).unwrap();
+                        let mut e = Context::make_node(&self.ctx, t.0[0].clone(), *ed_depth+1).unwrap();
                         *editor = Some(e.clone());
                         e.goto(c.clone());
                     }
@@ -128,7 +128,7 @@ impl TreeNav for ProductEditor {
                             } else {
                                 // create editor
 
-                                let mut e = Context::make_node(&self.ctx, t[0].clone(), *ed_depth+1).unwrap();
+                                let mut e = Context::make_node(&self.ctx, t.0[0].clone(), *ed_depth+1).unwrap();
                                 *editor = Some(e.clone());
                                 e.goby(direction);
                             }

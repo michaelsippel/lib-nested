@@ -65,7 +65,7 @@ impl ProductEditorSegment {
                 }),
 
             ProductEditorSegment::N{ t, editor: None, ed_depth, cur_depth, cur_dist } =>
-                make_label(&ctx.read().unwrap().type_term_to_str(&t[0]))
+                make_label(&ctx.read().unwrap().type_term_to_str(&t.0[0]))
                 .map_item({
                     let _cur_depth = *cur_depth;
                     let _ed_depth = *ed_depth;

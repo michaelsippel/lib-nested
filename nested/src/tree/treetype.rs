@@ -8,7 +8,7 @@ use {
 
 pub trait TreeType {
     fn get_type(&self, _addr: &TreeAddr) -> TypeLadder {
-        vec![]
+        vec![].into()
     }
 }
 

@@ -61,6 +61,7 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
             }
         )
     );
+    ctx.write().unwrap().add_list_typename("Seq".into());
     ctx.write().unwrap().add_list_typename("Sequence".into());
 
     ctx.write().unwrap().add_list_typename("List".into());
@@ -203,6 +204,7 @@ pub fn init_math_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
 
     ctx.write().unwrap().add_typename("MachineInt".into());
     ctx.write().unwrap().add_typename("u32".into());
+    ctx.write().unwrap().add_typename("LittleEndian".into());
     ctx.write().unwrap().add_typename("BigEndian".into());
 
     ctx.write().unwrap().add_node_ctor(
@@ -330,17 +332,17 @@ pub fn init_math_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
                     .with_n(Point2::new(1, 0),
                         vec![
                         ctx.read().unwrap().type_term_from_str("( PosInt 16 BigEndian )").unwrap()
-                        ])
+                        ].into())
                     .with_t(Point2::new(0, 1), "g: ")
                     .with_n(Point2::new(1, 1),
                         vec![
                         ctx.read().unwrap().type_term_from_str("( PosInt 16 BigEndian )").unwrap()
-                        ])
+                        ].into())
                     .with_t(Point2::new(0, 2), "b: ")
                     .with_n(Point2::new(1, 2),
                         vec![
                         ctx.read().unwrap().type_term_from_str("( PosInt 16 BigEndian )").unwrap()
-                        ]
+                        ].into()
                     );
 
                 let view = editor.get_term_view();
@@ -358,6 +360,13 @@ pub fn init_math_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
                 Some(node)
             }
         ));
+
+    ctx.write().unwrap().add_typename("Date".into());
+    ctx.write().unwrap().add_typename("ISO-8601".into());
+    ctx.write().unwrap().add_typename("TimeSinceEpoch".into());
+    ctx.write().unwrap().add_typename("Duration".into());
+    ctx.write().unwrap().add_typename("Seconds".into());
+    ctx.write().unwrap().add_typename("ℕ".into());
     
     ctx
 }

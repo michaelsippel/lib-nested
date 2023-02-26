@@ -3,7 +3,46 @@ use {crate::utils::Bimap, std::collections::HashMap};
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub type TypeID = u64;
-pub type TypeLadder = Vec<TypeTerm>;
+
+#[derive(Clone)]
+pub struct TypeLadder(pub Vec<TypeTerm>);
+
+impl From<Vec<TypeTerm>> for TypeLadder {
+    fn from(l: Vec<TypeTerm>) -> Self {
+        TypeLadder(l)
+    }
+}
+
+impl TypeLadder {
+    /// if compatible, returns the number of descents neccesary
+    pub fn is_compatible_with(&self, other: &TypeLadder) -> Option<usize> {
+        if let Some(other_top_type) = other.0.first() {
+            for (i, t) in self.0.iter().enumerate() {
+                if t == other_top_type {
+                    return Some(i);
+                }
+            }
+
+            None
+        } else {
+            None
+        }
+    }
+
+    pub fn is_matching_repr(&self, other: &TypeLadder) -> Result<usize, Option<(usize, usize)>> {
+        if let Some(start) = self.is_compatible_with(other) {
+            for (i, (t1, t2)) in self.0.iter().skip(start).zip(other.0.iter()).enumerate() {
+                if t1 != t2 {
+                    return Err(Some((start, i)));
+                }
+            }
+
+            Ok(start)
+        } else {
+            Err(None)
+        }
+    }
+}
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
@@ -30,7 +69,7 @@ impl TypeTerm {
     pub fn num_arg(&mut self, v: i64) -> &mut Self {
         self.arg(TypeTerm::Num(v))
     }
-
+ 
     pub fn from_str(s: &str, names: &HashMap<String, u64>) -> Option<Self> {
         let mut term_stack = Vec::<Option<TypeTerm>>::new();
 
@@ -107,7 +146,7 @@ impl TypeTerm {
     pub fn to_str(&self, names: &HashMap<u64, String>) -> String {
         match self {
             TypeTerm::Type { id, args } => format!(
-                "« {} {}»",
+                "( {} {})",
                 names[id],
                 if args.len() > 0 {
                     args.iter().fold(String::new(), |str, term| {
