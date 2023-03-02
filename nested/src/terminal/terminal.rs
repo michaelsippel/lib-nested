@@ -206,6 +206,7 @@ impl TermOutWriter {
                     if let Some(atom) = view.get(&pos) {
                         if cur_style != atom.style {
                             cur_style = atom.style;
+                            write!(out, "{}", termion::style::Reset)?;
                             write!(out, "{}", atom.style)?;
                         }
 
