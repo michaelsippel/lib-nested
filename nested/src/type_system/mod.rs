@@ -1,13 +1,17 @@
-
-pub mod type_term;
-pub mod repr_tree;
 pub mod context;
+
+pub mod dict;
+pub mod term;
+pub mod ladder;
+pub mod repr_tree;
 pub mod make_editor;
-//pub mod type_term_editor;
+//pub mod editor;
 
 pub use {
-    repr_tree::{ReprTree},
-    type_term::{TypeDict, TypeID, TypeTerm, TypeLadder},
+    dict::*,
+    ladder::*,
+    repr_tree::*,
+    term::*,
     context::{Context, MorphismMode, MorphismType, MorphismTypePattern},
 //    type_term_editor::TypeTermEditor,
     make_editor::*

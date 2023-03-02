@@ -125,8 +125,8 @@ impl ListEditor {
     pub fn get_seq_type(&self) -> TypeTerm {
         TypeTerm::Type {
             id: self.ctx.read().unwrap().get_typeid("List").unwrap(),
-            args: vec![ self.get_item_type() ]
-        }        
+            args: vec![ self.get_item_type().into() ]
+        }
     }
 
     pub fn get_cursor_port(&self) -> OuterViewPort<dyn SingletonView<Item = ListCursor>> {

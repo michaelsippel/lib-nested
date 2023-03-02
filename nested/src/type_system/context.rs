@@ -1,6 +1,6 @@
 use {
     crate::{
-        type_system::{TypeDict, TypeTerm, TypeID, ReprTree},
+        type_system::{TypeDict, TypeTerm, TypeID, ReprTree, TypeLadder},
         tree::NestedNode
     },
     std::{
@@ -10,8 +10,6 @@ use {
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
-
-pub struct TypeLadder(Vec<TypeTerm>);
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub enum MorphismMode {
@@ -50,12 +48,12 @@ impl From<MorphismType> for MorphismTypePattern {
     fn from(value: MorphismType) -> MorphismTypePattern {
         MorphismTypePattern {
             src_tyid: match value.src_type {
-                Some(TypeTerm::Type { id, args: _ }) => Some(id),
+                Some(TypeTerm::Type { id, args: _ }) => Some(TypeID::Fun(id)),
                 _ => None,
             },
 
             dst_tyid: match value.dst_type {
-                TypeTerm::Type { id, args: _ } => id,
+                TypeTerm::Type { id, args: _ } => TypeID::Fun(id),
                 _ => unreachable!()
             }
         }
@@ -66,7 +64,7 @@ impl From<MorphismType> for MorphismTypePattern {
 
 pub struct Context {
     /// assigns a name to every type
-    type_dict: Arc<RwLock<TypeDict>>,
+    pub type_dict: Arc<RwLock<TypeDict>>,
 
     /// named vertices of the graph
     nodes: HashMap< String, NestedNode >,
@@ -135,7 +133,7 @@ impl Context {
     pub fn is_list_type(&self, t: &TypeTerm) -> bool {
         match t {
             TypeTerm::Type { id, args: _ } => {
-                self.list_types.contains(id)
+                self.list_types.contains(&TypeID::Fun(*id))
             }
             _ => false
         }
@@ -143,6 +141,20 @@ impl Context {
 
     pub fn get_typeid(&self, tn: &str) -> Option<TypeID> {
         self.type_dict.read().unwrap().get_typeid(&tn.into())
+    }
+
+    pub fn get_fun_typeid(&self, tn: &str) -> Option<u64> {
+        match self.get_typeid(tn) {
+            Some(TypeID::Fun(x)) => Some(x),
+            _ => None
+        }
+    }
+
+    pub fn get_var_typeid(&self, tn: &str) -> Option<u64> {
+        match self.get_typeid(tn) {
+            Some(TypeID::Var(x)) => Some(x),
+            _ => None
+        }
     }
 
     pub fn type_term_from_str(&self, tn: &str) -> Option<TypeTerm> {

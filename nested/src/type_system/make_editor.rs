@@ -75,7 +75,7 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
                         if args.len() > 0 {
                             let editor = PTYListEditor::new(
                                 ctx,
-                                args[0].clone(),
+                                (args[0].clone().0)[0].clone(),
                                 Some(','),
                                 depth + 1
                             );
@@ -125,7 +125,7 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
                     TypeTerm::Type {
                         id: ctx.read().unwrap().get_typeid("List").unwrap(),
                         args: vec![
-                            TypeTerm::new(ctx.read().unwrap().get_typeid("Char").unwrap())
+                            TypeTerm::new(ctx.read().unwrap().get_typeid("Char").unwrap()).into()
                         ]
                     },
                     depth+1
@@ -173,7 +173,7 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
                     TypeTerm::Type {
                         id: ctx.read().unwrap().get_typeid("List").unwrap(),
                         args: vec![
-                            TypeTerm::new(ctx.read().unwrap().get_typeid("Char").unwrap())
+                            TypeTerm::new(ctx.read().unwrap().get_typeid("Char").unwrap()).into()
                         ]
                     },
                     depth+1
@@ -215,9 +215,9 @@ pub fn init_math_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
                         id: _, args
                     } => {
                         if args.len() > 0 {
-                            match args[0] {
+                            match (args[0].0)[0] {
                                 TypeTerm::Num(radix) => {
-                                    let node = DigitEditor::new(ctx.clone(), radix as u32).into_node(depth);                                    
+                                    let node = DigitEditor::new(ctx.clone(), radix as u32).into_node(depth);
                                     Some(
                                         node
                                     )
@@ -252,7 +252,7 @@ pub fn init_math_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
                         id: _, args
                     } => {
                         if args.len() > 0 {
-                            match args[0] {
+                            match (args[0].0)[0] {
                                 TypeTerm::Num(_radix) => {
                                     let pty_editor = PTYListEditor::from_editor(
                                         editor,
@@ -291,7 +291,7 @@ pub fn init_math_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
                         id: _, args
                     } => {
                         if args.len() > 0 {
-                            match args[0] {
+                            match (args[0].0)[0] {
                                 TypeTerm::Num(radix) => {
 
                                     let mut node = Context::make_node(
@@ -302,6 +302,7 @@ pub fn init_math_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
                                                 TypeTerm::new(ctx.read().unwrap().get_typeid("Digit").unwrap())
                                                     .num_arg(radix)
                                                     .clone()
+                                                    .into()
                                             ]
                                         },
                                         depth+1

@@ -116,7 +116,7 @@ impl DigitEditor {
         TypeTerm::Type {
             id: self.ctx.read().unwrap().get_typeid("Digit").unwrap(),
             args: vec![
-                TypeTerm::Num(self.radix as i64)
+                TypeTerm::Num(self.radix as i64).into()
             ]
         }
     }
@@ -145,7 +145,7 @@ impl PosIntEditor {
             TypeTerm::Type {
                 id: ctx.read().unwrap().get_typeid("Digit").unwrap(),
                 args: vec![
-                    TypeTerm::Num(radix as i64)
+                    TypeTerm::Num(radix as i64).into()
                 ]
             },
             None,
@@ -169,11 +169,11 @@ impl PosIntEditor {
             TypeTerm::Type {
                 id: ctx.read().unwrap().get_typeid("PosInt").unwrap(),
                 args: vec![
-                    TypeTerm::Num(radix as i64),
+                    TypeTerm::Num(radix as i64).into(),
                     TypeTerm::Type {
                         id: ctx.read().unwrap().get_typeid("BigEndian").unwrap(),
                         args: vec![]
-                    }
+                    }.into()
                 ]
             }
         ));
