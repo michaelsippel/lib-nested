@@ -192,21 +192,25 @@ impl PTYListEditor {
         {
             let prev_editor = e.data.get_mut(idx as usize-1);
             let prev_editor = prev_editor.editor.clone();
-            let prev_editor = prev_editor.unwrap().downcast::<RwLock<ListEditor>>().unwrap();
-            let mut prev_editor = prev_editor.write().unwrap();
+            if let Some(prev_editor) = prev_editor {
+                if let Ok(prev_editor) = prev_editor.downcast::<RwLock<ListEditor>>() {
+                    let mut prev_editor = prev_editor.write().unwrap();
 
-            let cur_editor = item.editor.clone().unwrap();
-            let cur_editor = cur_editor.downcast::<RwLock<ListEditor>>().unwrap();
-            let cur_editor = cur_editor.write().unwrap();
+                    let cur_editor = item.editor.clone().unwrap();
+                    let cur_editor = cur_editor.downcast::<RwLock<ListEditor>>().unwrap();
+                    let cur_editor = cur_editor.write().unwrap();
 
-            prev_editor.join(&cur_editor);
-        }
+                    prev_editor.join(&cur_editor);
+                    
+                    e.cursor.set(
+                        ListCursor {
+                            idx: Some(idx - 1), mode: ListCursorMode::Select
+                        }
+                    );
 
-        e.cursor.set(
-            ListCursor {
-                idx: Some(idx - 1), mode: ListCursorMode::Select
+                }
             }
-        );
+        }
 
         e.data.remove(idx as usize);
     }
@@ -214,14 +218,16 @@ impl PTYListEditor {
     fn join_nexd(e: &mut ListEditor, next_idx: usize, item: &NestedNode) {
         {
             let next_editor = e.data.get_mut(next_idx).editor.clone();
-            let next_editor = next_editor.unwrap().downcast::<RwLock<ListEditor>>().unwrap();
-            let next_editor = next_editor.write().unwrap();
+            if let Some(next_editor) = next_editor {
+                if let Ok(next_editor) = next_editor.downcast::<RwLock<ListEditor>>() {
+                    let mut next_editor = next_editor.write().unwrap();
+                    let cur_editor = item.editor.clone().unwrap();
+                    let cur_editor = cur_editor.downcast::<RwLock<ListEditor>>().unwrap();
+                    let mut cur_editor = cur_editor.write().unwrap();
 
-            let cur_editor = item.editor.clone().unwrap();
-            let cur_editor = cur_editor.downcast::<RwLock<ListEditor>>().unwrap();
-            let mut cur_editor = cur_editor.write().unwrap();
-
-            cur_editor.join(&next_editor);
+                    cur_editor.join(&next_editor);
+                }
+            }
         }
         e.data.remove(next_idx);
     }
