@@ -1,12 +1,13 @@
 use {
     r3vi::{
-        view::{OuterViewPort, singleton::*, sequence::*},
+        view::{port::UpdateTask, OuterViewPort, singleton::*, sequence::*},
         buffer::{singleton::*, vec::*}
     },
     crate::{
         type_system::{Context, TypeTerm, ReprTree},
         editors::list::{ListCursor, ListCursorMode},
-        tree::{NestedNode, TreeNav}
+        tree::{NestedNode, TreeNav, TreeCursor},
+        diagnostics::Diagnostics
     },
     std::sync::{Arc, RwLock}
 };
@@ -27,6 +28,31 @@ pub struct ListEditor {
 }
 
 impl ListEditor {
+    pub fn init_ctx(ctx: &Arc<RwLock<Context>>) {
+        let mut ctx = ctx.write().unwrap();
+
+        ctx.add_list_typename("List".into());
+        ctx.add_node_ctor(
+            "List", Arc::new(
+                |ctx: Arc<RwLock<Context>>, ty: TypeTerm, depth: usize| {
+                    match ty {
+                        TypeTerm::Type {
+                            id: _, args
+                        } => {
+                            if args.len() > 0 {
+                                let typ = (args[0].clone().0)[0].clone();
+                                Some(ListEditor::new(ctx, typ).into_node(depth))
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None
+                    }
+                }
+            )
+        );
+    }
+
     pub fn new(
         ctx: Arc<RwLock<Context>>,
         typ: TypeTerm,
@@ -92,30 +118,33 @@ impl ListEditor {
         let ctx = self.ctx.clone();
         let editor = Arc::new(RwLock::new(self));
 
+        let e = editor.read().unwrap();
+
         NestedNode::new(depth)
             .set_ctx(ctx)
             .set_data(data)
             .set_editor(editor.clone())
             .set_nav(editor.clone())
-//            .set_cmd(editor.clone())
-    }
-
-    pub fn new_node(
-        node: NestedNode,
-        item_type: TypeTerm
-    ) -> NestedNode {
-        let ctx = node.ctx.clone().unwrap();
-
-        let editor = ListEditor::new(
-            ctx.clone(),
-            item_type,
-        );
-        let data = editor.get_data();
-        let editor = Arc::new(RwLock::new(editor));
-
-        node.set_data(data)
-            .set_editor(editor.clone())
-            .set_nav(editor.clone())
+           //.set_cmd(editor.clone())
+            .set_diag(e
+                      .get_data_port()
+                      .enumerate()
+                      .map(
+                          |(idx, item_editor)| {
+                              let idx = *idx;
+                              item_editor
+                                  .get_msg_port()
+                                  .map(
+                                      move |msg| {
+                                          let mut msg = msg.clone();
+                                          msg.addr.insert(0, idx);
+                                          msg
+                                      }
+                                  )
+                          }
+                      )
+                      .flatten()
+            )
     }
 
     pub fn get_item_type(&self) -> TypeTerm {
@@ -124,7 +153,7 @@ impl ListEditor {
 
     pub fn get_seq_type(&self) -> TypeTerm {
         TypeTerm::Type {
-            id: self.ctx.read().unwrap().get_typeid("List").unwrap(),
+            id: self.ctx.read().unwrap().get_fun_typeid("List").unwrap(),
             args: vec![ self.get_item_type().into() ]
         }
     }
@@ -255,8 +284,10 @@ impl ListEditor {
                     let prev_node = self.data.get(prev_idx);
 
                     if let Some(prev_editor) = prev_node.editor.clone() {
-                        let prev_editor = prev_editor.downcast::<RwLock<ListEditor>>().unwrap();
+                        prev_editor.0.update();
+                        let prev_editor = prev_editor.get_view().unwrap().get().unwrap().downcast::<RwLock<ListEditor>>().unwrap();
                         let prev_editor = prev_editor.write().unwrap();
+                        prev_editor.get_data_port().0.update();
 
                         if prev_editor.get_data_port().get_view().unwrap().iter()
                             .filter_map(|x| x.get_data_view::<dyn SingletonView<Item = Option<char>>>(vec![].into_iter())?.get()).count() == 0
@@ -304,6 +335,110 @@ impl ListEditor {
         for i in 0 .. other.data.len() {
             self.data.push(other.data.get(i));
         }
+    }
+
+
+    pub fn listlist_split(&mut self) {
+        let cur = self.get_cursor();
+        if let Some(item) = self.get_item_mut() {
+            let depth = item.depth;
+
+            if let Some(head_editor) = item.editor.clone() {
+
+                head_editor.0.update();
+                let head = head_editor.get_view().unwrap().get().unwrap().downcast::<RwLock<ListEditor>>().unwrap();
+                let mut head = head.write().unwrap();
+
+                if head.data.len() > 0 {
+
+                    if cur.tree_addr.len() > 2 {
+                        head.listlist_split();
+                    }
+
+                    let mut tail = head.split();
+
+                    head.goto(TreeCursor::none());
+
+                    tail.cursor.set(
+                        ListCursor {
+                            idx: Some(0),
+                            mode: if cur.tree_addr.len() > 2 {
+                                ListCursorMode::Select
+                            } else {
+                                ListCursorMode::Insert
+                            }
+                        }
+                    );
+
+                    let item_type =
+                        if let Some(data) = item.data.clone() {
+                            let data = data.read().unwrap();
+                            Some(data.get_type().clone())
+                        } else {
+                            None
+                        };
+
+                    let mut tail_node = tail.into_node(depth);
+                    tail_node = tail_node.set_ctx(item.ctx.clone().unwrap());
+
+                    //                    if let Some(item_type) = item_type {
+                        tail_node = tail_node.morph(self.typ.clone());
+                    //}
+                    
+                    self.insert(
+                        tail_node
+                    );
+                }
+            }
+        }
+    }
+
+    pub fn listlist_join_pxev(&mut self, idx: isize, item: &NestedNode) {
+        {
+            let prev_editor = self.data.get_mut(idx as usize-1);
+            let prev_editor = prev_editor.editor.clone();
+            if let Some(prev_editor) = prev_editor {
+                prev_editor.0.update();
+                if let Ok(prev_editor) = prev_editor.get_view().unwrap().get().unwrap().downcast::<RwLock<ListEditor>>() {
+                    let mut prev_editor = prev_editor.write().unwrap();
+
+                    let cur_editor = item.editor.clone().unwrap();
+                    cur_editor.0.update();
+                    let cur_editor = cur_editor.get_view().unwrap().get().unwrap().downcast::<RwLock<ListEditor>>().unwrap();
+                    let cur_editor = cur_editor.write().unwrap();
+
+                    prev_editor.join(&cur_editor);
+                    
+                    self.cursor.set(
+                        ListCursor {
+                            idx: Some(idx - 1), mode: ListCursorMode::Select
+                        }
+                    );
+
+                }
+            }
+        }
+
+        self.data.remove(idx as usize);
+    }
+
+    pub fn listlist_join_nexd(&mut self, next_idx: usize, item: &NestedNode) {
+        {
+            let next_editor = self.data.get_mut(next_idx).editor.clone();
+            if let Some(next_editor) = next_editor {
+                next_editor.0.update();
+                if let Ok(next_editor) = next_editor.get_view().unwrap().get().unwrap().downcast::<RwLock<ListEditor>>() {
+                    let mut next_editor = next_editor.write().unwrap();
+                    let cur_editor = item.editor.clone().unwrap();
+                    cur_editor.0.update();
+                    let cur_editor = cur_editor.get_view().unwrap().get().unwrap().downcast::<RwLock<ListEditor>>().unwrap();
+                    let mut cur_editor = cur_editor.write().unwrap();
+
+                    cur_editor.join(&next_editor);
+                }
+            }
+        }
+        self.data.remove(next_idx);
     }
 }
 /*

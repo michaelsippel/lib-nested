@@ -61,38 +61,13 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
             }
         )
     );
+
     ctx.write().unwrap().add_list_typename("Seq".into());
     ctx.write().unwrap().add_list_typename("Sequence".into());
+    ctx.write().unwrap().add_list_typename("SepSeq".into());
+    ctx.write().unwrap().add_typename("NestedNode".into());
 
-    ctx.write().unwrap().add_list_typename("List".into());
-    ctx.write().unwrap().add_node_ctor(
-        "List", Arc::new(
-            |ctx: Arc<RwLock<Context>>, ty: TypeTerm, depth: usize| {
-                match ty {
-                    TypeTerm::Type {
-                        id: _, args
-                    } => {
-                        if args.len() > 0 {
-                            let editor = PTYListEditor::new(
-                                ctx,
-                                (args[0].clone().0)[0].clone(),
-                                Some(','),
-                                depth + 1
-                            );
-                            let view = editor.pty_view(("{",", ", "}"));
-
-                            Some(editor
-                                    .into_node()
-                                    .set_view(view))
-                        } else {
-                            None
-                        }
-                    }
-                    _ => None
-                }
-            }
-        )
-    );
+    ListEditor::init_ctx( &ctx );
 
     ctx.write().unwrap().add_list_typename("Symbol".into());
     let pattern = MorphismTypePattern {
@@ -102,17 +77,9 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
     ctx.write().unwrap().add_morphism(pattern,
         Arc::new(
             |mut node, _dst_type:_| {
-                let depth = node.depth;
-                let editor = node.editor.clone().unwrap().downcast::<RwLock<ListEditor>>().unwrap();
-                let pty_editor = PTYListEditor::from_editor(
-                    editor,
-                    None,
-                    depth
-                );
-
-                node.view = Some(pty_editor.pty_view(("", "", "")));
-                node.cmd = Some(Arc::new(RwLock::new(pty_editor)));
-                Some(node)                
+                PTYListController::for_node( &mut node, None, None );
+                PTYListStyle::for_node( &mut node, ("","","") );
+                Some(node)
             }
         )
     );
@@ -123,7 +90,7 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
                 let mut node = Context::make_node(
                     &ctx,
                     TypeTerm::Type {
-                        id: ctx.read().unwrap().get_typeid("List").unwrap(),
+                        id: ctx.read().unwrap().get_fun_typeid("List").unwrap(),
                         args: vec![
                             TypeTerm::new(ctx.read().unwrap().get_typeid("Char").unwrap()).into()
                         ]
@@ -146,20 +113,8 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
     ctx.write().unwrap().add_morphism(pattern,
         Arc::new(
             |mut node, _dst_type:_| {
-                let depth = node.depth;
-                let editor = node.editor.clone().unwrap().downcast::<RwLock<ListEditor>>().unwrap();
-                let pty_editor = PTYListEditor::from_editor(
-                    editor,
-                    None,
-                    depth
-                );
-
-                node.view = Some(pty_editor.pty_view((
-                    "\"".into(),
-                    "".into(),
-                    "\"".into()
-                )));
-                node.cmd = Some(Arc::new(RwLock::new(pty_editor)));
+                PTYListController::for_node( &mut node, None, Some('\"') );
+                PTYListStyle::for_node( &mut node, ("\"","","\"") );
                 Some(node)                
             }
         )
@@ -171,7 +126,7 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
                 let mut node = Context::make_node(
                     &ctx,
                     TypeTerm::Type {
-                        id: ctx.read().unwrap().get_typeid("List").unwrap(),
+                        id: ctx.read().unwrap().get_fun_typeid("List").unwrap(),
                         args: vec![
                             TypeTerm::new(ctx.read().unwrap().get_typeid("Char").unwrap()).into()
                         ]
@@ -243,7 +198,7 @@ pub fn init_math_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
         Arc::new(
             |mut node, dst_type| {
                 let depth = node.depth;
-                let editor = node.editor.clone().unwrap().downcast::<RwLock<ListEditor>>().unwrap();
+                let editor = node.editor.clone().unwrap().get_view().unwrap().get().unwrap().downcast::<RwLock<ListEditor>>().unwrap();
 
                 // todo: check src_type parameter to be ( Digit radix )
                 
@@ -254,21 +209,17 @@ pub fn init_math_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
                         if args.len() > 0 {
                             match (args[0].0)[0] {
                                 TypeTerm::Num(_radix) => {
-                                    let pty_editor = PTYListEditor::from_editor(
-                                        editor,
+                                    PTYListController::for_node(
+                                        &mut node,
                                         Some(','),
-                                        depth
+                                        None,
                                     );
 
-                                    // todo: set data view
-                                    node.view = Some(pty_editor.pty_view(
-                                        (
-                                            "{".into(),
-                                            ", ".into(),
-                                            "}".into()
-                                        )
-                                    ));
-                                    node.cmd = Some(Arc::new(RwLock::new(pty_editor)));
+                                    PTYListStyle::for_node(
+                                        &mut node,
+                                        ("0d", "", "")
+                                    );
+
                                     Some(node)
                                 },
                                 _ => None
@@ -297,7 +248,7 @@ pub fn init_math_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
                                     let mut node = Context::make_node(
                                         &ctx,
                                         TypeTerm::Type {
-                                            id: ctx.read().unwrap().get_typeid("List").unwrap(),
+                                            id: ctx.read().unwrap().get_fun_typeid("List").unwrap(),
                                             args: vec![
                                                 TypeTerm::new(ctx.read().unwrap().get_typeid("Digit").unwrap())
                                                     .num_arg(radix)

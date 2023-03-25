@@ -24,7 +24,7 @@ pub struct NestedNode {
     pub ctx: Option<Arc<RwLock<Context>>>,
 
     /// abstract editor
-    pub editor: Option<Arc<dyn Any + Send + Sync>>,
+    pub editor: Option<OuterViewPort<dyn SingletonView<Item = Option<Arc<dyn Any + Send + Sync>>>>>,
 
     /// abstract data view
     pub data: Option<Arc<RwLock<ReprTree>>>,
@@ -195,7 +195,7 @@ impl NestedNode {
     }
 
     pub fn set_editor(mut self, editor: Arc<dyn Any + Send + Sync>) -> Self {
-        self.editor = Some(editor);
+        self.editor = Some(SingletonBuffer::new(Some(editor)).get_port());
         self
     }
 
@@ -267,7 +267,7 @@ impl NestedNode {
 */
     pub fn get_edit<T: Send + Sync + 'static>(&self) -> Option<Arc<RwLock<T>>> {
         if let Some(edit) = self.editor.clone() {
-            if let Ok(edit) = edit.downcast::<RwLock<T>>() {
+            if let Ok(edit) = edit.get_view().unwrap().get().unwrap().downcast::<RwLock<T>>() {
                 Some(edit)
             } else {
                 None

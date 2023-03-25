@@ -12,7 +12,7 @@ use {
     },
     crate::{
         type_system::{Context, TypeTerm, ReprTree},
-        editors::list::{PTYListEditor},
+        editors::list::{ListEditor, PTYListController, PTYListStyle},
         terminal::{
             TerminalAtom, TerminalEvent, TerminalStyle, make_label
         },
@@ -114,7 +114,7 @@ impl DigitEditor {
 
     pub fn get_type(&self) -> TypeTerm {
         TypeTerm::Type {
-            id: self.ctx.read().unwrap().get_typeid("Digit").unwrap(),
+            id: self.ctx.read().unwrap().get_fun_typeid("Digit").unwrap(),
             args: vec![
                 TypeTerm::Num(self.radix as i64).into()
             ]
@@ -140,38 +140,31 @@ pub struct PosIntEditor {
 
 impl PosIntEditor {
     pub fn new(ctx: Arc<RwLock<Context>>, radix: u32) -> Self {
-        let editor = PTYListEditor::new(
-            ctx.clone(),
-            TypeTerm::Type {
-                id: ctx.read().unwrap().get_typeid("Digit").unwrap(),
-                args: vec![
-                    TypeTerm::Num(radix as i64).into()
-                ]
-            },
-            None,
-            0
-        );
+        let mut node = Context::make_node(&ctx, (&ctx, format!("( List ( Digit {} ) )", radix).as_str()).into(), 0).unwrap();
 
-            let view = editor.pty_view((
+        PTYListController::for_node( &mut node, Some(' '), None );
+        PTYListStyle::for_node( &mut node,
+            (
                 match radix {
                     2 => "0d".into(),
                     16 => "0x".into(),
                     _ => "".into()
                 },
                 "".into(),
-                "".into()));
-            let mut node = editor.into_node().set_view(view);
+                "".into()
+            )
+        );
 
         // Set Type
         let data = node.data.clone().unwrap();
         node = node.set_data(ReprTree::ascend(
             &data,
             TypeTerm::Type {
-                id: ctx.read().unwrap().get_typeid("PosInt").unwrap(),
+                id: ctx.read().unwrap().get_fun_typeid("PosInt").unwrap(),
                 args: vec![
                     TypeTerm::Num(radix as i64).into(),
                     TypeTerm::Type {
-                        id: ctx.read().unwrap().get_typeid("BigEndian").unwrap(),
+                        id: ctx.read().unwrap().get_fun_typeid("BigEndian").unwrap(),
                         args: vec![]
                     }.into()
                 ]
