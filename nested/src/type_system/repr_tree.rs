@@ -1,7 +1,7 @@
 use {
     r3vi::view::{AnyOuterViewPort, OuterViewPort, View},
     crate::{
-        type_system::{TypeTerm}
+        type_system::{TypeTerm, Context}
     },
     std::{
         collections::HashMap,
@@ -29,6 +29,14 @@ impl ReprTree {
 
     pub fn get_type(&self) -> &TypeTerm {
         &self.type_tag
+    }
+
+    pub fn from_char(ctx: &Arc<RwLock<Context>>, c: char) -> Arc<RwLock<Self>> {
+        let buf = r3vi::buffer::singleton::SingletonBuffer::<char>::new(c);
+        ReprTree::new_leaf(
+            (ctx, "( Char )"),
+            buf.get_port().into()
+        )
     }
 
     pub fn new_leaf(type_tag: impl Into<TypeTerm>, port: AnyOuterViewPort) -> Arc<RwLock<Self>> {
