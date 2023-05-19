@@ -18,6 +18,7 @@ use {
     cgmath::{Vector2, Point2}
 };
 
+#[derive(PartialEq, Eq, Clone, Copy)]
 enum State {
     Any,
     Char,
@@ -62,13 +63,39 @@ impl TypeTermEditor {
         ctx.add_morphism(pattern,
                          Arc::new(
                              |mut node, _dst_type:_| {
-                                 Some(TypeTermEditor::with_node( node.ctx.clone().unwrap(), node.depth, node, State::Any ))
+                                 //eprintln!("morphism to typeterm");
+
+                                 PTYListController::for_node( &mut node, Some(' '), None );
+                                 PTYListStyle::for_node( &mut node, ("","","") );
+
+                                 let mut new_node = TypeTermEditor::with_node( node.ctx.clone().unwrap(), node.depth, node.clone(), State::Any );
+
+                                 let item_nodes = node.get_edit::<ListEditor>().clone().unwrap();
+                                 let item_nodes = item_nodes.read().unwrap();
+
+                                 for i in 0..item_nodes.data.len() {
+                                     if let Some(x) = item_nodes.data.get(i).data {
+                                         //eprintln!("item with {:?}", x);
+                                         //let c = x.read().unwrap().get_view::<dyn SingletonView<Item = NestedNode>>().unwrap().get();
+                                         new_node.send_cmd_obj(
+                                             ReprTree::from_char(&new_node.ctx.as_ref().unwrap(), 'x')
+                                         );
+                                         //new_node.send_cmd_obj(c);
+                                     }
+                                 }
+
+                                 if item_nodes.data.len() > 0 {
+                                     new_node.goto(TreeCursor::home());
+                                 }
+
+                                 Some(new_node)
                              }
                          )
         );
     }
 
     fn set_state(&mut self, new_state: State) {
+        let old_node = self.cur_node.get();
         let mut node = match new_state {
             State::Char => {
                 let mut node = Context::make_node( &self.ctx, (&self.ctx, "( Char )").into(), 0 ).unwrap();
@@ -83,6 +110,7 @@ impl TypeTermEditor {
                     ]
                 );
                 
+                node.close_char = Some('\'');
                 node.view = Some(
                     grid.get_port()
                         .flatten()
@@ -92,8 +120,9 @@ impl TypeTermEditor {
             State::List => {
                 let mut node = Context::make_node( &self.ctx, (&self.ctx, "( List TypeTerm )").into(), 0 ).unwrap();
 
-                PTYListController::for_node( &mut node, Some(' '), Some(')') );
-                PTYListStyle::for_node( &mut node, ("("," ",")") );
+                PTYListController::for_node( &mut node, Some(' '), Some('>') );
+                PTYListStyle::for_node( &mut node, ("<"," ",">") );
+
                 node
             }
             State::Symbol => {
@@ -103,11 +132,12 @@ impl TypeTermEditor {
                 Context::make_node( &self.ctx, (&self.ctx, "( PosInt 10 BigEndian )").into(), 0 ).unwrap()
             }
             _ => {
-                self.cur_node.get()
+                old_node
             }
         };
 
         node.goto(TreeCursor::home());
+
         self.cur_node.set(node);
         self.state = new_state;
     }
@@ -117,7 +147,7 @@ impl TypeTermEditor {
     }
 
     fn with_node(ctx: Arc<RwLock<Context>>, depth: usize, node: NestedNode, state: State) -> NestedNode {
-        let editor = TypeTermEditor {
+        let mut editor = TypeTermEditor {
             ctx: ctx.clone(),
             state,
             cur_node: SingletonBuffer::new(node)
@@ -155,6 +185,7 @@ impl TypeTermEditor {
             .to_grid()
             .flatten();
 
+        let cc = editor.cur_node.get().close_char;
         let editor = Arc::new(RwLock::new(editor));
 
         let mut node = NestedNode::new(depth)
@@ -214,10 +245,10 @@ impl ObjCommander for TypeTermEditor {
             if let Some(cmd_view) = cmd_obj.get_view::<dyn SingletonView<Item = char>>() {
                 let c = cmd_view.get();
 
-                match self.state {
+                match &self.state {
                     State::Any => {
                         match c {
-                            '(' => {
+                            '<' => {
                                 self.set_state( State::List );
                                 TreeNavResult::Continue
                             }
@@ -233,8 +264,7 @@ impl ObjCommander for TypeTermEditor {
                             _ => {
                                 self.set_state( State::Symbol );
                                 self.cur_node.get_mut().goto(TreeCursor::home());
-                                self.cur_node.get_mut().send_cmd_obj( co );
-                                TreeNavResult::Continue
+                                self.cur_node.get_mut().send_cmd_obj( co )
                             }
                         }
                     }
@@ -246,15 +276,45 @@ impl ObjCommander for TypeTermEditor {
                                 TreeNavResult::Exit
                             }
                             _ => {
-                                self.cur_node.get_mut().send_cmd_obj( co );
-                                TreeNavResult::Continue                                
+                                self.cur_node.get_mut().send_cmd_obj( co )
+                            }
+                        }
+                    }
+                    
+                    State::List => {
+                        match self.cur_node.get_mut().send_cmd_obj( co ) {
+                            TreeNavResult::Continue => {
+                                TreeNavResult::Continue
+                            }
+
+                            TreeNavResult::Exit => {
+                                match c {
+                                    '>' => {
+                                        let cur = self.get_cursor();
+
+                                        if cur.tree_addr.len() > 2 {
+                                            self.goto(
+                                                TreeCursor {
+                                                    leaf_mode: ListCursorMode::Insert,
+                                                    tree_addr: vec![ cur.tree_addr.get(0).unwrap_or(&0)+1 ]
+                                                }
+                                            );
+                                            TreeNavResult::Continue
+                                        } else {
+                                            TreeNavResult::Exit
+                                        }
+                                    }
+                                    _ => {
+                                        TreeNavResult::Exit
+                                    }
+                                }
+                                
                             }
                         }
                     }
 
                     _ => {
-                        self.cur_node.get_mut().send_cmd_obj( co );
-                        TreeNavResult::Continue
+                        self.cur_node.get_mut().send_cmd_obj( co )
                     }
                 }
             } else {

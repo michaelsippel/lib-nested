@@ -89,12 +89,7 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
             |ctx: Arc<RwLock<Context>>, dst_typ: TypeTerm, depth: usize| {
                 let mut node = Context::make_node(
                     &ctx,
-                    TypeTerm::Type {
-                        id: ctx.read().unwrap().get_fun_typeid("List").unwrap(),
-                        args: vec![
-                            TypeTerm::new(ctx.read().unwrap().get_typeid("Char").unwrap()).into()
-                        ]
-                    },
+                    (&ctx, "( List Char )").into(),
                     depth+1
                 ).unwrap();
 

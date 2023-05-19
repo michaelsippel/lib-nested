@@ -13,6 +13,7 @@ use {
         PtySegment
     },
     std::sync::{Arc, RwLock},
+    std::any::{Any},
     termion::event::{Event, Key}
 };
 
@@ -101,10 +102,23 @@ impl PTYListController {
         split_char: Option<char>,
         close_char: Option<char>
     ) {
+        {
+            let mut ctx = node.ctx.as_ref().unwrap();
+            let mut ctx = ctx.write().unwrap();
+
+            if let Some(c) = split_char.as_ref() {
+                ctx.meta_chars.push(*c);
+            }
+            if let Some(c) = close_char.as_ref() {
+                ctx.meta_chars.push(*c);
+            }
+        }
+        
         let editor = node.get_edit::<ListEditor>().unwrap();
         let controller = Arc::new(RwLock::new(PTYListController::from_editor( editor, split_char, close_char, node.depth )));
 
         node.cmd = Some(controller.clone());
+        node.close_char = close_char;
     }
 
     pub fn get_data_port(&self) -> OuterViewPort<dyn SequenceView<Item = NestedNode>> {
@@ -285,55 +299,67 @@ impl ObjCommander for PTYListController {
             } else {
                 TreeNavResult::Exit
             }
-        } else if cmd_type == char_type && cur.mode == ListCursorMode::Select {
-            if let Some(cmd_view) = co.get_view::<dyn SingletonView<Item = char>>() {
-                drop(co);
-                let c = cmd_view.get();
+        }
 
-                if Some(c) == self.split_char && cur_depth == 2 {
-                    e.listlist_split();
-                    TreeNavResult::Continue
-                } else {
-                    if let Some(mut item) = e.get_item_mut() {
-                        match item.send_cmd_obj(cmd_obj) {
-                            TreeNavResult::Continue => TreeNavResult::Continue,
-                            TreeNavResult::Exit => {
-                                if Some(c) == self.split_char {                                
-                                    e.listlist_split();
-                                }
-
-                                item.goto(TreeCursor::none());
-                                e.cursor.set(ListCursor {
-                                    mode: ListCursorMode::Insert,
-                                    idx: Some(cur.idx.unwrap_or(0)+1)
-                                });
-
-                                TreeNavResult::Continue
-                            }
-                        }
-                    } else {
-                        TreeNavResult::Exit
-                    }
-                }
-            } else {
-                TreeNavResult::Exit
-            }
-        } else {
+        else {
             drop(co);
-
             match cur.mode {
                 ListCursorMode::Insert => {
                     let mut new_edit = Context::make_node(&e.ctx, e.typ.clone(), self.depth).unwrap();
                     new_edit.goto(TreeCursor::home());
-                    new_edit.send_cmd_obj(cmd_obj);
 
-                    e.insert(new_edit);
+                    match new_edit.send_cmd_obj(cmd_obj.clone()) {
+                        TreeNavResult::Continue => {
+                            e.insert(new_edit);
+                            TreeNavResult::Continue
+                        }
 
-                    TreeNavResult::Continue
+                        TreeNavResult::Exit => {
+                            //eprintln!("listedit: exit from insert mode");
+                            TreeNavResult::Exit
+                        }
+                    }
                 },
                 ListCursorMode::Select => {
                     if let Some(mut item) = e.get_item_mut() {
-                        item.send_cmd_obj(cmd_obj)
+                        match item.send_cmd_obj(cmd_obj.clone()) {
+                            TreeNavResult::Continue => {
+                                TreeNavResult::Continue
+                            }
+
+                            TreeNavResult::Exit => {
+                                if cmd_type == char_type {
+                                    let co = cmd_obj.read().unwrap();
+                                    if let Some(cmd_view) = co.get_view::<dyn SingletonView<Item = char>>() {
+                                        drop(co);
+                                        let c = cmd_view.get();
+
+                                        //eprintln!("close char = {:?}", item.close_char);
+
+                                        if Some(c) == self.split_char {
+                                            //eprintln!("listlist_split");
+                                            e.listlist_split();
+                                            TreeNavResult::Continue
+                                        } else if Some(c) == item.close_char {
+                                            //eprintln!("listedit: exit from select (close)");
+                                            //item.goto(TreeCursor::none());
+                                            e.cursor.set(ListCursor {
+                                                mode: ListCursorMode::Insert,
+                                                idx: Some(cur.idx.unwrap_or(0)+1)
+                                            });
+                                            TreeNavResult::Continue
+                                        } else {
+                                            //eprintln!("listedit: exit from select mode");
+                                            TreeNavResult::Exit
+                                        }
+                                    } else {
+                                        TreeNavResult::Exit
+                                    }
+                                } else {
+                                    TreeNavResult::Exit
+                                }
+                            }
+                        }
                     } else {
                         TreeNavResult::Exit
                     }

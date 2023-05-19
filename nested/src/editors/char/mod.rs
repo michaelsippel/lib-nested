@@ -32,11 +32,19 @@ impl ObjCommander for CharEditor {
         if cmd_type == char_type {
             if let Some(cmd_view) = cmd_obj.get_view::<dyn SingletonView<Item = char>>() {
                 let value = cmd_view.get();
-                self.data.set(Some(value));
-            }
-        }
 
-        TreeNavResult::Continue
+                if self.ctx.read().unwrap().meta_chars.contains(&value) {
+                    TreeNavResult::Exit
+                } else {
+                    self.data.set(Some(value));
+                    TreeNavResult::Continue
+                }
+            } else {
+                TreeNavResult::Exit
+            }
+        } else {
+            TreeNavResult::Exit   
+        }
     }
 }
 

@@ -36,6 +36,7 @@ pub struct NestedNode {
     pub diag: Option<OuterViewPort<dyn SequenceView<Item = Message>>>,
 
     /// commander
+    pub close_char: Option<char>,
     pub cmd: Option<Arc<RwLock<dyn ObjCommander + Send + Sync>>>,
 
     /// tree navigation
@@ -155,6 +156,7 @@ impl NestedNode {
             view: None,
             diag: None,
             cmd: None,
+            close_char: None,
             tree_nav: None
         }
     }

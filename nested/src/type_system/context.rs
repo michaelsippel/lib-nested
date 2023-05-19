@@ -38,7 +38,7 @@ pub struct MorphismType {
     pub dst_type: TypeTerm,
 }
 
-#[derive(Hash, Eq, PartialEq, Debug)]
+#[derive(Clone, Hash, Eq, PartialEq, Debug)]
 pub struct MorphismTypePattern {
     pub src_tyid: Option<TypeID>,
     pub dst_tyid: TypeID
@@ -62,6 +62,7 @@ impl From<MorphismType> for MorphismTypePattern {
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
+#[derive(Clone)]
 pub struct Context {
     /// assigns a name to every type
     pub type_dict: Arc<RwLock<TypeDict>>,
@@ -71,7 +72,8 @@ pub struct Context {
 
     /// todo: beautify
     /// types that can be edited as lists
-    list_types: Vec< TypeID >,
+    pub list_types: Vec< TypeID >,
+    pub meta_chars: Vec< char >,
 
     /// graph constructors
     morphisms: HashMap<
@@ -103,6 +105,10 @@ impl Context {
             nodes: HashMap::new(),
             list_types: match parent.as_ref() {
                 Some(p) => p.read().unwrap().list_types.clone(),
+                None => Vec::new()
+            },
+            meta_chars: match parent.as_ref() {
+                Some(p) => p.read().unwrap().meta_chars.clone(),
                 None => Vec::new()
             },
             parent,
@@ -215,7 +221,10 @@ impl Context {
             dst_type: type_term.clone()
         })?;
 
-        mk_node(NestedNode::new(depth).set_ctx(ctx.clone()), type_term)
+        mk_node(NestedNode::new(depth).set_ctx(
+            Arc::new(RwLock::new(
+                Context::with_parent(Some(ctx.clone()))))
+        ), type_term)
     }
 
     pub fn morph_node(mut node: NestedNode, dst_type: TypeTerm) -> NestedNode {
@@ -233,8 +242,9 @@ impl Context {
         }
 
         let pattern = MorphismType { src_type, dst_type: dst_type.clone() }.into();
-        let ctx = ctx.read().unwrap();
-        if let Some(transform) = ctx.get_morphism(pattern) {
+
+        let m = ctx.read().unwrap().get_morphism(pattern);
+        if let Some(transform) = m {
             if let Some(new_node) = transform(node.clone(), dst_type) {
                 new_node
             } else {

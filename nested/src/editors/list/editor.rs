@@ -5,7 +5,7 @@ use {
     },
     crate::{
         type_system::{Context, TypeTerm, ReprTree},
-        editors::list::{ListCursor, ListCursorMode},
+        editors::list::{ListCursor, ListCursorMode, PTYListController, PTYListStyle},
         tree::{NestedNode, TreeNav, TreeCursor},
         diagnostics::Diagnostics
     },
@@ -41,7 +41,13 @@ impl ListEditor {
                         } => {
                             if args.len() > 0 {
                                 let typ = (args[0].clone().0)[0].clone();
-                                Some(ListEditor::new(ctx, typ).into_node(depth))
+
+                                let mut node = ListEditor::new(ctx.clone(), typ).into_node(depth);
+
+                                PTYListController::for_node( &mut node, Some(','), Some('}') );
+                                PTYListStyle::for_node( &mut node, ("{",", ","}") );
+
+                                Some(node)
                             } else {
                                 None
                             }
@@ -250,7 +256,7 @@ impl ListEditor {
                     if self.is_listlist() {
                         cur.mode = ListCursorMode::Select;
                     } else {
-                        cur.idx = Some(idx + 1);                        
+                        cur.idx = Some(idx + 1);               
                     }
                 }
 
@@ -263,12 +269,16 @@ impl ListEditor {
             }
 
             self.cursor.set(cur);
+        } else {
+            //eprintln!("insert: no cursor");
         }
     }
 
     /// split the list off at the current cursor position and return the second half
     pub fn split(&mut self) -> ListEditor {
-        let mut le = ListEditor::new(self.ctx.clone(), self.typ.clone());
+        let mut le = ListEditor::new(
+            Arc::new(RwLock::new(self.ctx.read().unwrap().clone())),
+            self.typ.clone());
 
         let cur = self.cursor.get();
         if let Some(idx) = cur.idx {

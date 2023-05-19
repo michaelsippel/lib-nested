@@ -49,7 +49,11 @@ impl ObjCommander for DigitEditor {
                 self.data.set(Some(c));
 
                 self.msg.clear();
-                if c.to_digit(self.radix).is_none() {
+
+                if self.ctx.read().unwrap().meta_chars.contains(&c) {
+                    return TreeNavResult::Exit;
+                }
+                else if c.to_digit(self.radix).is_none() {
                     let mut mb = IndexBuffer::new();
                     mb.insert_iter(vec![
                         (Point2::new(1, 0), make_label("invalid digit '")),
