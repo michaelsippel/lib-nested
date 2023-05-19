@@ -9,6 +9,13 @@ use {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TypeTerm {
+    /* TODO: refactor into this:
+    Nominal {
+        id: u64,
+        args: Vec< TypeTerm >
+    },
+    Ladder(Vec< TypeTerm >),
+     */
     Type {
         id: u64,
         args: Vec< TypeLadder >
@@ -70,11 +77,24 @@ impl TypeTerm {
 
                     match f {
                         Some(f) => {
-                            if atom.chars().nth(0).unwrap().is_numeric() {
+                            let mut chars = atom.chars();
+                            let first = chars.next().unwrap();
+
+                            if first.is_numeric() {
                                 f.num_arg(i64::from_str_radix(atom, 10).unwrap());
+                            } else if first == '\'' {
+                                if let Some(mut c) = chars.next() {
+                                    if c == '\\' {
+                                        if let Some('n') = chars.next() {
+                                            c = '\n';
+                                        }
+                                    }
+                                    f.char_arg(c);
+                                }
                             } else {
                                 f.arg(TypeTerm::new(
-                                    names.get(atom).expect(&format!("invalid atom {}", atom)).clone(),
+                                    names.get(atom)
+                                    .expect(&format!("invalid atom {}", atom)).clone()
                                 ));
                             }
                         }
@@ -97,11 +117,11 @@ impl TypeTerm {
             TypeTerm::Type { id, args } => {
                 if args.len() > 0 {
                     format!(
-                        "({}{})",
+                        "<{}{}>",
                         names[&TypeID::Fun(*id)],
                         if args.len() > 0 {
                             args.iter().fold(String::new(), |str, term| {
-                                format!(" {}{}", str, term.to_str1(names))
+                                format!("{} {}", str, term.to_str1(names))
                             })
                         } else {
                             String::new()
@@ -113,6 +133,7 @@ impl TypeTerm {
             }
 
             TypeTerm::Num(n) => format!("{}", n),
+            TypeTerm::Char('\n') => format!("'\\n'"),
             TypeTerm::Char(c) => format!("'{}'", c),
             TypeTerm::Var(varid) => format!("T"),
         }
@@ -122,11 +143,11 @@ impl TypeTerm {
     pub fn to_str(&self, names: &HashMap<TypeID, String>) -> String {
         match self {
             TypeTerm::Type { id, args } => format!(
-                "( {} {})",
+                "<{}{}>",
                 names[&TypeID::Fun(*id)],
                 if args.len() > 0 {
                     args.iter().fold(String::new(), |str, term| {
-                        format!("{}{} ", str, term.to_str1(names))
+                        format!("{} {}", str, term.to_str1(names))
                     })
                 } else {
                     String::new()
@@ -134,6 +155,7 @@ impl TypeTerm {
             ),
 
             TypeTerm::Num(n) => format!("{}", n),
+            TypeTerm::Char('\n') => format!("'\\n'"),
             TypeTerm::Char(c) => format!("'{}'", c),
             TypeTerm::Var(varid) => format!("T"),
         }
