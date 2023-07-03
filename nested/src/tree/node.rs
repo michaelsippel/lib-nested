@@ -16,36 +16,42 @@ use {
 };
 
 #[derive(Clone)]
-pub struct NestedNode {
-    /// depth
-    pub depth: usize,
-    
+pub struct NestedNode {    
     /// context
-    pub ctx: Option<Arc<RwLock<Context>>>,
-
-    /// abstract editor
-    pub editor: Option<OuterViewPort<dyn SingletonView<Item = Option<Arc<dyn Any + Send + Sync>>>>>,
+    pub ctx: Option< Arc<RwLock<Context>> >,
 
     /// abstract data view
-    pub data: Option<Arc<RwLock<ReprTree>>>,
+    pub data: Option< Arc<RwLock<ReprTree>> >,
 
     /// display view
-    pub view: Option<OuterViewPort<dyn TerminalView>>,
+    pub view: Option< OuterViewPort<dyn TerminalView> >,
 
     /// diagnostics
-    pub diag: Option<OuterViewPort<dyn SequenceView<Item = Message>>>,
+    pub diag: Option< OuterViewPort<dyn SequenceView<Item = Message>> >,
 
-    /// commander
-    pub close_char: Option<char>,
-    pub cmd: Option<Arc<RwLock<dyn ObjCommander + Send + Sync>>>,
+    /// depth
+    pub depth: SingletonBuffer< usize >,
 
-    /// tree navigation
-    pub tree_nav: Option<Arc<RwLock<dyn TreeNav + Send + Sync>>>,
+    /// abstract editor
+    pub editor: SingletonBuffer<
+                    Option< Arc<dyn Any + Send + Sync> >
+                >,
+
+    /// commander & navigation
+    pub cmd: SingletonBuffer<
+                 Option< Arc<RwLock<dyn ObjCommander + Send + Sync>> >
+             >,
+    pub close_char: SingletonBuffer<
+                        Option< char >
+                    >,
+    pub tree_nav: SingletonBuffer<
+                      Option< Arc<RwLock<dyn TreeNav + Send + Sync>> >
+                  >,
 }
 
 impl ObjCommander for NestedNode {
     fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
-        if let Some(cmd) = self.cmd.as_ref() {
+        if let Some(cmd) = self.cmd.get() {
             // todo: filter out tree-nav cmds and send them to tree_nav
             cmd.write().unwrap().send_cmd_obj(cmd_obj)
         } else {
@@ -74,7 +80,7 @@ impl TerminalEditor for NestedNode {
     fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
         let buf = SingletonBuffer::new(event.clone());
 
-        if let (Some(cmd),Some(ctx)) = (self.cmd.as_ref(),self.ctx.as_ref()) {
+        if let (Some(cmd),Some(ctx)) = (self.cmd.get(),self.ctx.as_ref()) {
             cmd.write().unwrap().send_cmd_obj(
                 ReprTree::new_leaf(
                     ctx.read().unwrap().type_term_from_str("( TerminalEvent )").unwrap(),
@@ -88,7 +94,7 @@ impl TerminalEditor for NestedNode {
 
 impl TreeNav for NestedNode {
     fn get_cursor(&self) -> TreeCursor {
-        if let Some(tn) = self.tree_nav.as_ref() {
+        if let Some(tn) = self.tree_nav.get() {
             tn.read().unwrap().get_cursor()
         } else {
             TreeCursor::default()
@@ -96,7 +102,7 @@ impl TreeNav for NestedNode {
     }
 
     fn get_addr_view(&self) -> OuterViewPort<dyn SequenceView<Item = isize>> {
-        if let Some(tn) = self.tree_nav.as_ref() {
+        if let Some(tn) = self.tree_nav.get() {
             tn.read().unwrap().get_addr_view()
         } else {
             OuterViewPort::default()
@@ -104,7 +110,7 @@ impl TreeNav for NestedNode {
     }
 
     fn get_mode_view(&self) -> OuterViewPort<dyn SingletonView<Item = ListCursorMode>> {
-        if let Some(tn) = self.tree_nav.as_ref() {
+        if let Some(tn) = self.tree_nav.get() {
             tn.read().unwrap().get_mode_view()
         } else {
             OuterViewPort::default()
@@ -112,7 +118,7 @@ impl TreeNav for NestedNode {
     }
 
     fn get_cursor_warp(&self) -> TreeCursor {
-        if let Some(tn) = self.tree_nav.as_ref() {
+        if let Some(tn) = self.tree_nav.get() {
             tn.read().unwrap().get_cursor_warp()
         } else {
             TreeCursor::default()
@@ -124,7 +130,7 @@ impl TreeNav for NestedNode {
     }
 
     fn goby(&mut self, direction: Vector2<isize>) -> TreeNavResult {
-        if let Some(tn) = self.tree_nav.as_ref() {
+        if let Some(tn) = self.tree_nav.get() {
             tn.write().unwrap().goby(direction)
         } else {
             TreeNavResult::Exit
@@ -132,7 +138,7 @@ impl TreeNav for NestedNode {
     }
 
     fn goto(&mut self, new_cursor: TreeCursor) -> TreeNavResult {
-        if let Some(tn) = self.tree_nav.as_ref() {
+        if let Some(tn) = self.tree_nav.get() {
             tn.write().unwrap().goto(new_cursor)
         } else {
             TreeNavResult::Exit
@@ -149,15 +155,15 @@ impl Diagnostics for NestedNode {
 impl NestedNode {
     pub fn new(depth: usize) -> Self {
         NestedNode {
-            depth,
             ctx: None,
             data: None,
-            editor: None,
             view: None,
             diag: None,
-            cmd: None,
-            close_char: None,
-            tree_nav: None
+            depth: SingletonBuffer::new(depth),
+            editor: SingletonBuffer::new(None),
+            cmd: SingletonBuffer::new(None),
+            close_char: SingletonBuffer::new(None),
+            tree_nav: SingletonBuffer::new(None)
         }
     }
 
@@ -197,7 +203,7 @@ impl NestedNode {
     }
 
     pub fn set_editor(mut self, editor: Arc<dyn Any + Send + Sync>) -> Self {
-        self.editor = Some(SingletonBuffer::new(Some(editor)).get_port());
+        self.editor.set(Some(editor));
         self
     }
 
@@ -207,12 +213,12 @@ impl NestedNode {
     }
 
     pub fn set_cmd(mut self, cmd: Arc<RwLock<dyn ObjCommander + Send + Sync>>) -> Self {
-        self.cmd = Some(cmd);
+        self.cmd.set(Some(cmd));
         self
     }
 
     pub fn set_nav(mut self, nav: Arc<RwLock<dyn TreeNav + Send + Sync>>) -> Self {
-        self.tree_nav = Some(nav);
+        self.tree_nav.set(Some(nav));
         self
     }
 
@@ -268,8 +274,8 @@ impl NestedNode {
     }
 */
     pub fn get_edit<T: Send + Sync + 'static>(&self) -> Option<Arc<RwLock<T>>> {
-        if let Some(edit) = self.editor.clone() {
-            if let Ok(edit) = edit.get_view().unwrap().get().unwrap().downcast::<RwLock<T>>() {
+        if let Some(edit) = self.editor.get() {
+            if let Ok(edit) = edit.downcast::<RwLock<T>>() {
                 Some(edit)
             } else {
                 None

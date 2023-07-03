@@ -43,7 +43,7 @@ impl TreeNav for ListEditor {
             ListCursorMode::Select => {
                 if let Some(i) = cur.idx {
                     if i < self.data.len() as isize {
-                        let mut sub_cur = self.data.get(i as usize).get_cursor_warp();
+                        let mut sub_cur = self.data.get(i as usize).read().unwrap().get_cursor_warp();
                         sub_cur.tree_addr.insert(0, i as isize - self.data.len() as isize);
                         return sub_cur;
                     } else {
@@ -75,7 +75,7 @@ impl TreeNav for ListEditor {
             ListCursorMode::Select => {
                 if let Some(i) = cur.idx {
                     if i < self.data.len() as isize {
-                        let mut sub_cur = self.data.get(i as usize).get_cursor();
+                        let mut sub_cur = self.data.get(i as usize).read().unwrap().get_cursor();
                         if sub_cur.tree_addr.len() > 0 {
                             sub_cur.tree_addr.insert(0, i as isize);
                             return sub_cur;
@@ -99,7 +99,7 @@ impl TreeNav for ListEditor {
         let old_cur = self.cursor.get();
         if let Some(i) = old_cur.idx {
             if i < self.data.len() as isize {
-                self.data.get_mut(i as usize).goto(TreeCursor::none());
+                self.data.get_mut(i as usize).write().unwrap().goto(TreeCursor::none());
             }
         }
 
@@ -122,6 +122,7 @@ impl TreeNav for ListEditor {
                 if new_cur.leaf_mode == ListCursorMode::Select && self.data.len() > 0 {
                     self.data
                         .get_mut(idx as usize)
+                        .write().unwrap()
                         .goto(TreeCursor {
                             leaf_mode: ListCursorMode::Select,
                             tree_addr: vec![]
@@ -141,6 +142,7 @@ impl TreeNav for ListEditor {
 
                     self.data
                         .get_mut(idx as usize)
+                        .write().unwrap()
                         .goto(TreeCursor {
                             leaf_mode: new_cur.leaf_mode,
                             tree_addr: new_cur.tree_addr[1..].iter().cloned().collect(),
@@ -189,6 +191,7 @@ impl TreeNav for ListEditor {
                     if cur.tree_addr[0] < self.data.len() as isize {
                         if self.data
                             .get_mut(cur.tree_addr[0] as usize)
+                            .write().unwrap()
                             .goby(Vector2::new(direction.x, direction.y))
                             == TreeNavResult::Continue {
                                 self.cursor.set(ListCursor {
@@ -224,6 +227,7 @@ impl TreeNav for ListEditor {
                         if idx < self.data.len() as isize {
                             self.data
                                 .get_mut(idx as usize)
+                                .write().unwrap()
                                 .goto(TreeCursor {
                                     leaf_mode: cur.leaf_mode,
                                     tree_addr: vec![]
@@ -247,6 +251,7 @@ impl TreeNav for ListEditor {
                 if cur.tree_addr[0] < self.data.len() as isize {
                     match self.data
                         .get_mut(cur.tree_addr[0] as usize)
+                        .write().unwrap()
                         .goby(direction)
                     {
                         TreeNavResult::Exit => {

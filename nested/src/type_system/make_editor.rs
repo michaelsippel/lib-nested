@@ -192,8 +192,8 @@ pub fn init_math_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
     ctx.write().unwrap().add_morphism(pattern,
         Arc::new(
             |mut node, dst_type| {
-                let depth = node.depth;
-                let editor = node.editor.clone().unwrap().get_view().unwrap().get().unwrap().downcast::<RwLock<ListEditor>>().unwrap();
+                let depth = node.depth.get();
+                let editor = node.editor.get().unwrap().downcast::<RwLock<ListEditor>>().unwrap();
 
                 // todo: check src_type parameter to be ( Digit radix )
                 

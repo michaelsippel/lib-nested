@@ -33,7 +33,7 @@ pub struct TypeTermEditor {
     ctx: Arc<RwLock<Context>>,
 
     state: State,
-    cur_node: SingletonBuffer<NestedNode>
+    cur_node: SingletonBuffer< NestedNode >
 }
 
 impl TypeTermEditor {
@@ -64,17 +64,15 @@ impl TypeTermEditor {
                          Arc::new(
                              |mut node, _dst_type:_| {
                                  //eprintln!("morphism to typeterm");
-
                                  PTYListController::for_node( &mut node, Some(' '), None );
                                  PTYListStyle::for_node( &mut node, ("","","") );
-
-                                 let mut new_node = TypeTermEditor::with_node( node.ctx.clone().unwrap(), node.depth, node.clone(), State::Any );
+                                 let mut new_node = TypeTermEditor::with_node( node.ctx.clone().unwrap(), node.depth.get(), node.clone(), State::Any );
 
                                  let item_nodes = node.get_edit::<ListEditor>().clone().unwrap();
                                  let item_nodes = item_nodes.read().unwrap();
 
                                  for i in 0..item_nodes.data.len() {
-                                     if let Some(x) = item_nodes.data.get(i).data {
+                                     if let Some(x) = &item_nodes.data.get(i).read().unwrap().data {
                                          //eprintln!("item with {:?}", x);
                                          //let c = x.read().unwrap().get_view::<dyn SingletonView<Item = NestedNode>>().unwrap().get();
                                          new_node.send_cmd_obj(
@@ -99,7 +97,6 @@ impl TypeTermEditor {
         let mut node = match new_state {
             State::Char => {
                 let mut node = Context::make_node( &self.ctx, (&self.ctx, "( Char )").into(), 0 ).unwrap();
-
                 let mut grid = r3vi::buffer::index_hashmap::IndexBuffer::new();
 
                 grid.insert_iter(
@@ -110,7 +107,7 @@ impl TypeTermEditor {
                     ]
                 );
                 
-                node.close_char = Some('\'');
+                node.close_char.set(Some('\''));
                 node.view = Some(
                     grid.get_port()
                         .flatten()
@@ -153,21 +150,6 @@ impl TypeTermEditor {
             cur_node: SingletonBuffer::new(node)
         };
 
-        let ed_view = editor.cur_node
-            .get_port()
-            .map(
-                |node|
-                match node.editor {
-                    Some(e) => {
-                        e
-                    },
-                    None => {
-                        r3vi::buffer::singleton::SingletonBuffer::new(None).get_port()
-                    }
-                }
-            )
-            .flatten();
-
         let view = editor.cur_node
             .get_port()
             .map(
@@ -190,12 +172,10 @@ impl TypeTermEditor {
 
         let mut node = NestedNode::new(depth)
             .set_ctx(ctx)
-            .set_view( view )
+            .set_view(view)
             .set_nav(editor.clone())
-            .set_cmd(editor.clone());
-
-        node.editor = Some(ed_view);
-        //node.editor.unwrap().get_view().unwrap().get().unwrap()
+            .set_cmd(editor.clone())
+            .set_editor(editor.clone());
 
         node
     }
@@ -280,7 +260,7 @@ impl ObjCommander for TypeTermEditor {
                             }
                         }
                     }
-                    
+                     
                     State::List => {
                         match self.cur_node.get_mut().send_cmd_obj( co ) {
                             TreeNavResult::Continue => {
@@ -308,7 +288,6 @@ impl ObjCommander for TypeTermEditor {
                                         TreeNavResult::Exit
                                     }
                                 }
-                                
                             }
                         }
                     }

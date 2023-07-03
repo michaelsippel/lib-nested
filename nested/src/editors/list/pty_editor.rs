@@ -61,7 +61,7 @@ impl PTYListStyle {
 
     pub fn for_node(node: &mut NestedNode, style: (&str, &str, &str)) {
         node.view = Some(
-            Self::new(style, node.depth)
+            Self::new(style, node.depth.get())
                 .pty_view(
                     &node.get_edit::<ListEditor>().unwrap().read().unwrap()
                 )
@@ -115,10 +115,10 @@ impl PTYListController {
         }
         
         let editor = node.get_edit::<ListEditor>().unwrap();
-        let controller = Arc::new(RwLock::new(PTYListController::from_editor( editor, split_char, close_char, node.depth )));
+        let controller = Arc::new(RwLock::new(PTYListController::from_editor( editor, split_char, close_char, node.depth.get() )));
 
-        node.cmd = Some(controller.clone());
-        node.close_char = close_char;
+        node.cmd.set(Some(controller.clone()));
+        node.close_char.set(close_char);
     }
 
     pub fn get_data_port(&self) -> OuterViewPort<dyn SequenceView<Item = NestedNode>> {
@@ -136,6 +136,20 @@ impl PTYListController {
     pub fn set_depth(&mut self, depth: usize) {
         self.depth = depth;
     }
+
+/*
+    pub fn handle_node_event(&mut self, c: &NestedNode) -> TreeNavResult {
+        
+    }
+
+    pub fn handle_char_event(&mut self, c: &char) -> TreeNavResult {
+        
+    }
+
+    pub fn handle_term_event(&mut self, e: &TerminalEvent) -> TreeNavResult {
+        
+}
+    */
 }
 
 use r3vi::view::singleton::SingletonView;
@@ -161,10 +175,10 @@ impl ObjCommander for PTYListController {
                 if let Some(idx) = cur.idx {
                     match cur.mode {
                         ListCursorMode::Select => {
-                            *e.data.get_mut(idx as usize) = node_view.get();
+                            *e.data.get_mut(idx as usize) = Arc::new(RwLock::new(node_view.get()));
                         }
                         ListCursorMode::Insert => {
-                            e.data.insert(idx as usize, node_view.get());
+                            e.data.insert(idx as usize, Arc::new(RwLock::new(node_view.get())));
                         }
                     }
                 }
@@ -212,7 +226,7 @@ impl ObjCommander for PTYListController {
 
                                             if ! remove {
                                             */
-                                            e.insert(node);
+                                            e.insert(Arc::new(RwLock::new(node)));
 
                                             TreeNavResult::Continue
                                         }
@@ -310,7 +324,7 @@ impl ObjCommander for PTYListController {
 
                     match new_edit.send_cmd_obj(cmd_obj.clone()) {
                         TreeNavResult::Continue => {
-                            e.insert(new_edit);
+                            e.insert(Arc::new(RwLock::new(new_edit)));
                             TreeNavResult::Continue
                         }
 
@@ -322,7 +336,7 @@ impl ObjCommander for PTYListController {
                 },
                 ListCursorMode::Select => {
                     if let Some(mut item) = e.get_item_mut() {
-                        match item.send_cmd_obj(cmd_obj.clone()) {
+                        match item.write().unwrap().send_cmd_obj(cmd_obj.clone()) {
                             TreeNavResult::Continue => {
                                 TreeNavResult::Continue
                             }
@@ -337,10 +351,9 @@ impl ObjCommander for PTYListController {
                                         //eprintln!("close char = {:?}", item.close_char);
 
                                         if Some(c) == self.split_char {
-                                            //eprintln!("listlist_split");
                                             e.listlist_split();
                                             TreeNavResult::Continue
-                                        } else if Some(c) == item.close_char {
+                                        } else if Some(c) == item.read().unwrap().close_char.get() {
                                             //eprintln!("listedit: exit from select (close)");
                                             //item.goto(TreeCursor::none());
                                             e.cursor.set(ListCursor {

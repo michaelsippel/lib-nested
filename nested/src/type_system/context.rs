@@ -189,7 +189,7 @@ impl Context {
         self.add_morphism(morphism_pattern, Arc::new(move |node, dst_type| {
             let ctx = node.ctx.clone().unwrap();
             let depth = node.depth;
-            mk_editor(ctx, dst_type, depth)
+            mk_editor(ctx, dst_type, depth.get())
         }));
     }
 

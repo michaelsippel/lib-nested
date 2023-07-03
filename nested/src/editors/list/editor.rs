@@ -16,7 +16,7 @@ use {
 
 pub struct ListEditor {
     pub(super) cursor: SingletonBuffer<ListCursor>,
-    pub data: VecBuffer<NestedNode>,
+    pub data: VecBuffer< Arc<RwLock<NestedNode>> >,
 
     pub(super) addr_port: OuterViewPort<dyn SequenceView<Item = isize>>,
     pub(super) mode_port: OuterViewPort<dyn SingletonView<Item = ListCursorMode>>,
@@ -64,7 +64,7 @@ impl ListEditor {
         typ: TypeTerm,
     ) -> Self {
         let cursor = SingletonBuffer::new(ListCursor::default());
-        let data = VecBuffer::<NestedNode>::new();
+        let data = VecBuffer::<Arc<RwLock<NestedNode>>>::new();
 
         ListEditor {
             mode_port: cursor
@@ -77,7 +77,7 @@ impl ListEditor {
                             ListCursorMode::Insert => ip,
                             ListCursorMode::Select => {
                                 if let Some(idx) = c.idx {
-                                    data.get(idx as usize).get_mode_view()
+                                    data.get(idx as usize).read().unwrap().get_mode_view()
                                 } else {
                                     ip
                                 }
@@ -99,7 +99,7 @@ impl ListEditor {
                                 if cur.mode == ListCursorMode::Select {
                                     if let Some(idx) = cur.idx {
                                         if idx >= 0 && idx < data.len() as isize {
-                                            return data.get(idx as usize).get_addr_view();
+                                            return data.get(idx as usize).read().unwrap().get_addr_view();
                                         }
                                     }
                                 }
@@ -131,7 +131,7 @@ impl ListEditor {
             .set_data(data)
             .set_editor(editor.clone())
             .set_nav(editor.clone())
-           //.set_cmd(editor.clone())
+            //.set_cmd(editor.clone())
             .set_diag(e
                       .get_data_port()
                       .enumerate()
@@ -169,7 +169,9 @@ impl ListEditor {
     }
 
     pub fn get_data_port(&self) -> OuterViewPort<dyn SequenceView<Item = NestedNode>> {
-        self.data.get_port().to_sequence()
+        self.data.get_port().to_sequence().map(
+            |x| x.read().unwrap().clone()
+        )
     }
 
     pub fn get_data(&self) -> Arc<RwLock<ReprTree>> {
@@ -184,7 +186,7 @@ impl ListEditor {
         if let Some(idx) = self.cursor.get().idx {
             let idx = crate::utils::modulo(idx as isize, self.data.len() as isize) as usize;
             if idx < self.data.len() {
-                Some(self.data.get(idx))
+                Some(self.data.get(idx).read().unwrap().clone())
             } else {
                 None
             }
@@ -193,7 +195,7 @@ impl ListEditor {
         }
     }
 
-    pub fn get_item_mut(&mut self) -> Option<MutableVecAccess<NestedNode>> {
+    pub fn get_item_mut(&mut self) -> Option<MutableVecAccess<Arc<RwLock<NestedNode>>>> {
         if let Some(idx) = self.cursor.get().idx {
             let idx = crate::utils::modulo(idx as isize, self.data.len() as isize) as usize;
             if idx < self.data.len() {
@@ -208,14 +210,6 @@ impl ListEditor {
 
     pub fn is_listlist(&self) -> bool {
         self.ctx.read().unwrap().is_list_type(&self.typ)
-        /*
-        match self.typ.clone() {
-            TypeTerm::Type { id, args } => {
-                id == self.ctx.read().unwrap().get_typeid("List").unwrap()
-            },
-            TypeTerm::Num(_) => false
-        }
-        */
     }
 
     /// delete all items
@@ -246,10 +240,9 @@ impl ListEditor {
     }
 
     /// insert a new element
-    pub fn insert(&mut self, item: NestedNode) {
+    pub fn insert(&mut self, item: Arc<RwLock<NestedNode>>) {
         let mut cur = self.cursor.get();
         if let Some(idx) = cur.idx {
-
             match cur.mode {
                 ListCursorMode::Insert => {
                     self.data.insert(idx as usize, item.clone());
@@ -276,6 +269,7 @@ impl ListEditor {
 
     /// split the list off at the current cursor position and return the second half
     pub fn split(&mut self) -> ListEditor {
+        eprintln!("split!");
         let mut le = ListEditor::new(
             Arc::new(RwLock::new(self.ctx.read().unwrap().clone())),
             self.typ.clone());
@@ -290,12 +284,16 @@ impl ListEditor {
 
             if self.is_listlist() {
                 if idx > 0 && idx < self.data.len()+1 {
+
                     let prev_idx = idx - 1; // we are in insert mode, last element before cursor
                     let prev_node = self.data.get(prev_idx);
 
-                    if let Some(prev_editor) = prev_node.editor.clone() {
-                        prev_editor.0.update();
-                        let prev_editor = prev_editor.get_view().unwrap().get().unwrap().downcast::<RwLock<ListEditor>>().unwrap();
+                    eprintln!("try locking prev node");
+                    let prev_node = prev_node.read().unwrap();
+                    eprintln!("locked prev node");
+
+                    if let Some(prev_editor) = prev_node.editor.get() {
+                        let prev_editor = prev_editor.downcast::<RwLock<ListEditor>>().unwrap();
                         let prev_editor = prev_editor.write().unwrap();
                         prev_editor.get_data_port().0.update();
 
@@ -347,24 +345,28 @@ impl ListEditor {
         }
     }
 
-
     pub fn listlist_split(&mut self) {
+        eprintln!("listlist split");
         let cur = self.get_cursor();
-        if let Some(item) = self.get_item_mut() {
+
+        eprintln!("cur = {:?}", cur);
+        if let Some(item) = self.get_item() {
+            eprintln!("got item");
+//            let item = item.read().unwrap();
             let depth = item.depth;
 
-            if let Some(head_editor) = item.editor.clone() {
-
-                head_editor.0.update();
-                let head = head_editor.get_view().unwrap().get().unwrap().downcast::<RwLock<ListEditor>>().unwrap();
+            if let Some(head_editor) = item.editor.get() {
+                eprintln!("got head editor");
+                let head = head_editor.downcast::<RwLock<ListEditor>>().unwrap();
                 let mut head = head.write().unwrap();
 
                 if head.data.len() > 0 {
-
+                    eprintln!("data len > 0");
                     if cur.tree_addr.len() > 2 {
                         head.listlist_split();
                     }
 
+                    eprintln!("split head");
                     let mut tail = head.split();
 
                     head.goto(TreeCursor::none());
@@ -388,15 +390,16 @@ impl ListEditor {
                             None
                         };
 
-                    let mut tail_node = tail.into_node(depth);
-                    tail_node = tail_node.set_ctx(item.ctx.clone().unwrap());
+                    let mut tail_node = tail.into_node(depth.get());
 
-                    //                    if let Some(item_type) = item_type {
-                        tail_node = tail_node.morph(self.typ.clone());
+                    //if let Some(item_type) = item_type {
+                    //eprintln!("morph to {}", self.ctx.read().unwrap().type_term_to_str(&self.typ));
+                    tail_node = tail_node.morph(self.typ.clone());
                     //}
-                    
+
+                    //eprintln!("insert node");
                     self.insert(
-                        tail_node
+                        Arc::new(RwLock::new(tail_node))
                     );
                 }
             }
@@ -406,15 +409,14 @@ impl ListEditor {
     pub fn listlist_join_pxev(&mut self, idx: isize, item: &NestedNode) {
         {
             let prev_editor = self.data.get_mut(idx as usize-1);
-            let prev_editor = prev_editor.editor.clone();
-            if let Some(prev_editor) = prev_editor {
-                prev_editor.0.update();
-                if let Ok(prev_editor) = prev_editor.get_view().unwrap().get().unwrap().downcast::<RwLock<ListEditor>>() {
+            let prev_editor = prev_editor.read().unwrap();
+
+            if let Some(prev_editor) = prev_editor.editor.get() {
+                if let Ok(prev_editor) = prev_editor.downcast::<RwLock<ListEditor>>() {
                     let mut prev_editor = prev_editor.write().unwrap();
 
-                    let cur_editor = item.editor.clone().unwrap();
-                    cur_editor.0.update();
-                    let cur_editor = cur_editor.get_view().unwrap().get().unwrap().downcast::<RwLock<ListEditor>>().unwrap();
+                    let cur_editor = item.editor.get().unwrap();
+                    let cur_editor = cur_editor.downcast::<RwLock<ListEditor>>().unwrap();
                     let cur_editor = cur_editor.write().unwrap();
 
                     prev_editor.join(&cur_editor);
@@ -434,14 +436,13 @@ impl ListEditor {
 
     pub fn listlist_join_nexd(&mut self, next_idx: usize, item: &NestedNode) {
         {
-            let next_editor = self.data.get_mut(next_idx).editor.clone();
-            if let Some(next_editor) = next_editor {
-                next_editor.0.update();
-                if let Ok(next_editor) = next_editor.get_view().unwrap().get().unwrap().downcast::<RwLock<ListEditor>>() {
+            let next_editor = self.data.get(next_idx);
+            let next_editor = next_editor.read().unwrap();
+            if let Some(next_editor) = next_editor.editor.get() {
+                if let Ok(next_editor) = next_editor.downcast::<RwLock<ListEditor>>() {
                     let mut next_editor = next_editor.write().unwrap();
-                    let cur_editor = item.editor.clone().unwrap();
-                    cur_editor.0.update();
-                    let cur_editor = cur_editor.get_view().unwrap().get().unwrap().downcast::<RwLock<ListEditor>>().unwrap();
+                    let cur_editor = item.editor.get().unwrap();
+                    let cur_editor = cur_editor.downcast::<RwLock<ListEditor>>().unwrap();
                     let mut cur_editor = cur_editor.write().unwrap();
 
                     cur_editor.join(&next_editor);
