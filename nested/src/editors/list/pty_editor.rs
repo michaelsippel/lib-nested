@@ -336,24 +336,34 @@ impl ObjCommander for PTYListController {
                 },
                 ListCursorMode::Select => {
                     if let Some(mut item) = e.get_item_mut() {
-                        match item.write().unwrap().send_cmd_obj(cmd_obj.clone()) {
+
+                        eprintln!("send cmd to child");
+                        let mut i = item.write().unwrap();
+                        let res = i.send_cmd_obj(cmd_obj.clone());
+
+                        let close_char = i.close_char.get();
+                        eprintln!("close char = {:?}", close_char);
+                        drop(i);
+                        drop(item);
+                        
+                        eprintln!("back");
+                        match res {
                             TreeNavResult::Continue => {
                                 TreeNavResult::Continue
                             }
 
                             TreeNavResult::Exit => {
                                 if cmd_type == char_type {
+                                    eprintln!("char event event");
                                     let co = cmd_obj.read().unwrap();
                                     if let Some(cmd_view) = co.get_view::<dyn SingletonView<Item = char>>() {
                                         drop(co);
                                         let c = cmd_view.get();
 
-                                        //eprintln!("close char = {:?}", item.close_char);
-
                                         if Some(c) == self.split_char {
                                             e.listlist_split();
                                             TreeNavResult::Continue
-                                        } else if Some(c) == item.read().unwrap().close_char.get() {
+                                        } else if Some(c) == close_char {
                                             //eprintln!("listedit: exit from select (close)");
                                             //item.goto(TreeCursor::none());
                                             e.cursor.set(ListCursor {
