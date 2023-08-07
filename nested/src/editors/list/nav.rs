@@ -249,10 +249,15 @@ impl TreeNav for ListEditor {
                 // nested
 
                 if cur.tree_addr[0] < self.data.len() as isize {
-                    match self.data
-                        .get_mut(cur.tree_addr[0] as usize)
-                        .write().unwrap()
-                        .goby(direction)
+
+                    let cur_item = self.data
+                        .get_mut(cur.tree_addr[0] as usize);
+
+                    let result = cur_item.write().unwrap().goby(direction);
+
+                    drop(cur_item);
+                    
+                    match result
                     {
                         TreeNavResult::Exit => {
                             if direction.y < 0 {
