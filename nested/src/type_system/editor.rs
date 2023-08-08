@@ -14,7 +14,7 @@ use {
         PtySegment
     },
     termion::event::{Key},
-    std::{sync::{Arc, RwLock}},
+    std::{sync::{Arc, RwLock}, any::Any},
     cgmath::{Vector2, Point2}
 };
 
@@ -31,6 +31,10 @@ enum State {
 
 pub struct TypeTermEditor {
     ctx: Arc<RwLock<Context>>,
+
+    editor: SingletonBuffer<
+                Option< Arc<dyn Any + Send + Sync> >
+            >,
 
     state: State,
     cur_node: SingletonBuffer< NestedNode >
@@ -63,26 +67,28 @@ impl TypeTermEditor {
         ctx.add_morphism(pattern,
                          Arc::new(
                              |mut node, _dst_type:_| {
-                                 //eprintln!("morphism to typeterm");
+                                 // eprintln!("morphism to typeterm");
                                  PTYListController::for_node( &mut node, Some(' '), None );
                                  PTYListStyle::for_node( &mut node, ("","","") );
                                  let mut new_node = TypeTermEditor::with_node( node.ctx.clone().unwrap(), node.depth.get(), node.clone(), State::Any );
 
-                                 let item_nodes = node.get_edit::<ListEditor>().clone().unwrap();
-                                 let item_nodes = item_nodes.read().unwrap();
+                                 let item_editor1 = node.get_edit::<ListEditor>().clone().unwrap();
+                                 let item_editor = item_editor1.read().unwrap();
 
-                                 for i in 0..item_nodes.data.len() {
-                                     if let Some(x) = &item_nodes.data.get(i).read().unwrap().data {
-                                         //eprintln!("item with {:?}", x);
-                                         //let c = x.read().unwrap().get_view::<dyn SingletonView<Item = NestedNode>>().unwrap().get();
-                                         new_node.send_cmd_obj(
-                                             ReprTree::from_char(&new_node.ctx.as_ref().unwrap(), 'x')
-                                         );
-                                         //new_node.send_cmd_obj(c);
-                                     }
+                                 for i in 0..item_editor.data.len() {
+                                     let item_node = item_editor.data.get(i);
+                                     let item_node = item_node.read().unwrap();
+
+                                     let item_val_editor = item_node.get_edit::<crate::editors::char::CharEditor>().clone().unwrap();
+                                     let item_val_editor = item_val_editor.read().unwrap();
+                                     let c = item_val_editor.get();
+
+                                     new_node.send_cmd_obj(
+                                         ReprTree::from_char(new_node.ctx.as_ref().unwrap(), c)
+                                     );
                                  }
 
-                                 if item_nodes.data.len() > 0 {
+                                 if item_editor.data.len() > 0 {
                                      new_node.goto(TreeCursor::home());
                                  }
 
@@ -135,6 +141,7 @@ impl TypeTermEditor {
 
         node.goto(TreeCursor::home());
 
+        self.editor.set(node.editor.get());
         self.cur_node.set(node);
         self.state = new_state;
     }
@@ -147,7 +154,8 @@ impl TypeTermEditor {
         let mut editor = TypeTermEditor {
             ctx: ctx.clone(),
             state,
-            cur_node: SingletonBuffer::new(node)
+            cur_node: SingletonBuffer::new(node),
+            editor: SingletonBuffer::new(None)
         };
 
         let view = editor.cur_node
@@ -177,6 +185,8 @@ impl TypeTermEditor {
             .set_cmd(editor.clone())
             .set_editor(editor.clone());
 
+        editor.write().unwrap().editor = node.editor.clone();
+        
         node
     }
 }
@@ -260,7 +270,7 @@ impl ObjCommander for TypeTermEditor {
                             }
                         }
                     }
-                     
+
                     State::List => {
                         match self.cur_node.get_mut().send_cmd_obj( co ) {
                             TreeNavResult::Continue => {

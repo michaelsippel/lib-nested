@@ -68,13 +68,15 @@ impl CharEditor {
         let data = SingletonBuffer::new(None);
 
         let ctx = ctx0.clone();
+
+        let editor = Arc::new(RwLock::new(CharEditor{ ctx, data: data.clone() }));
         
         NestedNode::new(0)
             .set_ctx(ctx0.clone())
             .set_data(
                 ReprTree::new_leaf(
                     ctx0.read().unwrap().type_term_from_str("( Char )").unwrap(),
-                    data.get_port().into()   
+                    data.get_port().into()
                 )
             )
             .set_view(data
@@ -87,9 +89,8 @@ impl CharEditor {
                       })
                       .to_grid()
             )
-            .set_cmd(
-                Arc::new(RwLock::new(CharEditor{ ctx, data }))
-            )
+            .set_cmd( editor.clone() )
+            .set_editor( editor.clone() )
     }
 }
 /*
