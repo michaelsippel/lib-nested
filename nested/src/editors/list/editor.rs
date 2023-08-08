@@ -269,7 +269,6 @@ impl ListEditor {
 
     /// split the list off at the current cursor position and return the second half
     pub fn split(&mut self) -> ListEditor {
-        eprintln!("split!");
         let mut le = ListEditor::new(
             Arc::new(RwLock::new(self.ctx.read().unwrap().clone())),
             self.typ.clone());
@@ -285,12 +284,9 @@ impl ListEditor {
             if self.is_listlist() {
                 if idx > 0 && idx < self.data.len()+1 {
 
-                    let prev_idx = idx - 1; // we are in insert mode, last element before cursor
+                    let prev_idx = idx - 1; // get last element before cursor (we are in insert mode)
                     let prev_node = self.data.get(prev_idx);
-
-                    eprintln!("try locking prev node");
                     let prev_node = prev_node.read().unwrap();
-                    eprintln!("locked prev node");
 
                     if let Some(prev_editor) = prev_node.editor.get() {
                         let prev_editor = prev_editor.downcast::<RwLock<ListEditor>>().unwrap();
@@ -346,27 +342,21 @@ impl ListEditor {
     }
 
     pub fn listlist_split(&mut self) {
-        eprintln!("listlist split");
         let cur = self.get_cursor();
 
-        eprintln!("cur = {:?}", cur);
         if let Some(item) = self.get_item() {
-            eprintln!("got item");
 //            let item = item.read().unwrap();
             let depth = item.depth;
 
             if let Some(head_editor) = item.editor.get() {
-                eprintln!("got head editor");
                 let head = head_editor.downcast::<RwLock<ListEditor>>().unwrap();
                 let mut head = head.write().unwrap();
 
                 if head.data.len() > 0 {
-                    eprintln!("data len > 0");
                     if cur.tree_addr.len() > 2 {
                         head.listlist_split();
                     }
 
-                    eprintln!("split head");
                     let mut tail = head.split();
 
                     head.goto(TreeCursor::none());
@@ -420,7 +410,7 @@ impl ListEditor {
                     let cur_editor = cur_editor.write().unwrap();
 
                     prev_editor.join(&cur_editor);
-                    
+
                     self.cursor.set(
                         ListCursor {
                             idx: Some(idx - 1), mode: ListCursorMode::Select

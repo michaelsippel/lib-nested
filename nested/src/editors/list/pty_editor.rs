@@ -337,16 +337,13 @@ impl ObjCommander for PTYListController {
                 ListCursorMode::Select => {
                     if let Some(mut item) = e.get_item_mut() {
 
-                        eprintln!("send cmd to child");
                         let mut i = item.write().unwrap();
                         let res = i.send_cmd_obj(cmd_obj.clone());
 
                         let close_char = i.close_char.get();
-                        eprintln!("close char = {:?}", close_char);
                         drop(i);
                         drop(item);
-                        
-                        eprintln!("back");
+
                         match res {
                             TreeNavResult::Continue => {
                                 TreeNavResult::Continue
@@ -354,7 +351,6 @@ impl ObjCommander for PTYListController {
 
                             TreeNavResult::Exit => {
                                 if cmd_type == char_type {
-                                    eprintln!("char event event");
                                     let co = cmd_obj.read().unwrap();
                                     if let Some(cmd_view) = co.get_view::<dyn SingletonView<Item = char>>() {
                                         drop(co);
