@@ -18,7 +18,7 @@ use {
 
 pub struct CharEditor {
     ctx: Arc<RwLock<Context>>,
-    data: SingletonBuffer<Option<char>>
+    data: SingletonBuffer<char>
 }
 
 impl ObjCommander for CharEditor {
@@ -36,7 +36,7 @@ impl ObjCommander for CharEditor {
                 if self.ctx.read().unwrap().meta_chars.contains(&value) {
                     TreeNavResult::Exit
                 } else {
-                    self.data.set(Some(value));
+                    self.data.set(value);
                     TreeNavResult::Continue
                 }
             } else {
@@ -52,20 +52,20 @@ impl CharEditor {
     pub fn new(ctx: Arc<RwLock<Context>>) -> Self {
         CharEditor {
             ctx,
-            data: SingletonBuffer::new(None)
+            data: SingletonBuffer::new('\0')
         }
     }
 
-    pub fn get_port(&self) -> OuterViewPort<dyn SingletonView<Item = Option<char>>> {
+    pub fn get_port(&self) -> OuterViewPort<dyn SingletonView<Item = char>> {
         self.data.get_port()
     }
 
     pub fn get(&self) -> char {
-        self.get_port().get_view().unwrap().get().unwrap_or('?')
+        self.get_port().get_view().unwrap().get()
     }
 
     pub fn new_node(ctx0: Arc<RwLock<Context>>) -> NestedNode {
-        let data = SingletonBuffer::new(None);
+        let data = SingletonBuffer::new('\0');
 
         let ctx = ctx0.clone();
 
@@ -81,12 +81,7 @@ impl CharEditor {
             )
             .set_view(data
                       .get_port()
-                      .map(move |c| {
-                          match c {
-                              Some(c) => TerminalAtom::from(c),
-                              None => TerminalAtom::new(' ', TerminalStyle::bg_color((255,0,0)))
-                          }
-                      })
+                      .map(move |c| TerminalAtom::from(c))
                       .to_grid()
             )
             .set_cmd( editor.clone() )
