@@ -5,7 +5,7 @@ use {
     },
     crate::{
         type_system::{Context, TypeTerm, ReprTree},
-        editors::list::{ListCursor, ListCursorMode, PTYListController, PTYListStyle},
+        editors::list::{ListCursor, ListCursorMode, commander::ListCmd, PTYListController, PTYListStyle},
         tree::{NestedNode, TreeNav, TreeCursor},
         diagnostics::Diagnostics
     },
@@ -30,6 +30,8 @@ pub struct ListEditor {
 impl ListEditor {
     pub fn init_ctx(ctx: &Arc<RwLock<Context>>) {
         let mut ctx = ctx.write().unwrap();
+
+        ctx.add_list_typename("ListCmd".into());
 
         ctx.add_list_typename("List".into());
         ctx.add_node_ctor(
@@ -131,7 +133,7 @@ impl ListEditor {
             .set_data(data)
             .set_editor(editor.clone())
             .set_nav(editor.clone())
-            //.set_cmd(editor.clone())
+            .set_cmd(editor.clone())
             .set_diag(e
                       .get_data_port()
                       .enumerate()

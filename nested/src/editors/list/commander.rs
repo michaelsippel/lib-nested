@@ -1,41 +1,80 @@
-
 use {
+    r3vi::{
+        view::{singleton::*},
+        buffer::{singleton::*}
+    },
     crate::{
-        editors::list::ListEditor
+        editors::list::ListEditor,
+        type_system::{Context, ReprTree},
+        tree::{NestedNode, TreeNav, TreeNavResult, TreeCursor},
+        commander::{ObjCommander}
     },
     std::sync::{Arc, RwLock}
 };
 
-pub enum ListEditorCmd {
-    ItemCmd(Arc<RwLock<ReprTree>>)
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub enum ListCmd {    
+    DeletePxev,
+    DeleteNexd,
+    JoinNexd,
+    JoinPxev,
     Split,
-    Join
+    Clear,
+    Close,
+}
+
+impl ListCmd {
+    fn into_repr_tree(self, ctx: &Arc<RwLock<Context>>) -> Arc<RwLock<ReprTree>> {
+        let buf = r3vi::buffer::singleton::SingletonBuffer::new(self);
+        ReprTree::new_leaf(
+            (ctx, "( ListCmd )"),
+            buf.get_port().into()
+        )
+    }
 }
 
 impl ObjCommander for ListEditor {
-    fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) {
-        let cmd_repr = cmd_obj.read().unrwap();
-
-        if let Some(cmd) = cmd_repr.get_view<dyn SingletonView<ListEditorCmd>>() {
+    fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
+        let cmd_repr = cmd_obj.read().unwrap();
+        if let Some(cmd) = cmd_repr.get_view::<dyn SingletonView<Item = ListCmd>>() {
             match cmd.get() {
-                ListEditorCmd::Split => {
-                    
+                ListCmd::DeletePxev => {
+                    self.delete_pxev();
+                    TreeNavResult::Continue
                 }
-                ListEditorCmd::Join => {
-                    
+                ListCmd::DeleteNexd => {
+                    self.delete_nexd();
+                    TreeNavResult::Continue
                 }
-                ListEditorCmd::ItemCmd => {
-                    if let Some(cur_item) = self.get_item_mut() {
-                        drop(cmd);
-                        drop(cmd_repr);
-                        cur_item.send_cmd_obj(cmd_obj);
-                    }       
+                ListCmd::JoinPxev => {
+                    // TODO
+                    //self.listlist_join_pxev();
+                    TreeNavResult::Continue
+                }
+                ListCmd::JoinNexd => {
+                    // TODO
+                    //self.listlist_join_nexd();
+                    TreeNavResult::Continue
+                }
+                ListCmd::Split => {
+                    self.listlist_split();
+                    TreeNavResult::Continue
+                }
+                ListCmd::Clear => {
+                    self.clear();
+                    TreeNavResult::Continue
+                }
+                ListCmd::Close => {
+                    self.goto(TreeCursor::none());
+                    TreeNavResult::Exit
                 }
             }
         } else {
             if let Some(cur_item) = self.get_item_mut() {
                 drop(cmd_repr);
-                cur_item.send_cmd_obj(cmd_obj);
+                cur_item.write().unwrap().send_cmd_obj(cmd_obj)
+            } else {
+                TreeNavResult::Continue
             }
         }
     }
