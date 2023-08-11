@@ -268,18 +268,26 @@ impl ListEditor {
     }
 
     /// split the list off at the current cursor position and return the second half
-    pub fn split(&mut self) -> ListEditor {
-        let mut le = ListEditor::new(
-            Arc::new(RwLock::new(self.ctx.read().unwrap().clone())),
-            self.typ.clone());
-
+    pub fn split(&mut self, le_node: &mut NestedNode) {
         let cur = self.cursor.get();
         if let Some(idx) = cur.idx {
             let idx = idx as usize;
+            le_node.goto(TreeCursor::home());
             for _ in idx .. self.data.len() {
-                le.data.push( self.data.get(idx) );
+
+                eprintln!("send items to new tail");
+                le_node.cmd.get().unwrap().write().unwrap().send_cmd_obj(
+                    self.data.get(idx).read().unwrap().data.clone().unwrap()
+/*
+                    ReprTree::new_leaf(
+                        self.ctx.read().unwrap().type_term_from_str("( NestedNode )").unwrap(),
+                        SingletonBuffer::<NestedNode>::new( self.data.get(idx).clone().read().unwrap().clone() ).get_port().into()
+                    )
+*/
+                );
                 self.data.remove(idx);
             }
+            le_node.goto(TreeCursor::none());
 
             if self.is_listlist() {
                 if idx > 0 && idx < self.data.len()+1 {
@@ -303,8 +311,6 @@ impl ListEditor {
                 }
             }
         }
-
-        le
     }
 
     /// append data of other editor at the end and set cursor accordingly
@@ -347,24 +353,35 @@ impl ListEditor {
         if let Some(item) = self.get_item() {
 //            let item = item.read().unwrap();
             let depth = item.depth;
-
+            
             if let Some(head_editor) = item.editor.get() {
+
                 let head = head_editor.downcast::<RwLock<ListEditor>>().unwrap();
                 let mut head = head.write().unwrap();
-
+                
                 if head.data.len() > 0 {
                     if cur.tree_addr.len() > 2 {
+                        eprintln!("call child head listlist split");
                         head.listlist_split();
+                        eprintln!("return");
                     }
 
-                    let mut tail = head.split();
+                    eprintln!("got head");
+
+                    let mut tail_node = Context::make_node(&self.ctx, self.typ.clone(), 0).unwrap();
+                    head.split( &mut tail_node );
+                    
+                    eprintln!("made split");
 
                     head.goto(TreeCursor::none());
+                    drop(head);
 
-                    tail.cursor.set(
-                        ListCursor {
-                            idx: Some(0),
-                            mode: if cur.tree_addr.len() > 2 {
+                    eprintln!("done goto");
+
+                    tail_node.goto(
+                        TreeCursor {
+                            tree_addr: vec![0],
+                            leaf_mode: if cur.tree_addr.len() > 2 {
                                 ListCursorMode::Select
                             } else {
                                 ListCursorMode::Insert
@@ -372,25 +389,11 @@ impl ListEditor {
                         }
                     );
 
-                    let item_type =
-                        if let Some(data) = item.data.clone() {
-                            let data = data.read().unwrap();
-                            Some(data.get_type().clone())
-                        } else {
-                            None
-                        };
-
-                    let mut tail_node = tail.into_node(depth.get());
-
-                    //if let Some(item_type) = item_type {
-                    //eprintln!("morph to {}", self.ctx.read().unwrap().type_term_to_str(&self.typ));
-                    tail_node = tail_node.morph(self.typ.clone());
-                    //}
-
-                    //eprintln!("insert node");
                     self.insert(
                         Arc::new(RwLock::new(tail_node))
                     );
+
+                    eprintln!("made insert");
                 }
             }
         }

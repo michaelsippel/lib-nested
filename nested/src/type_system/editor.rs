@@ -64,34 +64,14 @@ impl TypeTermEditor {
             src_tyid: ctx.get_typeid("List"),
             dst_tyid: ctx.get_typeid("TypeTerm").unwrap()
         };
+
         ctx.add_morphism(pattern,
                          Arc::new(
-                             |mut node, _dst_type:_| {
-                                 // eprintln!("morphism to typeterm");
+                             move |mut node, _dst_type:_| {
+                                 eprintln!("morphism to typeterm");
                                  PTYListController::for_node( &mut node, Some(' '), None );
                                  PTYListStyle::for_node( &mut node, ("","","") );
                                  let mut new_node = TypeTermEditor::with_node( node.ctx.clone().unwrap(), node.depth.get(), node.clone(), State::Any );
-
-                                 let item_editor1 = node.get_edit::<ListEditor>().clone().unwrap();
-                                 let item_editor = item_editor1.read().unwrap();
-
-                                 for i in 0..item_editor.data.len() {
-                                     let item_node = item_editor.data.get(i);
-                                     let item_node = item_node.read().unwrap();
-
-                                     let item_val_editor = item_node.get_edit::<crate::editors::char::CharEditor>().clone().unwrap();
-                                     let item_val_editor = item_val_editor.read().unwrap();
-                                     let c = item_val_editor.get();
-
-                                     new_node.send_cmd_obj(
-                                         ReprTree::from_char(new_node.ctx.as_ref().unwrap(), c)
-                                     );
-                                 }
-
-                                 if item_editor.data.len() > 0 {
-                                     new_node.goto(TreeCursor::home());
-                                 }
-
                                  Some(new_node)
                              }
                          )
