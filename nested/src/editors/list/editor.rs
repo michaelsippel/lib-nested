@@ -38,11 +38,9 @@ impl ListEditor {
             "List", Arc::new(
                 |ctx: Arc<RwLock<Context>>, ty: TypeTerm, depth: usize| {
                     match ty {
-                        TypeTerm::Type {
-                            id: _, args
-                        } => {
-                            if args.len() > 0 {
-                                let typ = (args[0].clone().0)[0].clone();
+                        TypeTerm::App(args) => {
+                            if args.len() > 1 {
+                                let typ = args[1].clone();
 
                                 let mut node = ListEditor::new(ctx.clone(), typ).into_node(depth);
 
@@ -160,10 +158,10 @@ impl ListEditor {
     }
 
     pub fn get_seq_type(&self) -> TypeTerm {
-        TypeTerm::Type {
-            id: self.ctx.read().unwrap().get_fun_typeid("List").unwrap(),
-            args: vec![ self.get_item_type().into() ]
-        }
+        TypeTerm::App(vec![
+            TypeTerm::TypeID(self.ctx.read().unwrap().get_typeid("List").unwrap()),
+            self.get_item_type().into()
+        ])
     }
 
     pub fn get_cursor_port(&self) -> OuterViewPort<dyn SingletonView<Item = ListCursor>> {

@@ -61,7 +61,7 @@ impl TypeLadder {
                 s = s + "~";
             }
             first = false;
-            s = s + &t.to_str1(names);
+            s = s + &t.to_str(names);
         }
         s
     }

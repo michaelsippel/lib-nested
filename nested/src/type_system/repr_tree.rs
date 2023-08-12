@@ -89,8 +89,7 @@ impl ReprTree {
             self.port
                 .clone()?
                 .downcast::<V>()
-                .ok()
-                .unwrap()
+                .ok()?
         )
     }
 

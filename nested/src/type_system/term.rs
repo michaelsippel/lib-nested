@@ -1,43 +1,54 @@
 use {
     crate::{
-        type_system::{TypeLadder, TypeID}
+        type_system::{TypeID}
     },
     std::collections::HashMap
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
+
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TypeTerm {
-    /* TODO: refactor into this:
-    Nominal {
-        id: u64,
-        args: Vec< TypeTerm >
-    },
-    Ladder(Vec< TypeTerm >),
-     */
-    Type {
-        id: u64,
-        args: Vec< TypeLadder >
-    },
-    Var(u64),
+    /* Atomic Terms */
+
+    // Base types from dictionary
+    TypeID(TypeID),
+
+    // Literals
     Num(i64),
-    Char(char)
+    Char(char),
+
+
+    /* Complex Terms */
+
+    // Type Parameters
+    // avoid currying to save space & indirection
+    App(Vec< TypeTerm >),
+
+    // Type Ladders
+    Ladder(Vec< TypeTerm >),
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 impl TypeTerm {
     pub fn new(id: TypeID) -> Self {
-        match id {
-            TypeID::Fun(id) => TypeTerm::Type { id, args: vec![] },
-            TypeID::Var(_) => {unreachable!();}
-        }
+        TypeTerm::TypeID(id)
     }
 
-    pub fn arg(&mut self, t: impl Into<TypeLadder>) -> &mut Self {
-        if let TypeTerm::Type { id: _, args } = self {
-            args.push(t.into());
+    pub fn arg(&mut self, t: impl Into<TypeTerm>) -> &mut Self {
+        match self {
+            TypeTerm::App(args) => {
+                args.push(t.into());                
+            }
+
+            _ => {
+                *self = TypeTerm::App(vec![
+                    self.clone(),
+                    t.into()
+                ])                
+            }
         }
 
         self
@@ -50,6 +61,29 @@ impl TypeTerm {
     pub fn char_arg(&mut self, c: char) -> &mut Self {
         self.arg(TypeTerm::Char(c))
     }
+
+    /* TODO
+
+    // summarize all curried applications into one vec
+    pub fn decurry() {}
+
+    // transmute into Ladder-Normal-Form
+    pub fn normalize(&mut self) {
+        match self {
+            TypeTerm::Apply{ id, args } => {
+                
+            }
+        }
+    }
+
+    pub fn is_supertype_of(&self, t: &TypeTerm) -> bool {
+        t.is_subtype_of(self)
+    }
+
+    pub fn is_subtype_of(&self, t: &TypeTerm) -> bool {
+        false
+    }
+    */
 
     pub fn from_str(s: &str, names: &HashMap<String, TypeID>) -> Option<Self> {
         let mut term_stack = Vec::<Option<TypeTerm>>::new();
@@ -111,53 +145,42 @@ impl TypeTerm {
         None
     }
 
-    // only adds parenthesis where args.len > 0
-    pub fn to_str1(&self, names: &HashMap<TypeID, String>) -> String {
+    pub fn to_str(&self, names: &HashMap<TypeID, String>) -> String {
         match self {
-            TypeTerm::Type { id, args } => {
-                if args.len() > 0 {
-                    format!(
-                        "<{}{}>",
-                        names[&TypeID::Fun(*id)],
-                        if args.len() > 0 {
-                            args.iter().fold(String::new(), |str, term| {
-                                format!("{} {}", str, term.to_str1(names))
-                            })
-                        } else {
-                            String::new()
-                        }
-                    )
-                } else {
-                    names[&TypeID::Fun(*id)].clone()
+            TypeTerm::App(args) => {
+                let mut out = String::new();
+
+                out.push_str(&"<");
+
+                for x in args.iter() {
+                    out.push_str(&" ");
+                    out.push_str(&x.to_str(names));
                 }
+
+                out.push_str(&">");
+
+                out
+            }
+
+            TypeTerm::Ladder(l) => {
+                let mut out = String::new();
+
+                let mut first = true;
+                for x in l.iter() {
+                    if !first {
+                        out.push_str(&"~");
+                        first = false;
+                    }
+                    out.push_str(&x.to_str(names));
+                }
+
+                out                
             }
 
             TypeTerm::Num(n) => format!("{}", n),
             TypeTerm::Char('\n') => format!("'\\n'"),
             TypeTerm::Char(c) => format!("'{}'", c),
-            TypeTerm::Var(varid) => format!("T"),
-        }
-    }
-
-    // always adds an enclosing pair of parenthesis
-    pub fn to_str(&self, names: &HashMap<TypeID, String>) -> String {
-        match self {
-            TypeTerm::Type { id, args } => format!(
-                "<{}{}>",
-                names[&TypeID::Fun(*id)],
-                if args.len() > 0 {
-                    args.iter().fold(String::new(), |str, term| {
-                        format!("{} {}", str, term.to_str1(names))
-                    })
-                } else {
-                    String::new()
-                }
-            ),
-
-            TypeTerm::Num(n) => format!("{}", n),
-            TypeTerm::Char('\n') => format!("'\\n'"),
-            TypeTerm::Char(c) => format!("'{}'", c),
-            TypeTerm::Var(varid) => format!("T"),
+            TypeTerm::TypeID(id) => format!("{}", names[id]),
         }
     }
 }

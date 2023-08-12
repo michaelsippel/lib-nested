@@ -1,6 +1,6 @@
 use {
     crate::{
-        type_system::{TypeDict, TypeTerm, TypeID, ReprTree, TypeLadder},
+        type_system::{TypeDict, TypeTerm, TypeID, ReprTree},
         tree::NestedNode
     },
     std::{
@@ -44,18 +44,24 @@ pub struct MorphismTypePattern {
     pub dst_tyid: TypeID
 }
 
-impl From<MorphismType> for MorphismTypePattern {
+impl From<MorphismType> for MorphismTypePattern {    
     fn from(value: MorphismType) -> MorphismTypePattern {
+        fn strip( x: &TypeTerm ) -> TypeID {
+            match x {
+                TypeTerm::TypeID(id) => id.clone(),
+                TypeTerm::App(args) => strip(&args[0]),
+                TypeTerm::Ladder(args) => strip(&args[0]),
+                    _ => unreachable!()
+            }
+        }
+        
         MorphismTypePattern {
             src_tyid: match value.src_type {
-                Some(TypeTerm::Type { id, args: _ }) => Some(TypeID::Fun(id)),
+                Some(TypeTerm::TypeID(id)) => Some(id),
                 _ => None,
             },
 
-            dst_tyid: match value.dst_type {
-                TypeTerm::Type { id, args: _ } => TypeID::Fun(id),
-                _ => unreachable!()
-            }
+            dst_tyid: strip(&value.dst_type)
         }
     }
 }
@@ -138,8 +144,8 @@ impl Context {
 
     pub fn is_list_type(&self, t: &TypeTerm) -> bool {
         match t {
-            TypeTerm::Type { id, args: _ } => {
-                self.list_types.contains(&TypeID::Fun(*id))
+            TypeTerm::TypeID(id) => {
+                self.list_types.contains(id)
             }
             _ => false
         }
@@ -154,6 +160,10 @@ impl Context {
             Some(TypeID::Fun(x)) => Some(x),
             _ => None
         }
+    }
+
+    pub fn get_typename(&self, tid: &TypeID) -> Option<String> {
+        self.type_dict.read().unwrap().get_typename(tid)
     }
 
     pub fn get_var_typeid(&self, tn: &str) -> Option<u64> {
@@ -219,7 +229,7 @@ impl Context {
         let mk_node = ctx.read().unwrap().get_morphism(MorphismType {
             src_type: None,
             dst_type: type_term.clone()
-        })?;
+        }).expect("morphism");
 
         mk_node(NestedNode::new(depth).set_ctx(
             Arc::new(RwLock::new(

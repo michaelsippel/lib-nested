@@ -10,7 +10,7 @@ use {
         }
     },
     crate::{
-        type_system::{TypeLadder, Context},
+        type_system::{Context, TypeTerm},
         terminal::{
             TerminalEditor, TerminalEditorResult,
             TerminalEvent, TerminalView
@@ -79,7 +79,7 @@ impl ProductEditor {
         self
     }   
 
-    pub fn with_n(mut self, pos: Point2<i16>, n: TypeLadder) -> Self {
+    pub fn with_n(mut self, pos: Point2<i16>, n: &TypeTerm) -> Self {
         self.segments.insert(pos, ProductEditorSegment::N{
             t: n.clone(),
             editor: None,
@@ -90,7 +90,7 @@ impl ProductEditor {
         self.n_indices.push(pos);
 
         let mut b = VecBuffer::new();
-        b.push(crate::diagnostics::make_todo(crate::terminal::make_label(&format!("complete {}", self.ctx.read().unwrap().type_term_to_str(&n.0[0])))));
+        b.push(crate::diagnostics::make_todo(crate::terminal::make_label(&format!("complete {}", self.ctx.read().unwrap().type_term_to_str(n)))));
         self.msg_buf.push(Some(b.get_port().to_sequence()));
         self
     }
@@ -157,7 +157,7 @@ impl ProductEditor {
                 self.msg_buf.update(idx as usize, Some(e.get_msg_port()));
             } else {
                 let mut b = VecBuffer::new();
-                b.push(crate::diagnostics::make_todo(crate::terminal::make_label(&format!("complete {}", self.ctx.read().unwrap().type_term_to_str(&t.0[0])))));
+                b.push(crate::diagnostics::make_todo(crate::terminal::make_label(&format!("complete {}", self.ctx.read().unwrap().type_term_to_str(&t)))));
 
                 self.msg_buf.update(idx as usize, Some(b.get_port().to_sequence()));
 
@@ -238,7 +238,7 @@ impl ObjCommander for ProductEditor {
                                 }
                             }
                         } else {
-                            let mut e = Context::make_node(&self.ctx, t.0[0].clone(), *ed_depth+1).unwrap();
+                            let mut e = Context::make_node(&self.ctx, t.clone(), *ed_depth+1).unwrap();
                             *editor = Some(e.clone());
                             update_segment = true;
 

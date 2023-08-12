@@ -32,7 +32,13 @@ impl ListCmd {
         )
     }
 }
-
+/*
+impl Into< Arc<RwLock<ReprTree>> > for (&Arc<RwLock<Context>>, ListCmd) {
+    fn into(self) -> Arc<RwLock<ReprTree>> {
+        self.1.into_repr_tree(self.0)
+    }
+}
+*/
 impl ObjCommander for ListEditor {
     fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
         let cmd_repr = cmd_obj.read().unwrap();

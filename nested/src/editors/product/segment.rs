@@ -5,7 +5,7 @@ use {
         }
     },
     crate::{
-        type_system::{TypeLadder, Context},
+        type_system::{Context, TypeTerm},
         terminal::{
             TerminalStyle, TerminalView,
             make_label
@@ -20,7 +20,7 @@ use {
 pub enum ProductEditorSegment {
     T( String, usize ),
     N {
-        t: TypeLadder,
+        t: TypeTerm,
         editor: Option<NestedNode>,
         ed_depth: usize,
         cur_depth: usize,
@@ -65,7 +65,7 @@ impl ProductEditorSegment {
                 }),
 
             ProductEditorSegment::N{ t, editor: None, ed_depth, cur_depth, cur_dist } =>
-                make_label(&ctx.read().unwrap().type_term_to_str(&t.0[0]))
+                make_label(&ctx.read().unwrap().type_term_to_str(t))
                 .map_item({
                     let _cur_depth = *cur_depth;
                     let _ed_depth = *ed_depth;

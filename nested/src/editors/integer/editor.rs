@@ -117,12 +117,7 @@ impl DigitEditor {
     }
 
     pub fn get_type(&self) -> TypeTerm {
-        TypeTerm::Type {
-            id: self.ctx.read().unwrap().get_fun_typeid("Digit").unwrap(),
-            args: vec![
-                TypeTerm::Num(self.radix as i64).into()
-            ]
-        }
+        TypeTerm::TypeID(self.ctx.read().unwrap().get_typeid("Digit").unwrap())
     }
 
     pub fn get_data(&self) -> Arc<RwLock<ReprTree>> {
@@ -163,17 +158,12 @@ impl PosIntEditor {
         let data = node.data.clone().unwrap();
         node = node.set_data(ReprTree::ascend(
             &data,
-            TypeTerm::Type {
-                id: ctx.read().unwrap().get_fun_typeid("PosInt").unwrap(),
-                args: vec![
-                    TypeTerm::Num(radix as i64).into(),
-                    TypeTerm::Type {
-                        id: ctx.read().unwrap().get_fun_typeid("BigEndian").unwrap(),
-                        args: vec![]
-                    }.into()
+            TypeTerm::App(vec![
+                TypeTerm::TypeID(ctx.read().unwrap().get_typeid("PosInt").unwrap()),
+                TypeTerm::Num(radix as i64).into(),
+                TypeTerm::TypeID(ctx.read().unwrap().get_typeid("BigEndian").unwrap())
                 ]
-            }
-        ));
+        )));
 
         PosIntEditor {
             radix,

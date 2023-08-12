@@ -1,7 +1,7 @@
 use {
     crate::{
         utils::Bimap,
-        type_system::{TypeTerm, TypeLadder}
+        type_system::{TypeTerm}
     }
 };
 
@@ -60,10 +60,6 @@ impl TypeDict {
 
     pub fn type_term_to_str(&self, term: &TypeTerm) -> String {
         term.to_str(&self.typenames.my)
-    }
-
-    pub fn type_ladder_to_str(&self, ladder: &TypeLadder) -> String {
-        ladder.to_str1(&self.typenames.my)
     }
 }
 

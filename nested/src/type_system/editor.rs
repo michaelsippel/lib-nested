@@ -6,7 +6,7 @@ use {
         projection::flatten_singleton::*
     },
     crate::{
-        type_system::{Context, TypeTerm, ReprTree, MorphismTypePattern},
+        type_system::{Context, TypeID, TypeTerm, ReprTree, MorphismTypePattern},
         terminal::{TerminalEvent},
         editors::{sum::*, list::{ListCursorMode, ListEditor, PTYListStyle, PTYListController}},
         tree::{NestedNode, TreeNav, TreeNavResult, TreeCursor},
@@ -32,6 +32,7 @@ enum State {
 pub struct TypeTermEditor {
     ctx: Arc<RwLock<Context>>,
 
+    data: Arc<RwLock<ReprTree>>,
     editor: SingletonBuffer<
                 Option< Arc<dyn Any + Send + Sync> >
             >,
@@ -43,6 +44,9 @@ pub struct TypeTermEditor {
 impl TypeTermEditor {
     pub fn init_ctx(ctx: &mut Context) {
         ctx.add_list_typename("TypeTerm".into());
+        ctx.add_list_typename("TypeSymbol".into());
+        ctx.add_list_typename("TypeSymbol::Function".into());
+        ctx.add_list_typename("TypeSymbol::Variable".into());
         ctx.add_node_ctor(
             "TypeTerm", Arc::new(
                 |ctx: Arc<RwLock<Context>>, _ty: TypeTerm, depth: usize| {
@@ -98,6 +102,17 @@ impl TypeTermEditor {
                     grid.get_port()
                         .flatten()
                 );
+
+                self.data.write().unwrap().insert_leaf(
+                    vec![].into_iter(),
+                    node.data.clone().unwrap().read().unwrap()
+                        .get_port::<dyn SingletonView<Item = char>>().unwrap()
+                        .map(
+                            |c| TypeTerm::Char(c)
+                        )
+                        .into()
+                );
+                
                 node
             }
             State::List => {
@@ -106,6 +121,18 @@ impl TypeTermEditor {
                 PTYListController::for_node( &mut node, Some(' '), Some('>') );
                 PTYListStyle::for_node( &mut node, ("<"," ",">") );
 
+                self.data.write().unwrap().insert_leaf(
+                    vec![].into_iter(),
+                    node.data.clone().unwrap().read().unwrap()
+                        .get_port::<dyn SequenceView<Item = NestedNode>>().unwrap()
+                        .map(
+                            |node| {
+                                node.data.as_ref().unwrap().read().unwrap().get_port::<dyn SingletonView<Item = TypeTerm>>().unwrap()
+                            }
+                        )
+                        .into()
+                );
+                
                 node
             }
             State::Symbol => {
@@ -131,9 +158,16 @@ impl TypeTermEditor {
     }
 
     fn with_node(ctx: Arc<RwLock<Context>>, depth: usize, node: NestedNode, state: State) -> NestedNode {
+        let buffer = SingletonBuffer::<Option<TypeTerm>>::new( None );
+
+        let data = Arc::new(RwLock::new(ReprTree::new(
+            (&ctx, "( TypeTerm )")
+        )));
+
         let mut editor = TypeTermEditor {
             ctx: ctx.clone(),
             state,
+            data: data.clone(),
             cur_node: SingletonBuffer::new(node),
             editor: SingletonBuffer::new(None)
         };
@@ -161,13 +195,53 @@ impl TypeTermEditor {
         let mut node = NestedNode::new(depth)
             .set_ctx(ctx)
             .set_view(view)
+            .set_data(data)
             .set_nav(editor.clone())
             .set_cmd(editor.clone())
             .set_editor(editor.clone());
 
+        node.close_char.set(cc.get());
         editor.write().unwrap().editor = node.editor.clone();
         
         node
+    }
+
+    fn get_typeterm(&self) -> Option<TypeTerm> {
+        match self.state {
+            State::Any => None,
+
+            State::Symbol => {
+                /*
+                let x = self.data.descend_ladder(vec![
+                    (&ctx, "( FunctionID )").into(),
+                    (&ctx, "( Symbol )").into(),
+                    (&ctx, "( List Char )").into(),
+                ].into_iter());
+
+                let fun_name = /* x...*/ "PosInt";
+                let fun_id = self.ctx.read().unwrap().get_typeid( fun_name );
+
+                self.data.add_repr(
+                    vec![
+                        (&ctx, "( FunctionID )").into(),
+                        (&ctx, "( MachineInt )").into()
+                    ]
+                );
+*/
+                Some(TypeTerm::new(TypeID::Fun(0)))
+            },
+            State::List => {                
+                Some(TypeTerm::new(TypeID::Fun(0)))
+            },
+
+            State::Char => {
+                Some(TypeTerm::Char('c'))
+            }
+            State::Num => {
+                Some(TypeTerm::Num(44))
+            }
+            _ => {None}
+        }
     }
 }
 
@@ -252,6 +326,8 @@ impl ObjCommander for TypeTermEditor {
                     }
 
                     State::List => {
+                        self.cur_node.get_mut().send_cmd_obj( co )
+                        /*
                         match self.cur_node.get_mut().send_cmd_obj( co ) {
                             TreeNavResult::Continue => {
                                 TreeNavResult::Continue
@@ -277,9 +353,10 @@ impl ObjCommander for TypeTermEditor {
                                     _ => {
                                         TreeNavResult::Exit
                                     }
-                                }
                             }
-                        }
+                            }
+                    }
+                            */
                     }
 
                     _ => {
@@ -290,7 +367,17 @@ impl ObjCommander for TypeTermEditor {
                 TreeNavResult::Exit
             }
         } else {
-            self.cur_node.get_mut().send_cmd_obj( co )
+//            eprintln!("undefined comd object");
+            match &self.state {
+                State::Any => {
+                    eprintln!("undefined comd object set to listl");                    
+                    self.set_state( State::List );
+                    self.cur_node.get_mut().goto(TreeCursor::home());
+                }
+                _ => {}
+            }
+
+            self.cur_node.get().cmd.get().unwrap().write().unwrap().send_cmd_obj( co )
         }
     }
 }
