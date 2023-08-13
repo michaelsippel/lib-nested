@@ -22,6 +22,7 @@ use {
     },
     std::sync::Arc,
     std::sync::RwLock,
+    std::iter::FromIterator,
     termion::event::{Event, Key},
     cgmath::{Point2}
 };
@@ -40,28 +41,31 @@ impl ObjCommander for DigitEditor {
         let cmd_obj = cmd_obj.read().unwrap();
         let cmd_type = cmd_obj.get_type().clone();
 
-        let char_type = (&self.ctx, "( Char )").into();
-        //let _term_event_type = (&ctx, "( TerminalEvent )").into();
-
-        if cmd_type == char_type {
+        if cmd_type == (&self.ctx, "( Char )").into() {
             if let Some(cmd_view) = cmd_obj.get_view::<dyn SingletonView<Item = char>>() {
                 let c = cmd_view.get();
-                self.data.set(Some(c));
 
                 self.msg.clear();
 
                 if self.ctx.read().unwrap().meta_chars.contains(&c) {
                     return TreeNavResult::Exit;
-                }
-                else if c.to_digit(self.radix).is_none() {
-                    let mut mb = IndexBuffer::new();
-                    mb.insert_iter(vec![
+
+                } else if c.to_digit(self.radix).is_none() {
+                    /* in case the character c is not in the range of digit-chars,
+                       add a message to the diagnostics view
+                     */
+
+                    let mut message = IndexBuffer::from_iter(vec![
                         (Point2::new(1, 0), make_label("invalid digit '")),
                         (Point2::new(2, 0), make_label(&format!("{}", c))
                          .map_item(|_p,a| a.add_style_back(TerminalStyle::fg_color((140,140,250))))),
                         (Point2::new(3, 0), make_label("'"))
                     ]);
-                    self.msg.push(crate::diagnostics::make_error(mb.get_port().flatten()));
+
+                    self.msg.push(crate::diagnostics::make_error(message.get_port().flatten()));
+
+                } else {
+                    self.data.set(Some(c));
                 }
             }
         }
