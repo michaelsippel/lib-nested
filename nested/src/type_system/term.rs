@@ -10,6 +10,7 @@ use {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum TypeTerm {
+
     /* Atomic Terms */
 
     // Base types from dictionary
@@ -19,6 +20,7 @@ pub enum TypeTerm {
     Num(i64),
     Char(char),
 
+    
 
     /* Complex Terms */
 
@@ -62,28 +64,182 @@ impl TypeTerm {
         self.arg(TypeTerm::Char(c))
     }
 
-    /* TODO
-
-    // summarize all curried applications into one vec
-    pub fn decurry() {}
-
-    // transmute into Ladder-Normal-Form
-    pub fn normalize(&mut self) {
+    /// transform term to have at max 2 entries in Application list
+    pub fn curry(&self) -> Self {
         match self {
-            TypeTerm::Apply{ id, args } => {
-                
+            TypeTerm::App(head) => {
+                let mut head = head.clone();
+                if head.len() > 2 {
+                    let mut tail = head.split_off(2);
+
+                    TypeTerm::App(vec![
+                        TypeTerm::App(head),
+                        if tail.len() > 1 {
+                            TypeTerm::App(tail).curry()
+                        } else {
+                            tail.remove(0)
+                        }
+                    ])
+                } else {
+                    TypeTerm::App(head)
+                }
+            }
+
+            TypeTerm::Ladder(l) => {
+                TypeTerm::Ladder( l.iter().map(|x| x.curry()).collect() )
+            }
+
+            atom => { atom.clone() }
+        }
+    }
+
+    /// summarize all curried applications into one vec
+    pub fn decurry(&mut self) -> &mut Self {
+        match self {
+            TypeTerm::App(args) => {
+                if args.len() > 0 {
+                    let mut a0 = args.remove(0);
+                    a0.decurry();
+                    match a0 {
+                        TypeTerm::App(sub_args) => {
+                            for (i,x) in sub_args.into_iter().enumerate() {
+                                args.insert(i, x);
+                            }
+                        }
+                        other => { args.insert(0, other); }
+                    }
+                }
+            }
+            TypeTerm::Ladder(args) => {
+                for x in args.iter_mut() {
+                    x.decurry();
+                }
+            }
+            _ => {}
+        }
+
+        self
+    }
+
+    /// does the type contain ladders (false) or is it 'flat' (true) ?
+    pub fn is_flat(&self) -> bool {
+        match self {
+            TypeTerm::TypeID(_) => true,
+            TypeTerm::Num(_) => true,
+            TypeTerm::Char(_) => true,
+            TypeTerm::App(args) => args.iter().fold(true, |s,x| s && x.is_flat()),
+            TypeTerm::Ladder(_) => false
+        }
+    }
+
+    /// transmute self into Ladder-Normal-Form
+    ///
+    /// Example:
+    ///   <Seq <Digit 10>~Char> ⇒ <Seq <Digit 10>>~<Seq Char>
+    pub fn normalize(self) -> Self {
+        let mut new_ladder = Vec::<TypeTerm>::new();
+        
+        match self {
+            TypeTerm::Ladder(args) => {
+                for x in args.into_iter() {
+                    new_ladder.push(x.normalize());
+                }
+            }
+
+            TypeTerm::App(args) => {
+                let mut args_iter = args.into_iter();
+                if let Some(head) = args_iter.next() {
+
+                    let mut stage1_args = vec![ head.clone() ];
+                    let mut stage2_args = vec![ head.clone() ];
+
+                    let mut done = false;
+
+                    for x in args_iter {
+                        match x.normalize() {
+                            TypeTerm::Ladder(mut ladder) => {
+                                // normalize this ladder
+
+                                if !done {
+                                    if ladder.len() > 2 {
+                                        stage1_args.push( ladder.remove(0) );
+                                        stage2_args.push( TypeTerm::Ladder(ladder.to_vec()) );
+                                        done = true;
+                                    } else if ladder.len() == 1 {
+                                        stage1_args.push( ladder[0].clone() );
+                                        stage2_args.push( ladder[0].clone() );
+                                    } else {
+                                        // empty type ?
+                                    }
+
+                                } else {
+                                    stage1_args.push( TypeTerm::Ladder(ladder.clone()) );
+                                    stage2_args.push( TypeTerm::Ladder(ladder.clone()) );
+                                }
+                            },
+                            _ => {
+                                unreachable!("x is in LNF");
+                            }
+                        }
+                    }
+
+                    new_ladder.push(TypeTerm::Ladder(stage1_args));
+                    new_ladder.push(TypeTerm::Ladder(stage2_args));
+                }
+            }
+
+            atom => {
+                new_ladder.push(atom);
+            }
+        }
+
+        TypeTerm::Ladder( new_ladder )
+    }
+
+    /*
+    pub fn is_supertype_of(&self, t: &TypeTerm) -> bool {
+        t.is_semantic_subtype_of(self)
+    }
+     */
+
+    // returns provided syntax-type, 
+    pub fn is_semantic_subtype_of(&self, expected_type: &TypeTerm) -> Option< TypeTerm > {
+        let mut provided_lnf = self.clone();
+        let mut expected_lnf = expected_type.clone();
+
+        match
+            (provided_lnf.normalize(),
+             expected_lnf.normalize())
+        {
+            ( TypeTerm::Ladder( provided_ladder ),
+              TypeTerm::Ladder( expected_ladder )
+            ) => {
+
+                for i in 0..provided_ladder.len() {
+                    if provided_ladder[i] == expected_ladder[0] {
+                        return Some(TypeTerm::Ladder(
+                            provided_ladder[i..].into_iter().cloned().collect()
+                        ))
+                    }
+                }
+
+                None
+            },
+
+            _ => {
+                // both are in LNF!
+                unreachable!()
             }
         }
     }
 
-    pub fn is_supertype_of(&self, t: &TypeTerm) -> bool {
-        t.is_subtype_of(self)
+    pub fn is_syntactic_subtype_of(&self, expected_type: &TypeTerm) -> bool {
+        if let Some(provided_type) = self.is_semantic_subtype_of( expected_type ) {
+            &provided_type == expected_type
+        } else {
+            false
+        }
     }
-
-    pub fn is_subtype_of(&self, t: &TypeTerm) -> bool {
-        false
-    }
-    */
 
     pub fn from_str(s: &str, names: &HashMap<String, TypeID>) -> Option<Self> {
         let mut term_stack = Vec::<Option<TypeTerm>>::new();
@@ -152,8 +308,14 @@ impl TypeTerm {
 
                 out.push_str(&"<");
 
+                let mut first = true;
                 for x in args.iter() {
-                    out.push_str(&" ");
+                    if !first {
+                        out.push_str(&" ");
+                    } else {
+                        first = false;
+                    }
+
                     out.push_str(&x.to_str(names));
                 }
 
@@ -169,8 +331,10 @@ impl TypeTerm {
                 for x in l.iter() {
                     if !first {
                         out.push_str(&"~");
+                    } else {
                         first = false;
                     }
+
                     out.push_str(&x.to_str(names));
                 }
 
