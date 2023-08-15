@@ -31,9 +31,7 @@ pub fn init_mem_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
                             );
 
                             Some(
-                                NestedNode::new(depth)
-                                    .set_ctx(ctx)
-                                    .set_data(data)
+                                NestedNode::new(ctx, data, depth)
                                     .set_editor(Arc::new(RwLock::new(buf)))
                             )
                         } else {
@@ -51,10 +49,12 @@ pub fn init_mem_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
 
 pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
     let ctx0 = Arc::new(RwLock::new(Context::with_parent(Some(parent))));
+
     ListEditor::init_ctx( &ctx0 );
 
+    
     let mut ctx = ctx0.write().unwrap();
-
+// TODO:: CharEditor::init_ctx( &ctx );
     ctx.add_node_ctor(
         "Char", Arc::new(
             |ctx: Arc<RwLock<Context>>, _ty: TypeTerm, _depth: usize| {
@@ -62,7 +62,6 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
             }
         )
     );
-
 
     ctx.add_list_typename("Seq".into());
     ctx.add_list_typename("Sequence".into());
@@ -95,7 +94,7 @@ pub fn init_editor_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
                     depth+1
                 ).expect("nested node");
 
-                //node = node.morph(dst_typ);
+                node = node.morph(dst_typ);
 
                 Some(node)
             }

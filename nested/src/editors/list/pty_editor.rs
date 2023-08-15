@@ -103,7 +103,7 @@ impl PTYListController {
         close_char: Option<char>
     ) {
         {
-            let mut ctx = node.ctx.as_ref().unwrap();
+            let mut ctx = node.ctx.as_ref();
             let mut ctx = ctx.write().unwrap();
 
             if let Some(c) = split_char.as_ref() {

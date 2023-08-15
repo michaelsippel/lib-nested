@@ -126,9 +126,7 @@ impl ListEditor {
 
         let e = editor.read().unwrap();
 
-        NestedNode::new(depth)
-            .set_ctx(ctx)
-            .set_data(data)
+        NestedNode::new(ctx, data, depth)
             .set_editor(editor.clone())
             .set_nav(editor.clone())
             .set_cmd(editor.clone())
@@ -277,7 +275,7 @@ impl ListEditor {
 
                 eprintln!("send items to new tail");
                 le_node.cmd.get().unwrap().write().unwrap().send_cmd_obj(
-                    self.data.get(idx).read().unwrap().data.clone().unwrap()
+                    self.data.get(idx).read().unwrap().data.clone()
 /*
                     ReprTree::new_leaf(
                         self.ctx.read().unwrap().type_term_from_str("( NestedNode )").unwrap(),

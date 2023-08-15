@@ -39,6 +39,10 @@ impl ReprTree {
         }
     }
 
+    pub fn new_arc(type_tag: impl Into<TypeTerm>) -> Arc<RwLock<Self>> {
+        Arc::new(RwLock::new(Self::new(type_tag)))
+    }
+
     pub fn get_type(&self) -> &TypeTerm {
         &self.type_tag
     }

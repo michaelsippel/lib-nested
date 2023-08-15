@@ -1,7 +1,5 @@
 use {
-    crate::{
-        type_system::{TypeID}
-    },
+    crate::{type_system::{TypeID}},
     std::collections::HashMap
 };
 
@@ -241,6 +239,9 @@ impl TypeTerm {
         }
     }
 
+    /* this function is deprecated and only partially working,
+    wontfix, will be replaced by TypeTerm-Editor
+    */
     pub fn from_str(s: &str, names: &HashMap<String, TypeID>) -> Option<Self> {
         let mut term_stack = Vec::<Option<TypeTerm>>::new();
 
@@ -263,35 +264,35 @@ impl TypeTerm {
                     }
                 }
                 atom => {
-                    let f = term_stack.last_mut().unwrap();
+                    if let Some(f) = term_stack.last_mut() {
+                        match f {
+                            Some(f) => {
+                                let mut chars = atom.chars();
+                                let first = chars.next().unwrap();
 
-                    match f {
-                        Some(f) => {
-                            let mut chars = atom.chars();
-                            let first = chars.next().unwrap();
-
-                            if first.is_numeric() {
-                                f.num_arg(i64::from_str_radix(atom, 10).unwrap());
-                            } else if first == '\'' {
-                                if let Some(mut c) = chars.next() {
-                                    if c == '\\' {
-                                        if let Some('n') = chars.next() {
-                                            c = '\n';
+                                if first.is_numeric() {
+                                    f.num_arg(i64::from_str_radix(atom, 10).unwrap());
+                                } else if first == '\'' {
+                                    if let Some(mut c) = chars.next() {
+                                        if c == '\\' {
+                                            if let Some('n') = chars.next() {
+                                                c = '\n';
+                                            }
                                         }
+                                        f.char_arg(c);
                                     }
-                                    f.char_arg(c);
+                                } else {
+                                    f.arg(TypeTerm::new(
+                                        names.get(atom)
+                                            .expect(&format!("invalid atom {}", atom)).clone()
+                                    ));
                                 }
-                            } else {
-                                f.arg(TypeTerm::new(
-                                    names.get(atom)
-                                    .expect(&format!("invalid atom {}", atom)).clone()
+                            }
+                            None => {
+                                *f = Some(TypeTerm::new(
+                                    names.get(atom).expect(&format!("invalid atom {}", atom)).clone(),
                                 ));
                             }
-                        }
-                        None => {
-                            *f = Some(TypeTerm::new(
-                                names.get(atom).expect(&format!("invalid atom {}", atom)).clone(),
-                            ));
                         }
                     }
                 }

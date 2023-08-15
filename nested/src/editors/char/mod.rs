@@ -70,15 +70,15 @@ impl CharEditor {
         let ctx = ctx0.clone();
 
         let editor = Arc::new(RwLock::new(CharEditor{ ctx, data: data.clone() }));
-        
-        NestedNode::new(0)
-            .set_ctx(ctx0.clone())
-            .set_data(
-                ReprTree::new_leaf(
-                    ctx0.read().unwrap().type_term_from_str("( Char )").unwrap(),
-                    data.get_port().into()
-                )
-            )
+
+        NestedNode::new(
+            ctx0.clone(),
+            ReprTree::new_leaf(
+                ctx0.read().unwrap().type_term_from_str("( Char )").unwrap(),
+                data.get_port().into()
+            ),
+            0 // fixme
+        )
             .set_view(data
                       .get_port()
                       .map(move |c| TerminalAtom::from(c))

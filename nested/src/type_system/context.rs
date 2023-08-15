@@ -31,21 +31,45 @@ pub enum MorphismMode {
     Any,
 }
 
-#[derive(Clone, Hash, PartialEq, Eq)]
+#[derive(Clone, Hash, PartialEq, Eq, Debug)]
 pub struct MorphismType {
 //    pub mode: MorphismMode,
     pub src_type: Option<TypeTerm>,
     pub dst_type: TypeTerm,
 }
 
-#[derive(Clone, Hash, Eq, PartialEq, Debug)]
+#[derive(Clone, Hash, Eq, PartialEq)]
 pub struct MorphismTypePattern {
     pub src_tyid: Option<TypeID>,
     pub dst_tyid: TypeID
 }
 
+impl MorphismType {
+    pub fn to_str(&self, ctx: &Context) -> String {
+        format!("src_tyid = {:?}, dst_tyid = {:?}",
+                if let Some(t) = self.src_type.as_ref() {
+                    ctx.type_term_to_str(t)
+                } else {
+                    "None".into()
+                },
+                ctx.type_term_to_str(&self.dst_type))
+    }
+}
+
+impl MorphismTypePattern {
+    pub fn to_str(&self, ctx: &Context) -> String {
+        format!("src_tyid = {:?}, dst_tyid = {:?}",
+                if let Some(t) = self.src_tyid.as_ref() {
+                    ctx.type_term_to_str(&TypeTerm::TypeID(t.clone()))
+                } else {
+                    "None".into()
+                },
+                ctx.type_term_to_str(&TypeTerm::TypeID(self.dst_tyid.clone())))
+    }
+}
+
 impl From<MorphismType> for MorphismTypePattern {    
-    fn from(value: MorphismType) -> MorphismTypePattern {
+    fn from(mut value: MorphismType) -> MorphismTypePattern {
         fn strip( x: &TypeTerm ) -> TypeID {
             match x {
                 TypeTerm::TypeID(id) => id.clone(),
@@ -54,13 +78,9 @@ impl From<MorphismType> for MorphismTypePattern {
                     _ => unreachable!()
             }
         }
-        
-        MorphismTypePattern {
-            src_tyid: match value.src_type {
-                Some(TypeTerm::TypeID(id)) => Some(id),
-                _ => None,
-            },
 
+        MorphismTypePattern {
+            src_tyid: value.src_type.map(|x| strip(&x)),
             dst_tyid: strip(&value.dst_type)
         }
     }
@@ -82,6 +102,7 @@ pub struct Context {
     pub meta_chars: Vec< char >,
 
     /// graph constructors
+    /// TODO: move into separate struct MorphismMap or something
     morphisms: HashMap<
                    MorphismTypePattern,
                    Arc<
@@ -96,7 +117,7 @@ pub struct Context {
 
 impl Into<TypeTerm> for (&Arc<RwLock<Context>>, &str) {
     fn into(self) -> TypeTerm {
-        self.0.read().unwrap().type_term_from_str(self.1).unwrap()
+        self.0.read().unwrap().type_term_from_str(self.1).expect("could not parse type term")
     }
 }
 
@@ -184,6 +205,7 @@ impl Context {
     pub fn add_node_ctor(&mut self, tn: &str, mk_editor: Arc<dyn Fn(Arc<RwLock<Self>>, TypeTerm, usize) -> Option<NestedNode> + Send + Sync>) {
         let dict = self.type_dict.clone();
         let mut dict = dict.write().unwrap();
+
         let tyid =
             if let Some(tyid) = dict.get_typeid(&tn.into()) {
                 tyid
@@ -196,10 +218,10 @@ impl Context {
             dst_tyid: tyid
         };
 
+        drop(dict);
+
         self.add_morphism(morphism_pattern, Arc::new(move |node, dst_type| {
-            let ctx = node.ctx.clone().unwrap();
-            let depth = node.depth;
-            mk_editor(ctx, dst_type, depth.get())
+            mk_editor(node.ctx.clone(), dst_type, node.depth.get())
         }));
     }
 
@@ -216,6 +238,7 @@ impl Context {
 
     pub fn get_morphism(&self, ty: MorphismType) -> Option<Arc<dyn Fn(NestedNode, TypeTerm) -> Option<NestedNode> + Send + Sync>> {
         let pattern = MorphismTypePattern::from(ty.clone());
+
         if let Some(morphism) = self.morphisms.get( &pattern ) {
             Some(morphism.clone())
         } else {
@@ -231,29 +254,29 @@ impl Context {
             dst_type: type_term.clone()
         }).expect("morphism");
 
-        mk_node(NestedNode::new(depth).set_ctx(
-            Arc::new(RwLock::new(
-                Context::with_parent(Some(ctx.clone()))))
-        ), type_term)
+        /* create new context per node ?? too heavy.. whats the reason? TODO */
+
+        let new_ctx = Arc::new(RwLock::new(Context::with_parent(Some(ctx.clone()))));
+        let new_depth = depth;
+
+        mk_node(
+            NestedNode::new(new_ctx, ReprTree::new_arc(type_term.clone()), 0),
+            type_term
+        )
     }
 
     pub fn morph_node(mut node: NestedNode, dst_type: TypeTerm) -> NestedNode {
-        let ctx = node.ctx.clone().unwrap();
-        let mut src_type = None;
-
-        if let Some(data) = node.data.clone() {
-            src_type = Some(data.read().unwrap().get_type().clone());
-            node = node.set_data(
-                ReprTree::ascend(
-                    &data,
-                    dst_type.clone()
-                )
+        let mut src_type = node.data.read().unwrap().get_type().clone();
+        let pattern = MorphismType { src_type: Some(src_type), dst_type: dst_type.clone() };
+        /* it is not univesally true to always use ascend.
+         */
+        node.data =
+            ReprTree::ascend(
+                &node.data,
+                dst_type.clone()
             );
-        }
 
-        let pattern = MorphismType { src_type, dst_type: dst_type.clone() }.into();
-
-        let m = ctx.read().unwrap().get_morphism(pattern);
+        let m = node.ctx.read().unwrap().get_morphism(pattern);
         if let Some(transform) = m {
             if let Some(new_node) = transform(node.clone(), dst_type) {
                 new_node
@@ -261,6 +284,7 @@ impl Context {
                 node.clone()
             }
         } else {
+            eprintln!("could not find morphism");
             node
         }
     }

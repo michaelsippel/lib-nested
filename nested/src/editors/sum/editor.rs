@@ -9,7 +9,7 @@ use {
     crate::{
         terminal::TerminalView,
         editors::list::ListCursorMode,
-        type_system::{Context, ReprTree},
+        type_system::{Context, TypeTerm, ReprTree},
         tree::{TreeNav, TreeCursor, TreeNavResult},
         diagnostics::{Diagnostics, Message},
         tree::NestedNode,
@@ -49,11 +49,19 @@ impl SumEditor {
         }
     }
 
+    pub fn init_ctx(ctx: &Arc<RwLock<Context>>) {
+        ctx.write().unwrap().add_typename("Sum".into());
+    }
+
     pub fn into_node(self, ctx: Arc<RwLock<Context>>) -> NestedNode {
         let view = self.pty_view();
         let editor = Arc::new(RwLock::new(self));
-        NestedNode::new(0)
-            .set_ctx(ctx)
+
+        NestedNode::new(
+            ctx.clone(),
+            ReprTree::new_arc(TypeTerm::TypeID(ctx.read().unwrap().get_typeid("Sum").unwrap())),
+            0
+        )
             .set_view(view)
             .set_editor(editor.clone())
             .set_cmd(editor.clone())

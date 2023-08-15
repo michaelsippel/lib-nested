@@ -90,10 +90,9 @@ impl DigitEditor {
         let ed = editor.write().unwrap();
         let r = ed.radix;
 
-        NestedNode::new(depth)
-            .set_ctx(ed.ctx.clone())
+        NestedNode::new(ed.ctx.clone(), data, depth)
+
             .set_cmd(editor.clone())
-            .set_data(data)
             .set_view(
                 ed.data
                     .get_port()
@@ -125,11 +124,10 @@ impl DigitEditor {
     }
 
     pub fn get_data(&self) -> Arc<RwLock<ReprTree>> {
-        let data_view = self.get_data_port();
         ReprTree::ascend(
             &ReprTree::new_leaf(
-                self.ctx.read().unwrap().type_term_from_str("( u32 )").unwrap(),
-                data_view.into()
+                self.ctx.read().unwrap().type_term_from_str("( Seq u32 )").unwrap(),
+                self.get_data_port().into()
             ),
             self.get_type()
         )
@@ -143,7 +141,21 @@ pub struct PosIntEditor {
 
 impl PosIntEditor {
     pub fn new(ctx: Arc<RwLock<Context>>, radix: u32) -> Self {
-        let mut node = Context::make_node(&ctx, (&ctx, format!("( List ( Digit {} ) )", radix).as_str()).into(), 0).unwrap();
+        let mut node = Context::make_node(
+            &ctx,
+            (&ctx, format!("( List ( Digit {} ) )", radix).as_str()).into(),
+            0
+        ).unwrap();
+
+        // Set Type
+        node.data = ReprTree::ascend(
+            &node.data.clone(),
+            TypeTerm::App(vec![
+                TypeTerm::TypeID(ctx.read().unwrap().get_typeid("PosInt").unwrap()),
+                TypeTerm::Num(radix as i64).into(),
+                TypeTerm::TypeID(ctx.read().unwrap().get_typeid("BigEndian").unwrap())
+                ]
+        ));
 
         PTYListController::for_node( &mut node, Some(' '), None );
         PTYListStyle::for_node( &mut node,
@@ -157,17 +169,6 @@ impl PosIntEditor {
                 "".into()
             )
         );
-
-        // Set Type
-        let data = node.data.clone().unwrap();
-        node = node.set_data(ReprTree::ascend(
-            &data,
-            TypeTerm::App(vec![
-                TypeTerm::TypeID(ctx.read().unwrap().get_typeid("PosInt").unwrap()),
-                TypeTerm::Num(radix as i64).into(),
-                TypeTerm::TypeID(ctx.read().unwrap().get_typeid("BigEndian").unwrap())
-                ]
-        )));
 
         PosIntEditor {
             radix,
