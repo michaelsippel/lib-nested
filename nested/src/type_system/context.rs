@@ -46,7 +46,7 @@ pub struct MorphismTypePattern {
 
 impl MorphismType {
     pub fn to_str(&self, ctx: &Context) -> String {
-        format!("src_tyid = {:?}, dst_tyid = {:?}",
+        format!("{:?} -> {:?}",
                 if let Some(t) = self.src_type.as_ref() {
                     ctx.type_term_to_str(t)
                 } else {
@@ -58,7 +58,7 @@ impl MorphismType {
 
 impl MorphismTypePattern {
     pub fn to_str(&self, ctx: &Context) -> String {
-        format!("src_tyid = {:?}, dst_tyid = {:?}",
+        format!("{:?} -> {:?}",
                 if let Some(t) = self.src_tyid.as_ref() {
                     ctx.type_term_to_str(&TypeTerm::TypeID(t.clone()))
                 } else {
@@ -154,12 +154,16 @@ impl Context {
         }
     }
 
-    pub fn add_typename(&mut self, tn: String) -> TypeID {
-        self.type_dict.write().unwrap().add_typename(tn)
+    pub fn add_typename(&mut self, tn: &str) -> TypeID {
+        self.type_dict.write().unwrap().add_typename(tn.to_string())
+    }
+
+    pub fn add_varname(&mut self, vn: &str) -> TypeID {
+        self.type_dict.write().unwrap().add_varname(vn.to_string())
     }
 
     pub fn add_list_typename(&mut self, tn: String) {
-        let tid = self.add_typename(tn);
+        let tid = self.add_typename(&tn);
         self.list_types.push( tid );
     }
 
@@ -252,7 +256,7 @@ impl Context {
         let mk_node = ctx.read().unwrap().get_morphism(MorphismType {
             src_type: None,
             dst_type: type_term.clone()
-        }).expect("morphism");
+        }).expect(&format!("morphism {}", ctx.read().unwrap().type_term_to_str(&type_term)));
 
         /* create new context per node ?? too heavy.. whats the reason? TODO */
 
@@ -268,6 +272,7 @@ impl Context {
     pub fn morph_node(mut node: NestedNode, dst_type: TypeTerm) -> NestedNode {
         let mut src_type = node.data.read().unwrap().get_type().clone();
         let pattern = MorphismType { src_type: Some(src_type), dst_type: dst_type.clone() };
+
         /* it is not univesally true to always use ascend.
          */
         node.data =
@@ -276,7 +281,7 @@ impl Context {
                 dst_type.clone()
             );
 
-        let m = node.ctx.read().unwrap().get_morphism(pattern);
+        let m = node.ctx.read().unwrap().get_morphism(pattern.clone());
         if let Some(transform) = m {
             if let Some(new_node) = transform(node.clone(), dst_type) {
                 new_node
@@ -284,7 +289,7 @@ impl Context {
                 node.clone()
             }
         } else {
-            eprintln!("could not find morphism");
+            eprintln!("could not find morphism {}", pattern.to_str(&node.ctx.read().unwrap()));
             node
         }
     }
