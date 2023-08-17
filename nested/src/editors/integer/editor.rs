@@ -12,12 +12,12 @@ use {
     },
     crate::{
         type_system::{Context, TypeTerm, ReprTree},
-        editors::list::{ListEditor, PTYListController, PTYListStyle},
+        editors::list::{ListEditor, ListCmd, PTYListController, PTYListStyle},
         terminal::{
             TerminalAtom, TerminalEvent, TerminalStyle, make_label
         },
         diagnostics::{Message},
-        tree::{NestedNode, TreeNavResult},
+        tree::{NestedNode, TreeNav, TreeNavResult, TreeCursor},
         commander::ObjCommander
     },
     std::sync::Arc,
@@ -91,7 +91,6 @@ impl DigitEditor {
         let r = ed.radix;
 
         NestedNode::new(ed.ctx.clone(), data, depth)
-
             .set_cmd(editor.clone())
             .set_view(
                 ed.data
@@ -134,9 +133,12 @@ impl DigitEditor {
     }
 }
 
+
 pub struct PosIntEditor {
     radix: u32,
-    digits: NestedNode
+    digits: NestedNode,
+
+    // todo: endianness
 }
 
 impl PosIntEditor {
@@ -154,7 +156,7 @@ impl PosIntEditor {
                 TypeTerm::TypeID(ctx.read().unwrap().get_typeid("PosInt").unwrap()),
                 TypeTerm::Num(radix as i64).into(),
                 TypeTerm::TypeID(ctx.read().unwrap().get_typeid("BigEndian").unwrap())
-                ]
+            ]
         ));
 
         PTYListController::for_node( &mut node, Some(' '), None );
@@ -176,9 +178,31 @@ impl PosIntEditor {
         }
     }
 
+    pub fn from_u64(ctx: Arc<RwLock<Context>>, radix: u32, value: u64) -> Self {
+        let mut edit = PosIntEditor::new(ctx, radix);
+        edit.set_value_u64( value );
+        edit
+    }
+
+    pub fn set_value_u64(&mut self, mut value: u64) {
+        self.digits.send_cmd_obj(ListCmd::Clear.into_repr_tree(&self.digits.ctx));
+
+        while value > 0 {
+            let digit_val = (value % self.radix as u64) as u32;
+            value /= self.radix as u64;
+
+            // if BigEndian
+            self.digits.goto(TreeCursor::home());
+
+            self.digits.send_cmd_obj(ReprTree::from_char(&self.digits.ctx, char::from_digit(digit_val, self.radix).expect("invalid digit"))); 
+        }
+        self.digits.goto(TreeCursor::none());
+    }
+
     pub fn into_node(self) -> NestedNode {
         self.digits
     }
+
 /*
     pub fn get_data_port(&self) -> OuterViewPort<dyn SequenceView<Item = u32>> {
         let radix = self.radix;
