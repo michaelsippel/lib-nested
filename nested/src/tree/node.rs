@@ -37,6 +37,10 @@ pub struct NestedNode {
                     Option< Arc<dyn Any + Send + Sync> >
                 >,
 
+    /* TODO:
+     * - spill buffer (contains overflowing elements as well as 'split-off' parts)
+     */
+    
     /// commander & navigation
     pub cmd: SingletonBuffer<
                  Option< Arc<RwLock<dyn ObjCommander + Send + Sync>> >
