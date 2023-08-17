@@ -167,25 +167,39 @@ impl ObjCommander for PTYListController {
         let co = cmd_obj.read().unwrap();
         let cmd_type = co.get_type().clone();
         let term_event_type = ctx.type_term_from_str("( TerminalEvent )").unwrap();
+        let list_cmd_type = ctx.type_term_from_str("( ListCmd )").unwrap();
         let nested_node_type = ctx.type_term_from_str("( NestedNode )").unwrap();
         let char_type = ctx.type_term_from_str("( Char )").unwrap();
 
         if cmd_type == nested_node_type {
+            eprintln!("got nested node cmd");
             if let Some(node_view) = co.get_view::<dyn SingletonView<Item = NestedNode>>() {
                 if let Some(idx) = cur.idx {
                     match cur.mode {
                         ListCursorMode::Select => {
                             *e.data.get_mut(idx as usize) = Arc::new(RwLock::new(node_view.get()));
+                            TreeNavResult::Exit
                         }
                         ListCursorMode::Insert => {
-                            e.data.insert(idx as usize, Arc::new(RwLock::new(node_view.get())));
+                            e.insert(Arc::new(RwLock::new(node_view.get())));
+                            e.cursor.set(ListCursor{ idx: Some(idx+1),  mode: ListCursorMode::Insert });
+                            TreeNavResult::Continue
                         }
                     }
+                } else {
+                    TreeNavResult::Exit
                 }
+            } else {
+                TreeNavResult::Continue
             }
         }
 
-        if cmd_type == term_event_type {
+        else if cmd_type == list_cmd_type {
+            drop(co);
+            e.send_cmd_obj( cmd_obj )
+        }
+
+        else if cmd_type == term_event_type {
             if let Some(te_view) = co.get_view::<dyn SingletonView<Item = TerminalEvent>>() {
                 drop(co);
                 let event = te_view.get();
