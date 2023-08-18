@@ -5,7 +5,7 @@ use {
     },
     crate::{
         type_system::{Context, TypeTerm, ReprTree},
-        editors::list::{ListCursor, ListCursorMode, commander::ListCmd, PTYListController, PTYListStyle},
+        editors::list::{ListCursor, ListCursorMode, ListCmd, PTYListController, PTYListStyle},
         tree::{NestedNode, TreeNav, TreeCursor},
         diagnostics::Diagnostics
     },

@@ -5,13 +5,13 @@ pub mod editor;
 pub mod nav;
 pub mod segment;
 pub mod pty_editor;
-pub mod commander;
+pub mod cmd;
 
 pub use {
     cursor::{ListCursor, ListCursorMode},
     editor::ListEditor,
     segment::{ListSegment, ListSegmentSequence},
     pty_editor::{PTYListStyle, PTYListController},
-    commander::ListCmd
+    cmd::ListCmd
 };
 

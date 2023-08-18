@@ -161,6 +161,7 @@ impl ObjCommander for PTYListController {
         let cur = e.cursor.get();
         let cur_depth = e.get_cursor().tree_addr.len();
 
+        let ctx0 = e.ctx.clone();
         let ctx = e.ctx.clone();
         let ctx = ctx.read().unwrap();
 
@@ -218,12 +219,10 @@ impl ObjCommander for PTYListController {
                                 ListCursorMode::Insert => {
                                     match event {
                                         TerminalEvent::Input(Event::Key(Key::Backspace)) => {
-                                            e.delete_pxev();
-                                            TreeNavResult::Continue
+                                            e.send_cmd_obj( ListCmd::DeletePxev.into_repr_tree(&ctx0) )
                                         }
                                         TerminalEvent::Input(Event::Key(Key::Delete)) => {
-                                            e.delete_nexd();
-                                            TreeNavResult::Continue
+                                            e.send_cmd_obj( ListCmd::DeletePxev.into_repr_tree(&ctx0) )
                                         }
                                         _ => {
                                             let mut node = Context::make_node(&e.ctx, e.typ.clone(), self.depth).unwrap();
@@ -251,52 +250,10 @@ impl ObjCommander for PTYListController {
                                         if e.is_listlist() {
                                             match event {
                                                 TerminalEvent::Input(Event::Key(Key::Backspace)) => {
-                                                    let item_cur = item.get_cursor();
-
-                                                    if idx > 0
-                                                        && item_cur.tree_addr.iter().fold(
-                                                            true,
-                                                            |is_zero, x| is_zero && (*x == 0)
-                                                        )
-                                                    {
-                                                        e.listlist_join_pxev(idx, &item);
-
-                                                        /* Optional: recursive joining
-                                                        
-                                                        if item_cur.tree_addr.len() > 1 {
-                                                        let mut item = e.get_item_mut().unwrap();
-                                                        item.handle_terminal_event(event);
-                                                        }
-                                                         */
-                                                        TreeNavResult::Continue
-                                                    } else {
-                                                        item.send_cmd_obj(cmd_obj)
-                                                    }
+                                                    e.send_cmd_obj( ListCmd::DeletePxev.into_repr_tree(&ctx0) )
                                                 }
                                                 TerminalEvent::Input(Event::Key(Key::Delete)) => {
-                                                    let item_cur = item.get_cursor_warp();
-                                                    let next_idx = idx as usize + 1;
-
-                                                    if next_idx < e.data.len()
-                                                        && item_cur.tree_addr.iter().fold(
-                                                            true,
-                                                            |is_end, x| is_end && (*x == -1)
-                                                        )
-                                                    {
-                                                        e.listlist_join_nexd(next_idx, &item);
-
-                                                        /* Optional: recursive joining
-
-                                                        if item_cur.tree_addr.len() > 1 {
-                                                        let mut item = e.get_item_mut().unwrap();
-                                                        item.handle_terminal_event(event);
-                                                    }
-                                                         */
-
-                                                        TreeNavResult::Continue
-                                                    } else {
-                                                        item.send_cmd_obj(cmd_obj)
-                                                    }
+                                                    e.send_cmd_obj( ListCmd::DeleteNexd.into_repr_tree(&ctx0) )
                                                 }
 
                                                 TerminalEvent::Input(Event::Key(Key::Char(c))) => {
