@@ -63,7 +63,7 @@ impl ObjCommander for DigitEditor {
                     ]);
 
                     self.msg.push(crate::diagnostics::make_error(message.get_port().flatten()));
-
+                    self.data.set(Some(c));
                 } else {
                     self.data.set(Some(c));
                 }
