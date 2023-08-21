@@ -115,6 +115,25 @@ pub struct Context {
     parent: Option<Arc<RwLock<Context>>>,
 }
 
+impl Default for Context {
+    fn default() -> Context {
+        let mut ctx = Context::new();
+
+        ctx.add_list_typename("Seq".into());
+        ctx.add_list_typename("Sequence".into());
+        ctx.add_list_typename("SepSeq".into());
+        ctx.add_typename("NestedNode".into());
+        ctx.add_typename("TerminalEvent".into());
+        
+        crate::editors::list::init_ctx( &mut ctx );
+        crate::editors::char::init_ctx( &mut ctx );
+        crate::editors::integer::init_ctx( &mut ctx );
+        crate::editors::typeterm::init_ctx( &mut ctx );
+
+        ctx
+    }
+}
+
 impl Into<TypeTerm> for (&Arc<RwLock<Context>>, &str) {
     fn into(self) -> TypeTerm {
         self.0.read().unwrap().type_term_from_str(self.1).expect("could not parse type term")
@@ -396,3 +415,4 @@ impl Context {
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+

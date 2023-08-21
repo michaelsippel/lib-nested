@@ -7,7 +7,7 @@ use {
         buffer::singleton::*
     },
     crate::{
-        type_system::{Context, ReprTree},
+        type_system::{Context, ReprTree, TypeTerm},
         terminal::{TerminalAtom, TerminalStyle},
         tree::{NestedNode, TreeNavResult},
         commander::{ObjCommander}
@@ -15,6 +15,14 @@ use {
     std::sync::Arc,
     std::sync::RwLock
 };
+
+pub fn init_ctx( ctx: &mut Context ) {
+    ctx.add_node_ctor(
+        "Char",
+        Arc::new(|ctx: Arc<RwLock<Context>>, _ty: TypeTerm, _depth: usize| {
+            Some(CharEditor::new_node(ctx))
+        }));
+}
 
 pub struct CharEditor {
     ctx: Arc<RwLock<Context>>,

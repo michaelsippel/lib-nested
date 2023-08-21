@@ -7,6 +7,6 @@ pub use {
     add::Add,
     editor::{DigitEditor, PosIntEditor},
     radix::RadixProjection,
-    ctx::init_integer_ctx
+    ctx::init_ctx
 };
 

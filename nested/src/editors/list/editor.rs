@@ -28,37 +28,6 @@ pub struct ListEditor {
 }
 
 impl ListEditor {
-    pub fn init_ctx(ctx: &Arc<RwLock<Context>>) {
-        let mut ctx = ctx.write().unwrap();
-
-        ctx.add_list_typename("ListCmd".into());
-
-        ctx.add_list_typename("List".into());
-        ctx.add_node_ctor(
-            "List", Arc::new(
-                |ctx: Arc<RwLock<Context>>, ty: TypeTerm, depth: usize| {
-                    match ty {
-                        TypeTerm::App(args) => {
-                            if args.len() > 1 {
-                                let typ = args[1].clone();
-
-                                let mut node = ListEditor::new(ctx.clone(), typ).into_node(depth);
-
-                                PTYListController::for_node( &mut node, Some(','), Some('}') );
-                                PTYListStyle::for_node( &mut node, ("{",", ","}") );
-
-                                Some(node)
-                            } else {
-                                None
-                            }
-                        }
-                        _ => None
-                    }
-                }
-            )
-        );
-    }
-
     pub fn new(
         ctx: Arc<RwLock<Context>>,
         typ: TypeTerm,
@@ -353,7 +322,6 @@ impl ListEditor {
             let depth = item.depth;
             
             if let Some(head_editor) = item.editor.get() {
-
                 eprintln!("listlistsplit:editor = {:?}", Arc::into_raw(head_editor.clone()));
 
                 let head = head_editor.downcast::<RwLock<ListEditor>>().unwrap();
@@ -419,7 +387,6 @@ impl ListEditor {
                             idx: Some(idx - 1), mode: ListCursorMode::Select
                         }
                     );
-
                 }
             }
         }

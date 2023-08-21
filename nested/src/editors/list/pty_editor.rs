@@ -176,24 +176,28 @@ impl PTYListController {
 
         match cur.mode {
             ListCursorMode::Insert => {
+                eprintln!("PTYList(insert): create new child and forward cmd");
                 let mut new_edit = Context::make_node(&e.ctx, e.typ.clone(), self.depth).unwrap();
                 new_edit.goto(TreeCursor::home());
 
                 match new_edit.send_cmd_obj(cmd_obj.clone()) {
                     TreeNavResult::Continue => {
+                        eprintln!("PTYList(insert): child returned cont");
                         e.insert(Arc::new(RwLock::new(new_edit)));
                         TreeNavResult::Continue
                     }
-                    TreeNavResult::Exit => TreeNavResult::Exit
+                    TreeNavResult::Exit => {
+                        eprintln!("PTYList(insert): child returned exit");
+                        TreeNavResult::Exit
+                    }
                 }
             },
             ListCursorMode::Select => {
                 if let Some(mut item) = e.get_item_mut() {
-
-                    eprintln!("PTYList: forward any cmd to current child item");
+                    eprintln!("PTYList(select): forward any cmd to current child item");
                     let res = item.write().unwrap().send_cmd_obj(cmd_obj.clone());
                     let child_close_char = item.read().unwrap().close_char.get();
-                    eprintln!("PTYList: returned");
+                    eprintln!("PTYList(select): child returned");
 
                     match res {
                         TreeNavResult::Continue => TreeNavResult::Continue,
@@ -223,7 +227,6 @@ impl PTYListController {
         }
     }
 }
-
 
 use r3vi::view::singleton::SingletonView;
 use crate::commander::ObjCommander;

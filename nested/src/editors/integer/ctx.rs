@@ -15,10 +15,7 @@ use {
     cgmath::Point2
 };
 
-pub fn init_integer_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
-    let ctx0 = Arc::new(RwLock::new(Context::with_parent(Some(parent))));
-
-    let mut ctx = ctx0.write().unwrap();
+pub fn init_ctx(ctx: &mut Context) {
     ctx.add_typename("MachineInt".into());
     ctx.add_typename("u32".into());
     ctx.add_typename("u64".into());
@@ -141,8 +138,5 @@ pub fn init_integer_ctx(parent: Arc<RwLock<Context>>) -> Arc<RwLock<Context>> {
     ctx.add_typename("Duration".into());
     ctx.add_typename("Seconds".into());
     ctx.add_typename("ℕ".into());
-
-    drop(ctx);
-    ctx0
 }
 
