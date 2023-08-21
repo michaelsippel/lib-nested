@@ -15,6 +15,57 @@ use {
     }
 };
 
+/* TODO: refactoring proposal
+
+struct NestedNodeDisplay {
+    /// display view
+    pub view: Option< OuterViewPort<dyn TerminalView> >,
+
+    /// diagnostics
+    pub diag: Option< OuterViewPort<dyn SequenceView<Item = Message>> >,
+
+    /// depth
+    pub depth: SingletonBuffer< usize >,    
+}
+
+struct NestedNodeEdit {
+    /// abstract editor
+    pub editor: SingletonBuffer<
+                    Option< Arc<dyn Any + Send + Sync> >
+>,
+
+    pub spill_buf: VecBuffer< NestedNode >,
+
+    /// commander & navigation
+    pub cmd: SingletonBuffer<
+                 Option< Arc<RwLock<dyn ObjCommander + Send + Sync>> >
+             >,
+    pub close_char: SingletonBuffer<
+                        Option< char >
+            >,
+
+    // could be replaced by cmd when TreeNav -CmdObjects are used
+    pub tree_nav: SingletonBuffer<
+                      Option< Arc<RwLock<dyn TreeNav + Send + Sync>> >
+                  >,    
+}
+
+pub struct NewNestedNode {
+    /// context
+    pub ctx: Arc<RwLock<Context>>,
+
+    /// abstract data view
+    pub data: Arc<RwLock<ReprTree>>,
+
+    /// viewports for terminal display
+    pub disp: NestedNodeDisplay,
+
+    /// editor & commander objects
+    pub edit: NestedNodeEdit
+}
+
+*/
+
 #[derive(Clone)]
 pub struct NestedNode {    
     /// context
@@ -158,9 +209,7 @@ impl NestedNode {
         self.get_data_port::<V>(type_str)?.get_view()
     }
 
-
     /* TODO
-
     pub fn get_seq_view<'a, T: Clone>(&self, type_str: impl Iterator<Item = &'a str>) -> Option<OuterViewPort<dyn SingletonView<Item = T>>> {
         self.get_data_view::<dyn SequenceView<Item = NestedNode>>(type_str)
             .unwrap()
