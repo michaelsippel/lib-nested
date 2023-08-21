@@ -48,6 +48,7 @@ impl ObjCommander for DigitEditor {
                 self.msg.clear();
 
                 if self.ctx.read().unwrap().meta_chars.contains(&c) {
+                    eprintln!("digitedit: meta char");
                     return TreeNavResult::Exit;
 
                 } else if c.to_digit(self.radix).is_none() {
@@ -163,7 +164,9 @@ impl PosIntEditor {
         PTYListStyle::for_node( &mut node,
             (
                 match radix {
-                    2 => "0d".into(),
+                    2 => "0b".into(),
+                    8 => "0o".into(),
+                    10 => "0d".into(),
                     16 => "0x".into(),
                     _ => "".into()
                 },
