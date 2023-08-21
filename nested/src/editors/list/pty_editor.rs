@@ -137,20 +137,93 @@ impl PTYListController {
         self.depth = depth;
     }
 
-/*
-    pub fn handle_node_event(&mut self, c: &NestedNode) -> TreeNavResult {
-        
+    pub fn handle_term_event(&mut self, event: &TerminalEvent, cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
+        let mut e = self.editor.write().unwrap();
+        match event {
+            TerminalEvent::Input(Event::Key(Key::Insert)) => {
+                e.toggle_leaf_mode();
+                TreeNavResult::Continue
+            }
+            _  => TreeNavResult::Continue
+        }        
     }
 
-    pub fn handle_char_event(&mut self, c: &char) -> TreeNavResult {
+    pub fn handle_meta_char(&mut self, c: char, child_close_char: Option<char>) -> TreeNavResult {
+        eprintln!("handle meta char");
+        let mut e = self.editor.write().unwrap();
+        let cur = e.cursor.get();
         
+        if Some(c) == self.split_char {
+            e.listlist_split();
+            TreeNavResult::Continue
+        } else if Some(c) == child_close_char {
+            e.goto(TreeCursor::none());
+            e.cursor.set(ListCursor {
+                mode: ListCursorMode::Select,
+                idx: Some(cur.idx.unwrap_or(0))
+            });
+            TreeNavResult::Continue
+        } else {
+            TreeNavResult::Exit
+        }
     }
 
-    pub fn handle_term_event(&mut self, e: &TerminalEvent) -> TreeNavResult {
-        
+    pub fn handle_any_event(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
+        let mut e = self.editor.write().unwrap();
+        let cur = e.cursor.get();
+        let ctx = e.ctx.clone();
+        let ctx = ctx.read().unwrap();
+
+        match cur.mode {
+            ListCursorMode::Insert => {
+                let mut new_edit = Context::make_node(&e.ctx, e.typ.clone(), self.depth).unwrap();
+                new_edit.goto(TreeCursor::home());
+
+                match new_edit.send_cmd_obj(cmd_obj.clone()) {
+                    TreeNavResult::Continue => {
+                        e.insert(Arc::new(RwLock::new(new_edit)));
+                        TreeNavResult::Continue
+                    }
+                    TreeNavResult::Exit => TreeNavResult::Exit
+                }
+            },
+            ListCursorMode::Select => {
+                if let Some(mut item) = e.get_item_mut() {
+
+                    eprintln!("PTYList: forward any cmd to current child item");
+                    let res = item.write().unwrap().send_cmd_obj(cmd_obj.clone());
+                    let child_close_char = item.read().unwrap().close_char.get();
+                    eprintln!("PTYList: returned");
+
+                    match res {
+                        TreeNavResult::Continue => TreeNavResult::Continue,
+                        TreeNavResult::Exit => {
+                            eprintln!("...returned with exit");
+                            // child editor returned control, probably for meta-char handling..
+
+                            if cmd_obj.read().unwrap().get_type().clone() == ctx.type_term_from_str("( Char )").unwrap() {
+                                let co = cmd_obj.read().unwrap();
+                                if let Some(cmd_view) = co.get_view::<dyn SingletonView<Item = char>>() {
+                                    drop(co);
+                                    drop(e);
+                                    self.handle_meta_char(cmd_view.get(), child_close_char)
+                                } else {
+                                    TreeNavResult::Exit
+                                }
+                            } else {
+                                TreeNavResult::Exit
+                            }
+                        }
+                    }
+                } else {
+                    // cursor selects non existent item
+                    TreeNavResult::Exit
+                }
+            }
+        }
+    }
 }
-    */
-}
+
 
 use r3vi::view::singleton::SingletonView;
 use crate::commander::ObjCommander;
@@ -158,203 +231,28 @@ use crate::commander::ObjCommander;
 impl ObjCommander for PTYListController {
     fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
         let mut e = self.editor.write().unwrap();
-        let cur = e.cursor.get();
-        let cur_depth = e.get_cursor().tree_addr.len();
+        let cmd_type = cmd_obj.read().unwrap().get_type().clone();
 
-        let ctx0 = e.ctx.clone();
-        let ctx = e.ctx.clone();
-        let ctx = ctx.read().unwrap();
-
-        let co = cmd_obj.read().unwrap();
-        let cmd_type = co.get_type().clone();
-        let term_event_type = ctx.type_term_from_str("( TerminalEvent )").unwrap();
-        let list_cmd_type = ctx.type_term_from_str("( ListCmd )").unwrap();
-        let nested_node_type = ctx.type_term_from_str("( NestedNode )").unwrap();
-        let char_type = ctx.type_term_from_str("( Char )").unwrap();
-
-        if cmd_type == nested_node_type {
-            eprintln!("got nested node cmd");
-            if let Some(node_view) = co.get_view::<dyn SingletonView<Item = NestedNode>>() {
-                if let Some(idx) = cur.idx {
-                    match cur.mode {
-                        ListCursorMode::Select => {
-                            *e.data.get_mut(idx as usize) = Arc::new(RwLock::new(node_view.get()));
-                            TreeNavResult::Exit
-                        }
-                        ListCursorMode::Insert => {
-                            e.insert(Arc::new(RwLock::new(node_view.get())));
-                            e.cursor.set(ListCursor{ idx: Some(idx+1),  mode: ListCursorMode::Insert });
-                            TreeNavResult::Continue
-                        }
-                    }
-                } else {
-                    TreeNavResult::Exit
-                }
-            } else {
-                TreeNavResult::Continue
-            }
-        }
-
-        else if cmd_type == list_cmd_type {
-            drop(co);
+        if cmd_type == (&e.ctx, "( ListCmd )").into()
+        || cmd_type == (&e.ctx, "( NestedNode )").into()
+        {
             e.send_cmd_obj( cmd_obj )
         }
 
-        else if cmd_type == term_event_type {
-            if let Some(te_view) = co.get_view::<dyn SingletonView<Item = TerminalEvent>>() {
-                drop(co);
-                let event = te_view.get();
-
-                match event {
-                    TerminalEvent::Input(Event::Key(Key::Char('\t')))
-                        | TerminalEvent::Input(Event::Key(Key::Insert)) => {
-                            e.toggle_leaf_mode();
-                            e.set_leaf_mode(ListCursorMode::Select);
-
-                            TreeNavResult::Continue
-                        }
-                    _ => {
-                        if let Some(idx) = cur.idx {
-                            match cur.mode {
-                                ListCursorMode::Insert => {
-                                    match event {
-                                        TerminalEvent::Input(Event::Key(Key::Backspace)) => {
-                                            e.send_cmd_obj( ListCmd::DeletePxev.into_repr_tree(&ctx0) )
-                                        }
-                                        TerminalEvent::Input(Event::Key(Key::Delete)) => {
-                                            e.send_cmd_obj( ListCmd::DeletePxev.into_repr_tree(&ctx0) )
-                                        }
-                                        _ => {
-                                            let mut node = Context::make_node(&e.ctx, e.typ.clone(), self.depth).unwrap();
-                                            node.goto(TreeCursor::home());
-                                            node.send_cmd_obj(cmd_obj);
-/*
-                                            if e.is_listlist() {
-                                                if let Some(new_edit) = node.get_edit::<ListEditor>() {
-                                                    if new_edit.data.len() == 0 {
-                                                        remove = true;
-                                                    }
-                                                }
-                                            }
-
-                                            if ! remove {
-                                            */
-                                            e.insert(Arc::new(RwLock::new(node)));
-
-                                            TreeNavResult::Continue
-                                        }
-                                    }
-                                },
-                                ListCursorMode::Select => {
-                                    if let Some(mut item) = e.get_item().clone() {
-                                        if e.is_listlist() {
-                                            match event {
-                                                TerminalEvent::Input(Event::Key(Key::Backspace)) => {
-                                                    e.send_cmd_obj( ListCmd::DeletePxev.into_repr_tree(&ctx0) )
-                                                }
-                                                TerminalEvent::Input(Event::Key(Key::Delete)) => {
-                                                    e.send_cmd_obj( ListCmd::DeleteNexd.into_repr_tree(&ctx0) )
-                                                }
-
-                                                TerminalEvent::Input(Event::Key(Key::Char(c))) => {
-                                                    if Some(c) == self.split_char {
-                                                        e.listlist_split();
-                                                        TreeNavResult::Continue
-                                                    } else {
-                                                        item.send_cmd_obj(cmd_obj)
-                                                    }
-                                                }
-                                                _ => {
-                                                    item.send_cmd_obj(cmd_obj)
-                                                }
-                                            }
-                                        } else {
-                                            item.send_cmd_obj(cmd_obj)
-                                        }
-                                    } else {
-                                        TreeNavResult::Exit
-                                    }
-                                }
-                            }
-                        } else {
-                            TreeNavResult::Exit
-                        }
-                    }
-                }
+        else if cmd_type == (&e.ctx, "( TerminalEvent )").into() {
+            let co = cmd_obj.read().unwrap();
+            if let Some(view) = co.get_view::<dyn SingletonView<Item = TerminalEvent>>() {
+                drop( co );
+                drop( e );
+                self.handle_term_event( &view.get(), cmd_obj )
             } else {
                 TreeNavResult::Exit
             }
         }
 
         else {
-            drop(co);
-            match cur.mode {
-                ListCursorMode::Insert => {
-                    let mut new_edit = Context::make_node(&e.ctx, e.typ.clone(), self.depth).unwrap();
-                    new_edit.goto(TreeCursor::home());
-
-                    match new_edit.send_cmd_obj(cmd_obj.clone()) {
-                        TreeNavResult::Continue => {
-                            e.insert(Arc::new(RwLock::new(new_edit)));
-                            TreeNavResult::Continue
-                        }
-
-                        TreeNavResult::Exit => {
-                            //eprintln!("listedit: exit from insert mode");
-                            TreeNavResult::Exit
-                        }
-                    }
-                },
-                ListCursorMode::Select => {
-                    if let Some(mut item) = e.get_item_mut() {
-
-                        let mut i = item.write().unwrap();
-                        let res = i.send_cmd_obj(cmd_obj.clone());
-
-                        let close_char = i.close_char.get();
-                        drop(i);
-                        drop(item);
-
-                        match res {
-                            TreeNavResult::Continue => {
-                                TreeNavResult::Continue
-                            }
-
-                            TreeNavResult::Exit => {
-                                if cmd_type == char_type {
-                                    let co = cmd_obj.read().unwrap();
-                                    if let Some(cmd_view) = co.get_view::<dyn SingletonView<Item = char>>() {
-                                        drop(co);
-                                        let c = cmd_view.get();
-
-                                        if Some(c) == self.split_char {
-                                            e.listlist_split();
-                                            TreeNavResult::Continue
-                                        } else if Some(c) == close_char {
-                                            //eprintln!("listedit: exit from select (close)");
-                                            //item.goto(TreeCursor::none());
-                                            e.cursor.set(ListCursor {
-                                                mode: ListCursorMode::Insert,
-                                                idx: Some(cur.idx.unwrap_or(0)+1)
-                                            });
-                                            TreeNavResult::Continue
-                                        } else {
-                                            //eprintln!("listedit: exit from select mode");
-                                            TreeNavResult::Exit
-                                        }
-                                    } else {
-                                        TreeNavResult::Exit
-                                    }
-                                } else {
-                                    TreeNavResult::Exit
-                                }
-                            }
-                        }
-                    } else {
-                        TreeNavResult::Exit
-                    }
-                }
-            }
+            drop( e );
+            self.handle_any_event( cmd_obj )
         }
     }
 }

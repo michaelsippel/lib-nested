@@ -354,9 +354,13 @@ impl ListEditor {
             
             if let Some(head_editor) = item.editor.get() {
 
+                eprintln!("listlistsplit:editor = {:?}", Arc::into_raw(head_editor.clone()));
+
                 let head = head_editor.downcast::<RwLock<ListEditor>>().unwrap();
                 let mut head = head.write().unwrap();
-                
+
+                let mut tail_node = Context::make_node(&self.ctx, self.typ.clone(), 0).unwrap();
+
                 if head.data.len() > 0 {
                     if cur.tree_addr.len() > 2 {
                         eprintln!("call child head listlist split");
@@ -364,35 +368,33 @@ impl ListEditor {
                         eprintln!("return");
                     }
 
-                    eprintln!("got head");
+                    /*
+                    TODO: replace this by: (does not require  ListEditor downcast)
+                    head.send_cmd_obj(ListCmd::Split.into_repr());
+                    tail_node = head.spill_buf.clone();
+                     */
 
-                    let mut tail_node = Context::make_node(&self.ctx, self.typ.clone(), 0).unwrap();
                     head.split( &mut tail_node );
-                    
-                    eprintln!("made split");
-
-                    head.goto(TreeCursor::none());
-                    drop(head);
-
-                    eprintln!("done goto");
-
-                    tail_node.goto(
-                        TreeCursor {
-                            tree_addr: vec![0],
-                            leaf_mode: if cur.tree_addr.len() > 2 {
-                                ListCursorMode::Select
-                            } else {
-                                ListCursorMode::Insert
-                            }
-                        }
-                    );
-
-                    self.insert(
-                        Arc::new(RwLock::new(tail_node))
-                    );
-
-                    eprintln!("made insert");
                 }
+
+                head.goto(TreeCursor::none());
+                drop(head);
+
+                tail_node.goto(
+                    TreeCursor {
+                        tree_addr: vec![0],
+                        leaf_mode: if cur.tree_addr.len() > 2 {
+                            ListCursorMode::Select
+                        } else {
+                            ListCursorMode::Insert
+                        }
+                    }
+                );
+                self.insert(
+                    Arc::new(RwLock::new(tail_node))
+                );
+
+                eprintln!("made insert");
             }
         }
     }

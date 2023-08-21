@@ -26,10 +26,7 @@ impl ObjCommander for CharEditor {
         let cmd_obj = cmd_obj.read().unwrap();
         let cmd_type = cmd_obj.get_type().clone();
 
-        let char_type = (&self.ctx, "( Char )").into();
-        //let _term_event_type = (&ctx, "( TerminalEvent )").into();
-
-        if cmd_type == char_type {
+        if cmd_type == (&self.ctx, "( Char )").into() {
             if let Some(cmd_view) = cmd_obj.get_view::<dyn SingletonView<Item = char>>() {
                 let value = cmd_view.get();
 
@@ -66,9 +63,7 @@ impl CharEditor {
 
     pub fn new_node(ctx0: Arc<RwLock<Context>>) -> NestedNode {
         let data = SingletonBuffer::new('\0');
-
         let ctx = ctx0.clone();
-
         let editor = Arc::new(RwLock::new(CharEditor{ ctx, data: data.clone() }));
 
         NestedNode::new(

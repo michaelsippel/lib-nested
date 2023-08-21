@@ -4,7 +4,7 @@ use {
         buffer::{singleton::*}
     },
     crate::{
-        editors::list::{ListEditor, ListCursorMode},
+        editors::list::{ListEditor, ListCursor, ListCursorMode},
         type_system::{Context, ReprTree},
         tree::{NestedNode, TreeNav, TreeNavResult, TreeCursor},
         commander::{ObjCommander}
@@ -36,8 +36,29 @@ impl ListCmd {
 impl ObjCommander for ListEditor {
     fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
         let cmd_repr = cmd_obj.read().unwrap();
+        
+        if let Some(view) = cmd_repr.get_view::<dyn SingletonView<Item = NestedNode>>() {
+            let node = view.get();
+            let cur = self.cursor.get();
 
-        if let Some(cmd) = cmd_repr.get_view::<dyn SingletonView<Item = ListCmd>>() {
+            if let Some(idx) = cur.idx {
+                match cur.mode {
+                    ListCursorMode::Select => {
+                        *self.data.get_mut(idx as usize) = Arc::new(RwLock::new(node));
+                        TreeNavResult::Exit
+                    }
+                    ListCursorMode::Insert => {
+                        self.insert(Arc::new(RwLock::new(node)));
+                        self.cursor.set(ListCursor{ idx: Some(idx+1),  mode: ListCursorMode::Insert });
+                        TreeNavResult::Continue
+                    }
+                }
+            } else {
+                TreeNavResult::Exit
+            }
+        }
+
+        else if let Some(cmd) = cmd_repr.get_view::<dyn SingletonView<Item = ListCmd>>() {
             let cur = self.cursor.get();
             drop(cmd_repr);
             
@@ -80,8 +101,29 @@ impl ObjCommander for ListEditor {
                                         }
                                     }
 
-                                    _ => {
+                                    ListCmd::Split => {
+                                        self.listlist_split();
                                         TreeNavResult::Continue
+                                    }
+
+                                    _ => {
+                                        eprintln!("list edit: give cmd to child");
+
+                                        match item.send_cmd_obj(cmd_obj) {
+                                            TreeNavResult::Continue => TreeNavResult::Continue,
+                                            TreeNavResult::Exit => {
+                                                TreeNavResult::Continue
+                                                /*
+                                                match cmd.get() {
+                                                ListCmd::Split => {
+                                                    },
+                                                    _ => {
+                                                        TreeNavResult::Exit
+                                                    }
+                                            }
+                                                    */
+                                            }
+                                        }
                                     }
                                 }
                             } else {
@@ -103,7 +145,11 @@ impl ObjCommander for ListEditor {
                                 TreeNavResult::Continue
                             }
                             ListCmd::Split => {
+/*
+                                self.split(self.spill_node);
+                                */
                                 self.listlist_split();
+
                                 TreeNavResult::Continue
                             }
                             ListCmd::Clear => {
