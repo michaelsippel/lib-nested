@@ -39,6 +39,8 @@ pub struct TypeTermEditor {
                 Option< Arc<dyn Any + Send + Sync> >
             >,
 
+    close_char: SingletonBuffer<Option<char>>,
+
     state: State,
     cur_node: SingletonBuffer< NestedNode >
 }
@@ -56,7 +58,7 @@ impl TypeTermEditor {
                     TypeID::Var(_) => State::VarSymbol
                 });
 
-                let typename = ctx.read().unwrap().get_typename(&tyid).unwrap_or("UNKNOWN TYPE".into());
+                let typename = ctx.read().unwrap().get_typename(&tyid).unwrap_or("UNNAMED TYPE".into());
                 for x in typename.chars()
                 {
                     node.send_cmd_obj(
@@ -69,10 +71,11 @@ impl TypeTermEditor {
                 let editor = node.get_edit::<TypeTermEditor>().expect("typ term edit");
                 editor.write().unwrap().set_state( State::App );
 
-                for x in args.iter() {
-                    let arg_node = TypeTermEditor::from_type_term( ctx.clone(), depth+1, x );
+                let parent_ctx = editor.read().unwrap().cur_node.get().ctx.clone();
 
-                    eprintln!("add node arg!");
+                for x in args.iter() {                    
+                    let arg_node = TypeTermEditor::from_type_term( parent_ctx.clone(), depth+1, x );
+
                     node.send_cmd_obj(
                         ReprTree::new_leaf(
                             (&ctx, "( NestedNode )"),
@@ -86,10 +89,11 @@ impl TypeTermEditor {
                 let editor = node.get_edit::<TypeTermEditor>().expect("typ term edit");
                 editor.write().unwrap().set_state( State::Ladder );
 
-                for x in args.iter() {
-                    let arg_node = TypeTermEditor::from_type_term( ctx.clone(), depth+1, x );
+                let parent_ctx = editor.read().unwrap().cur_node.get().ctx.clone();
 
-                    eprintln!("add node arg!");
+                for x in args.iter() {
+                    let arg_node = TypeTermEditor::from_type_term( parent_ctx.clone(), depth+1, x );
+
                     node.send_cmd_obj(
                         ReprTree::new_leaf(
                             (&ctx, "( NestedNode )"),
@@ -102,7 +106,9 @@ impl TypeTermEditor {
             TypeTerm::Num( n ) => {
                 let editor = node.get_edit::<TypeTermEditor>().expect("typ term edit");
 
-                let int_edit = crate::editors::integer::PosIntEditor::from_u64(node.ctx.clone(), 10, *n as u64);
+                let parent_ctx = editor.read().unwrap().cur_node.get().ctx.clone();
+
+                let int_edit = crate::editors::integer::PosIntEditor::from_u64(parent_ctx, 10, *n as u64);
                 let node = int_edit.into_node();
 
                 editor.write().unwrap().editor.set(node.editor.get());
@@ -126,6 +132,7 @@ impl TypeTermEditor {
     
     fn set_state(&mut self, new_state: State) {
         let old_node = self.cur_node.get();
+
         let mut node = match new_state {
             State::App => {
                 let mut node = Context::make_node( &self.ctx, (&self.ctx, "( List Type )").into(), 0 ).unwrap();
@@ -144,7 +151,7 @@ impl TypeTermEditor {
             },
             State::FunSymbol => {
                 let mut node = Context::make_node( &self.ctx, (&self.ctx, "( List Char )").into(), 0 ).unwrap();
-                node = node.morph( (&self.ctx, "( Type::Sym::Fun )").into() );                
+                node = node.morph( (&self.ctx, "( Type::Sym::Fun )").into() );
                 node
             },
             State::VarSymbol => {
@@ -155,7 +162,6 @@ impl TypeTermEditor {
             State::Num => {
                 let int_edit = crate::editors::integer::PosIntEditor::new(self.ctx.clone(), 10);
                 let mut node = int_edit.into_node();
-
                 node = node.morph( (&self.ctx, "( Type::Lit::Num )").into() );
                 node
             }
@@ -172,15 +178,15 @@ impl TypeTermEditor {
         node.goto(TreeCursor::home());
 
         let editor = node.editor.get();
-        eprintln!("set_state:editor = {:?}", Arc::into_raw(editor.clone().unwrap()));
 
         self.editor.set(editor);
-        self.cur_node.set(node);
+        self.close_char.set(node.close_char.get());
 
+        self.cur_node.set(node);
         self.state = new_state;
     }
 
-    pub fn new_node(ctx: Arc<RwLock<Context>>, depth: usize) -> NestedNode {
+    pub fn new_node(ctx: Arc<RwLock<Context>>, depth: usize) -> NestedNode {        
         let mut symb_node = Context::make_node( &ctx, (&ctx, "( List Char )").into(), 0 ).unwrap();
         symb_node = symb_node.morph( (&ctx, "( Type::Sym )").into() );
 
@@ -204,7 +210,8 @@ impl TypeTermEditor {
             state,
             data: data.clone(),
             cur_node: SingletonBuffer::new(node),
-            editor: SingletonBuffer::new(None)
+            editor: SingletonBuffer::new(None),
+            close_char: SingletonBuffer::new(None)
         };
 
         let view = editor.cur_node
@@ -233,7 +240,7 @@ impl TypeTermEditor {
             .set_cmd(editor.clone())
             .set_editor(editor.clone());
 
-        node.close_char.set(cc.get());
+        editor.write().unwrap().close_char = node.close_char.clone();
         editor.write().unwrap().editor = node.editor.clone();
         
         node
@@ -358,8 +365,7 @@ impl ObjCommander for TypeTermEditor {
                         }
                     }
 
-//                    State::App | State::AnySymbol | State::FunSymbol | State::VarSymbol
-                        _ => {
+                    _ => {
                         match self.cur_node.get_mut().send_cmd_obj( co ) {
                             TreeNavResult::Exit => {
                                 match c {
@@ -392,7 +398,7 @@ impl ObjCommander for TypeTermEditor {
         } else {
             match &self.state {
                 State::Any => {
-                    eprintln!("undefined comd object set to listl");
+                    eprintln!("undefined comd object set to ladder");
                     self.set_state( State::Ladder );
                     self.cur_node.get_mut().goto(TreeCursor::home());
                     let res = self.cur_node.get().cmd.get().unwrap().write().unwrap().send_cmd_obj( co );

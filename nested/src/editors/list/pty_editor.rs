@@ -147,7 +147,7 @@ impl PTYListController {
     }
 
     pub fn handle_meta_char(&mut self, c: char, child_close_char: Option<char>) -> TreeNavResult {
-        eprintln!("handle meta char");
+        eprintln!("handle meta char: got '{}', child_close={:?}, self.close={:?}, split={:?}", c, child_close_char, self.close_char, self.split_char);
         let mut e = self.editor.write().unwrap();
         let cur = e.cursor.get();
         
@@ -157,8 +157,8 @@ impl PTYListController {
         } else if Some(c) == child_close_char {
             e.goto(TreeCursor::none());
             e.cursor.set(ListCursor {
-                mode: ListCursorMode::Select,
-                idx: Some(cur.idx.unwrap_or(0))
+                mode: ListCursorMode::Insert,
+                idx: Some(cur.idx.unwrap_or(0)+1)
             });
             TreeNavResult::Continue
         } else {
@@ -174,33 +174,27 @@ impl PTYListController {
 
         match cur.mode {
             ListCursorMode::Insert => {
-                eprintln!("PTYList(insert): create new child and forward cmd");
                 let mut new_edit = Context::make_node(&e.ctx, e.typ.clone(), self.depth).unwrap();
                 new_edit.goto(TreeCursor::home());
 
                 match new_edit.send_cmd_obj(cmd_obj.clone()) {
                     TreeNavResult::Continue => {
-                        eprintln!("PTYList(insert): child returned cont");
                         e.insert(Arc::new(RwLock::new(new_edit)));
                         TreeNavResult::Continue
                     }
                     TreeNavResult::Exit => {
-                        eprintln!("PTYList(insert): child returned exit");
                         TreeNavResult::Exit
                     }
                 }
             },
             ListCursorMode::Select => {
                 if let Some(item) = e.get_item_mut() {
-                    eprintln!("PTYList(select): forward any cmd to current child item");
                     let res = item.write().unwrap().send_cmd_obj(cmd_obj.clone());
                     let child_close_char = item.read().unwrap().close_char.get();
-                    eprintln!("PTYList(select): child returned");
 
                     match res {
                         TreeNavResult::Continue => TreeNavResult::Continue,
                         TreeNavResult::Exit => {
-                            eprintln!("...returned with exit");
                             // child editor returned control, probably for meta-char handling..
 
                             if cmd_obj.read().unwrap().get_type().clone() == ctx.type_term_from_str("( Char )").unwrap() {
