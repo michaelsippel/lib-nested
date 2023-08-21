@@ -202,8 +202,8 @@ impl TypeTerm {
 
     // returns provided syntax-type, 
     pub fn is_semantic_subtype_of(&self, expected_type: &TypeTerm) -> Option< TypeTerm > {
-        let mut provided_lnf = self.clone();
-        let mut expected_lnf = expected_type.clone();
+        let provided_lnf = self.clone();
+        let expected_lnf = expected_type.clone();
 
         match
             (provided_lnf.normalize(),

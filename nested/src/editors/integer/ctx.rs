@@ -1,18 +1,13 @@
 use {
     crate::{
-        type_system::{Context, TypeTerm, ReprTree},
+        type_system::{Context, TypeTerm},
         editors::{
-            char::*,
             list::*,
-            integer::*,
-            product::*
+            integer::*
         },
-        tree::{NestedNode},
-        diagnostics::{Diagnostics},
         type_system::{MorphismTypePattern},
     },
-    std::sync::{Arc, RwLock},
-    cgmath::Point2
+    std::sync::{Arc, RwLock}
 };
 
 pub fn init_ctx(ctx: &mut Context) {
@@ -55,8 +50,8 @@ pub fn init_ctx(ctx: &mut Context) {
     ctx.add_morphism(pattern,
         Arc::new(
             |mut node, dst_type| {
-                let depth = node.depth.get();
-                let editor = node.editor.get().unwrap().downcast::<RwLock<ListEditor>>().unwrap();
+                let _depth = node.depth.get();
+                let _editor = node.editor.get().unwrap().downcast::<RwLock<ListEditor>>().unwrap();
 
                 // todo: check src_type parameter to be ( Digit radix )
 

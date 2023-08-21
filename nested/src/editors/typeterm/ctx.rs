@@ -1,21 +1,14 @@
 use {
     r3vi::{
-        buffer::singleton::*,
-        view::{singleton::*, sequence::*, OuterViewPort},
-        projection::flatten_grid::*,
-        projection::flatten_singleton::*
+        view::{singleton::*, sequence::*}
     },
     crate::{
-        type_system::{Context, TypeID, TypeTerm, ReprTree, MorphismTypePattern},
-        terminal::{TerminalEvent, TerminalStyle},
-        editors::{sum::*, list::{ListCursorMode, ListEditor, PTYListStyle, PTYListController}, typeterm::{State, TypeTermEditor}},
-        tree::{NestedNode, TreeNav, TreeNavResult, TreeCursor},
-        commander::ObjCommander,
-        PtySegment
+        type_system::{Context, TypeTerm, MorphismTypePattern},
+        terminal::{TerminalStyle},
+        editors::{list::{PTYListStyle, PTYListController}, typeterm::{State, TypeTermEditor}}
     },
-    termion::event::{Key},
-    std::{sync::{Arc, RwLock}, any::Any},
-    cgmath::{Vector2, Point2}
+    std::{sync::{Arc, RwLock}},
+    cgmath::{Point2}
 };
 
 pub fn init_ctx(ctx: &mut Context) {
@@ -31,8 +24,8 @@ pub fn init_ctx(ctx: &mut Context) {
 
     ctx.add_morphism(
         MorphismTypePattern { src_tyid: ctx.get_typeid("List"), dst_tyid: ctx.get_typeid("Type").unwrap() },
-        Arc::new(move |mut node, _dst_type:_| {
-            let mut new_node = TypeTermEditor::with_node( node.ctx.clone(), node.depth.get(), node.clone(), State::Any );
+        Arc::new(move |node, _dst_type:_| {
+            let new_node = TypeTermEditor::with_node( node.ctx.clone(), node.depth.get(), node.clone(), State::Any );
             Some(new_node)
         }));
 
@@ -77,14 +70,14 @@ pub fn init_ctx(ctx: &mut Context) {
             // display variables blue color
             if let Some(v) = node.view {
                 node.view = Some(
-                    v.map_item(|i,p| p.add_style_front(TerminalStyle::fg_color((5, 120, 240)))));
+                    v.map_item(|_i,p| p.add_style_front(TerminalStyle::fg_color((5, 120, 240)))));
             }
             Some(node)
         }));
 
     ctx.add_morphism(
         MorphismTypePattern { src_tyid: ctx.get_typeid("PosInt"), dst_tyid: ctx.get_typeid("Type::Lit::Num").unwrap() },
-        Arc::new(|mut node, _dst_type:_| {
+        Arc::new(|node, _dst_type:_| {
             Some(node)
         }));
 
@@ -115,3 +108,4 @@ pub fn init_ctx(ctx: &mut Context) {
             Some(TypeTermEditor::new_node(ctx, depth))
         }));
 }
+

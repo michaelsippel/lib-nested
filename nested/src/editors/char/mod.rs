@@ -8,7 +8,7 @@ use {
     },
     crate::{
         type_system::{Context, ReprTree, TypeTerm},
-        terminal::{TerminalAtom, TerminalStyle},
+        terminal::{TerminalAtom},
         tree::{NestedNode, TreeNavResult},
         commander::{ObjCommander}
     },
@@ -39,6 +39,7 @@ impl ObjCommander for CharEditor {
                 let value = cmd_view.get();
 
                 if self.ctx.read().unwrap().meta_chars.contains(&value) {
+                    eprintln!("char: meta char EXID");
                     TreeNavResult::Exit
                 } else {
                     self.data.set(value);

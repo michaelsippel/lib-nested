@@ -4,16 +4,14 @@ use {
         projection::decorate_sequence::*,
     },
     crate::{
-        type_system::{Context, TypeTerm, ReprTree},
+        type_system::{Context, ReprTree},
         editors::list::*,
         terminal::{TerminalEvent, TerminalView, make_label},
         tree::{TreeCursor, TreeNav, TreeNavResult},
-        diagnostics::{Diagnostics},
         tree::NestedNode,
         PtySegment
     },
     std::sync::{Arc, RwLock},
-    std::any::{Any},
     termion::event::{Event, Key}
 };
 
@@ -103,7 +101,7 @@ impl PTYListController {
         close_char: Option<char>
     ) {
         {
-            let mut ctx = node.ctx.as_ref();
+            let ctx = node.ctx.as_ref();
             let mut ctx = ctx.write().unwrap();
 
             if let Some(c) = split_char.as_ref() {
@@ -137,7 +135,7 @@ impl PTYListController {
         self.depth = depth;
     }
 
-    pub fn handle_term_event(&mut self, event: &TerminalEvent, cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
+    pub fn handle_term_event(&mut self, event: &TerminalEvent, _cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
         let mut e = self.editor.write().unwrap();
         match event {
             TerminalEvent::Input(Event::Key(Key::Insert)) => {
@@ -193,7 +191,7 @@ impl PTYListController {
                 }
             },
             ListCursorMode::Select => {
-                if let Some(mut item) = e.get_item_mut() {
+                if let Some(item) = e.get_item_mut() {
                     eprintln!("PTYList(select): forward any cmd to current child item");
                     let res = item.write().unwrap().send_cmd_obj(cmd_obj.clone());
                     let child_close_char = item.read().unwrap().close_char.get();

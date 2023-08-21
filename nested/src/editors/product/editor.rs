@@ -211,7 +211,7 @@ impl ObjCommander for ProductEditor {
 
                 let mut update_segment = false;
 
-                let result = if let Some(mut segment) = self.get_cur_segment_mut().as_deref_mut() {
+                let _result = if let Some(mut segment) = self.get_cur_segment_mut().as_deref_mut() {
                     if let Some(ProductEditorSegment::N{ t, editor, ed_depth, cur_depth, cur_dist: _ }) = segment.deref_mut() {
                         *cur_depth = self.get_cursor().tree_addr.len();
 

@@ -5,7 +5,7 @@ use {
     },
     crate::{
         type_system::{Context, TypeTerm, ReprTree},
-        editors::list::{ListCursor, ListCursorMode, ListCmd, PTYListController, PTYListStyle},
+        editors::list::{ListCursor, ListCursorMode},
         tree::{NestedNode, TreeNav, TreeCursor},
         diagnostics::Diagnostics
     },
@@ -319,7 +319,7 @@ impl ListEditor {
 
         if let Some(item) = self.get_item() {
 //            let item = item.read().unwrap();
-            let depth = item.depth;
+            let _depth = item.depth;
             
             if let Some(head_editor) = item.editor.get() {
                 eprintln!("listlistsplit:editor = {:?}", Arc::into_raw(head_editor.clone()));
@@ -400,7 +400,7 @@ impl ListEditor {
             let next_editor = next_editor.read().unwrap();
             if let Some(next_editor) = next_editor.editor.get() {
                 if let Ok(next_editor) = next_editor.downcast::<RwLock<ListEditor>>() {
-                    let mut next_editor = next_editor.write().unwrap();
+                    let next_editor = next_editor.write().unwrap();
                     let cur_editor = item.editor.get().unwrap();
                     let cur_editor = cur_editor.downcast::<RwLock<ListEditor>>().unwrap();
                     let mut cur_editor = cur_editor.write().unwrap();

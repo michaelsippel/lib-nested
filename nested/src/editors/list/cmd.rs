@@ -1,7 +1,6 @@
 use {
     r3vi::{
-        view::{singleton::*},
-        buffer::{singleton::*}
+        view::{singleton::*}
     },
     crate::{
         editors::list::{ListEditor, ListCursor, ListCursorMode},

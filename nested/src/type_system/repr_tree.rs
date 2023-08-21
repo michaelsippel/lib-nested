@@ -22,7 +22,7 @@ impl std::fmt::Debug for ReprTree {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "type: {:?}", self.type_tag)?;
 
-        for (k,x) in self.branches.iter() {
+        for (_k,x) in self.branches.iter() {
             write!(f, "child: {:?}", x)?;
         }
 

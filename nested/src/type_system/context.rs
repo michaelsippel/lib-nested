@@ -69,7 +69,7 @@ impl MorphismTypePattern {
 }
 
 impl From<MorphismType> for MorphismTypePattern {    
-    fn from(mut value: MorphismType) -> MorphismTypePattern {
+    fn from(value: MorphismType) -> MorphismTypePattern {
         fn strip( x: &TypeTerm ) -> TypeID {
             match x {
                 TypeTerm::TypeID(id) => id.clone(),
@@ -280,7 +280,7 @@ impl Context {
         /* create new context per node ?? too heavy.. whats the reason? TODO */
 
         let new_ctx = Arc::new(RwLock::new(Context::with_parent(Some(ctx.clone()))));
-        let new_depth = depth;
+        let _new_depth = depth;
 
         mk_node(
             NestedNode::new(new_ctx, ReprTree::new_arc(type_term.clone()), 0),
@@ -289,7 +289,7 @@ impl Context {
     }
 
     pub fn morph_node(mut node: NestedNode, dst_type: TypeTerm) -> NestedNode {
-        let mut src_type = node.data.read().unwrap().get_type().clone();
+        let src_type = node.data.read().unwrap().get_type().clone();
         let pattern = MorphismType { src_type: Some(src_type), dst_type: dst_type.clone() };
 
         /* it is not univesally true to always use ascend.

@@ -5,21 +5,16 @@ pub use ctx::init_ctx;
 use {
     r3vi::{
         buffer::singleton::*,
-        view::{singleton::*, sequence::*, OuterViewPort},
-        projection::flatten_grid::*,
-        projection::flatten_singleton::*
+        view::{singleton::*, sequence::*, OuterViewPort}
     },
     crate::{
-        type_system::{Context, TypeID, TypeTerm, ReprTree, MorphismTypePattern},
-        terminal::{TerminalEvent, TerminalStyle},
-        editors::{sum::*, list::{ListCursorMode, ListEditor, PTYListStyle, PTYListController}},
+        type_system::{Context, TypeID, TypeTerm, ReprTree},
+        editors::{list::{ListCursorMode}},
         tree::{NestedNode, TreeNav, TreeNavResult, TreeCursor},
-        commander::ObjCommander,
-        PtySegment
+        commander::ObjCommander
     },
-    termion::event::{Key},
     std::{sync::{Arc, RwLock}, any::Any},
-    cgmath::{Vector2, Point2}
+    cgmath::{Vector2}
 };
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -55,7 +50,7 @@ impl TypeTermEditor {
 
         match term {
             TypeTerm::TypeID( tyid ) => {
-                let mut editor = node.get_edit::<TypeTermEditor>().expect("typ term edit");
+                let editor = node.get_edit::<TypeTermEditor>().expect("typ term edit");
                 editor.write().unwrap().set_state(match tyid {
                     TypeID::Fun(_) => State::FunSymbol,
                     TypeID::Var(_) => State::VarSymbol
@@ -71,11 +66,11 @@ impl TypeTermEditor {
             },
 
             TypeTerm::App( args ) => {
-                let mut editor = node.get_edit::<TypeTermEditor>().expect("typ term edit");
+                let editor = node.get_edit::<TypeTermEditor>().expect("typ term edit");
                 editor.write().unwrap().set_state( State::App );
 
                 for x in args.iter() {
-                    let mut arg_node = TypeTermEditor::from_type_term( ctx.clone(), depth+1, x );
+                    let arg_node = TypeTermEditor::from_type_term( ctx.clone(), depth+1, x );
 
                     eprintln!("add node arg!");
                     node.send_cmd_obj(
@@ -88,11 +83,11 @@ impl TypeTermEditor {
             }
 
             TypeTerm::Ladder( args ) => {
-                let mut editor = node.get_edit::<TypeTermEditor>().expect("typ term edit");
+                let editor = node.get_edit::<TypeTermEditor>().expect("typ term edit");
                 editor.write().unwrap().set_state( State::Ladder );
 
                 for x in args.iter() {
-                    let mut arg_node = TypeTermEditor::from_type_term( ctx.clone(), depth+1, x );
+                    let arg_node = TypeTermEditor::from_type_term( ctx.clone(), depth+1, x );
 
                     eprintln!("add node arg!");
                     node.send_cmd_obj(
@@ -105,10 +100,10 @@ impl TypeTermEditor {
             }
 
             TypeTerm::Num( n ) => {
-                let mut editor = node.get_edit::<TypeTermEditor>().expect("typ term edit");
+                let editor = node.get_edit::<TypeTermEditor>().expect("typ term edit");
 
-                let mut int_edit = crate::editors::integer::PosIntEditor::from_u64(node.ctx.clone(), 10, *n as u64);
-                let mut node = int_edit.into_node();
+                let int_edit = crate::editors::integer::PosIntEditor::from_u64(node.ctx.clone(), 10, *n as u64);
+                let node = int_edit.into_node();
 
                 editor.write().unwrap().editor.set(node.editor.get());
                 editor.write().unwrap().cur_node.set(node);
@@ -116,7 +111,7 @@ impl TypeTermEditor {
             }
 
             TypeTerm::Char( c ) => {
-                let mut editor = node.get_edit::<TypeTermEditor>().expect("typ term edit");
+                let editor = node.get_edit::<TypeTermEditor>().expect("typ term edit");
 
                 editor.write().unwrap().set_state( State::Char );
                 editor.write().unwrap().send_cmd_obj(ReprTree::from_char(&ctx, *c));
@@ -158,7 +153,7 @@ impl TypeTermEditor {
                 node
             }
             State::Num => {
-                let mut int_edit = crate::editors::integer::PosIntEditor::new(self.ctx.clone(), 10);
+                let int_edit = crate::editors::integer::PosIntEditor::new(self.ctx.clone(), 10);
                 let mut node = int_edit.into_node();
 
                 node = node.morph( (&self.ctx, "( Type::Lit::Num )").into() );
@@ -198,13 +193,13 @@ impl TypeTermEditor {
     }
 
     fn with_node(ctx: Arc<RwLock<Context>>, depth: usize, node: NestedNode, state: State) -> NestedNode {
-        let buffer = SingletonBuffer::<Option<TypeTerm>>::new( None );
+        let _buffer = SingletonBuffer::<Option<TypeTerm>>::new( None );
 
         let data = Arc::new(RwLock::new(ReprTree::new(
             (&ctx, "( Type )")
         )));
 
-        let mut editor = TypeTermEditor {
+        let editor = TypeTermEditor {
             ctx: ctx.clone(),
             state,
             data: data.clone(),

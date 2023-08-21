@@ -1,13 +1,10 @@
 use {
     r3vi::{
-        view::{port::UpdateTask, OuterViewPort, singleton::*, sequence::*},
-        buffer::{singleton::*, vec::*}
+        view::{sequence::*}
     },
     crate::{
-        type_system::{Context, TypeTerm, ReprTree},
-        editors::list::{ListEditor, ListCursor, ListCursorMode, ListCmd, PTYListController, PTYListStyle},
-        tree::{NestedNode, TreeNav, TreeCursor},
-        diagnostics::Diagnostics
+        type_system::{Context, TypeTerm},
+        editors::list::{ListEditor, PTYListController, PTYListStyle}
     },
     std::sync::{Arc, RwLock}
 };

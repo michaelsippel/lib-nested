@@ -12,9 +12,9 @@ use {
     },
     crate::{
         type_system::{Context, TypeTerm, ReprTree},
-        editors::list::{ListEditor, ListCmd, PTYListController, PTYListStyle},
+        editors::list::{ListCmd, PTYListController, PTYListStyle},
         terminal::{
-            TerminalAtom, TerminalEvent, TerminalStyle, make_label
+            TerminalAtom, TerminalStyle, make_label
         },
         diagnostics::{Message},
         tree::{NestedNode, TreeNav, TreeNavResult, TreeCursor},
@@ -23,7 +23,6 @@ use {
     std::sync::Arc,
     std::sync::RwLock,
     std::iter::FromIterator,
-    termion::event::{Event, Key},
     cgmath::{Point2}
 };
 
@@ -56,7 +55,7 @@ impl ObjCommander for DigitEditor {
                        add a message to the diagnostics view
                      */
 
-                    let mut message = IndexBuffer::from_iter(vec![
+                    let message = IndexBuffer::from_iter(vec![
                         (Point2::new(1, 0), make_label("invalid digit '")),
                         (Point2::new(2, 0), make_label(&format!("{}", c))
                          .map_item(|_p,a| a.add_style_back(TerminalStyle::fg_color((140,140,250))))),
