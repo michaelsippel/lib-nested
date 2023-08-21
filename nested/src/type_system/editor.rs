@@ -21,13 +21,13 @@ use {
 #[derive(PartialEq, Eq, Clone, Copy)]
 enum State {
     Any,
-    App,
-    Ladder,
-    Char,
     Num,
+    Char,
     AnySymbol,
     FunSymbol,
     VarSymbol,
+    App,
+    Ladder,
 }
 
 pub struct TypeTermEditor {
@@ -46,97 +46,101 @@ pub struct TypeTermEditor {
 
 impl TypeTermEditor {
     pub fn init_ctx(ctx: &mut Context) {
-        ctx.add_list_typename("TypeTerm".into());
-        ctx.add_list_typename("TypeSymbol".into());
-        ctx.add_list_typename("TypeLadder".into());
-        ctx.add_list_typename("TypeSymbol::Function".into());
-        ctx.add_list_typename("TypeSymbol::Variable".into());
-        ctx.add_list_typename("TypeSymbol::Literal::Num".into());
-        ctx.add_list_typename("TypeSymbol::Literal::Char".into());
+        ctx.add_list_typename("Type".into()); // = Lit | Sym | App | Ladder
+        ctx.add_list_typename("Type::Lit".into()); // = Num | char
+        ctx.add_list_typename("Type::Lit::Num".into());  // [0-9]*
+        ctx.add_list_typename("Type::Lit::Char".into()); // .
+        ctx.add_list_typename("Type::Sym".into()); // = Fun | Var
+        ctx.add_list_typename("Type::Sym::Fun".into());  // [a-zA-Z][a-zA-Z0-9]*
+        ctx.add_list_typename("Type::Sym::Var".into());  // [a-zA-Z][a-zA-Z0-9]*
+        ctx.add_list_typename("Type::App".into()); // = <T1 T2 ...>
+        ctx.add_list_typename("Type::Ladder".into()); // = T1~T2~...
 
         ctx.add_morphism(
-            MorphismTypePattern {
-                src_tyid: ctx.get_typeid("List"),
-                dst_tyid: ctx.get_typeid("TypeSymbol").unwrap()
-            },
-            Arc::new(
-                |mut node, _dst_type:_| {
-                    PTYListController::for_node( &mut node, Some(' '), None );
-                    PTYListStyle::for_node( &mut node, ("","","") );
-
-                    if let Some(v) = node.view {
-                        node.view = Some(
-                            v.map_item(|i,p| p.add_style_front(TerminalStyle::fg_color((220, 220, 200)))));
-                    }
-
-                    Some(node)
-                }
-            )
-        );
-        
-        ctx.add_morphism(
-            MorphismTypePattern {
-                src_tyid: ctx.get_typeid("List"),
-                dst_tyid: ctx.get_typeid("TypeSymbol::Function").unwrap()
-            },
-            Arc::new(
-                |mut node, _dst_type:_| {
-                    PTYListController::for_node( &mut node, None, None );
-                    PTYListStyle::for_node( &mut node, ("","","") );
-
-                    if let Some(v) = node.view {
-                        node.view = Some(
-                            v.map_item(|i,p| p.add_style_front(TerminalStyle::fg_color((220, 220, 220)))));
-                    }
-
-                    Some(node)
-                }
-            )
-        );
+            MorphismTypePattern { src_tyid: ctx.get_typeid("List"), dst_tyid: ctx.get_typeid("Type").unwrap() },
+            Arc::new(move |mut node, _dst_type:_| {
+                let mut new_node = TypeTermEditor::with_node( node.ctx.clone(), node.depth.get(), node.clone(), State::Any );
+                Some(new_node)
+            }));
 
         ctx.add_morphism(
-            MorphismTypePattern {
-                src_tyid: ctx.get_typeid("List"),
-                dst_tyid: ctx.get_typeid("TypeSymbol::Variable").unwrap()
-            },
-            Arc::new(
-                |mut node, _dst_type:_| {
-                    PTYListController::for_node( &mut node, None, None );
-                    PTYListStyle::for_node( &mut node, ("","","") );
-
-                    if let Some(v) = node.view {
-                        node.view = Some(
-                            v.map_item(|i,p| p.add_style_front(TerminalStyle::fg_color((5, 120, 240)))));
-                    }
-
-                    Some(node)
-                }
-            )
-        );
-
-        ctx.add_node_ctor(
-            "TypeTerm", Arc::new(
-                |ctx: Arc<RwLock<Context>>, _ty: TypeTerm, depth: usize| {
-                    Some(TypeTermEditor::new_node(ctx, depth))
-                }
-            )
-        );
+            MorphismTypePattern { src_tyid: ctx.get_typeid("List"), dst_tyid: ctx.get_typeid("Type::Ladder").unwrap() },
+            Arc::new(|mut node, _dst_type: _| {
+                PTYListController::for_node( &mut node, Some('~'), None );
+                PTYListStyle::for_node( &mut node, ("","~","") );
+                Some(node)
+            }));
 
         ctx.add_morphism(
-            MorphismTypePattern {
-                src_tyid: ctx.get_typeid("List"),
-                dst_tyid: ctx.get_typeid("TypeTerm").unwrap()
-            },
-            Arc::new(
-                move |mut node, _dst_type:_| {
-                    eprintln!("morphism to typeterm");
-                    PTYListController::for_node( &mut node, Some(' '), None );
-                    PTYListStyle::for_node( &mut node, ("","","") );
-                    let mut new_node = TypeTermEditor::with_node( node.ctx.clone(), node.depth.get(), node.clone(), State::Any );
-                    Some(new_node)
+            MorphismTypePattern { src_tyid: ctx.get_typeid("List"), dst_tyid: ctx.get_typeid("Type::App").unwrap() },
+            Arc::new( |mut node, _dst_type: _| {
+                PTYListController::for_node( &mut node, Some(' '), Some('>') );
+                PTYListStyle::for_node( &mut node, ("<"," ",">") );
+                Some(node)
+            }));
+
+        ctx.add_morphism(
+            MorphismTypePattern { src_tyid: ctx.get_typeid("List"), dst_tyid: ctx.get_typeid("Type::Sym").unwrap() },
+            Arc::new(|mut node, _dst_type:_| {
+                PTYListController::for_node( &mut node, Some(' '), None );
+                PTYListStyle::for_node( &mut node, ("","","") );
+                Some(node)
+            }));
+
+        ctx.add_morphism(
+            MorphismTypePattern { src_tyid: ctx.get_typeid("List"), dst_tyid: ctx.get_typeid("Type::Sym::Fun").unwrap() },
+            Arc::new(|mut node, _dst_type:_| {
+                PTYListController::for_node( &mut node, Some(' '), None );
+                PTYListStyle::for_node( &mut node, ("","","") );
+                Some(node)
+            }));
+
+        ctx.add_morphism(
+            MorphismTypePattern { src_tyid: ctx.get_typeid("List"), dst_tyid: ctx.get_typeid("Type::Sym::Var").unwrap() },
+            Arc::new(|mut node, _dst_type:_| {
+                PTYListController::for_node( &mut node, Some(' '), None );
+                PTYListStyle::for_node( &mut node, ("","","") );
+
+                // display variables blue color
+                if let Some(v) = node.view {
+                    node.view = Some(
+                        v.map_item(|i,p| p.add_style_front(TerminalStyle::fg_color((5, 120, 240)))));
                 }
-            )
-        );
+                Some(node)
+            }));
+
+        ctx.add_morphism(
+            MorphismTypePattern { src_tyid: ctx.get_typeid("PosInt"), dst_tyid: ctx.get_typeid("Type::Lit::Num").unwrap() },
+            Arc::new(|mut node, _dst_type:_| {
+                Some(node)
+            }));
+
+        ctx.add_morphism(
+            MorphismTypePattern { src_tyid: ctx.get_typeid("List"), dst_tyid: ctx.get_typeid("Type::Lit::Char").unwrap() },
+            Arc::new(|mut node, _dst_type:_| {
+                let mut grid = r3vi::buffer::index_hashmap::IndexBuffer::new();
+
+                grid.insert_iter(
+                    vec![
+                        (Point2::new(0,0), crate::terminal::make_label("'")),
+                        (Point2::new(1,0), node.view.clone().unwrap()),
+                        (Point2::new(2,0), crate::terminal::make_label("'")),
+                    ]
+                );
+                
+                node.close_char.set(Some('\''));
+                node.view = Some(
+                    grid.get_port()
+                        .flatten()
+                );
+
+                Some(node)
+            }));
+
+        ctx.add_node_ctor("Type", Arc::new(
+            |ctx: Arc<RwLock<Context>>, _ty: TypeTerm, depth: usize| {
+                Some(TypeTermEditor::new_node(ctx, depth))
+            }));
     }
 
     pub fn from_type_term(ctx: Arc<RwLock<Context>>, depth: usize, term: &TypeTerm) -> NestedNode {
@@ -202,7 +206,7 @@ impl TypeTermEditor {
 
                 editor.write().unwrap().editor.set(node.editor.get());
                 editor.write().unwrap().cur_node.set(node);
-                editor.write().unwrap().state = State::Num;                
+                editor.write().unwrap().state = State::Num;
             }
 
             TypeTerm::Char( c ) => {
@@ -222,93 +226,42 @@ impl TypeTermEditor {
     fn set_state(&mut self, new_state: State) {
         let old_node = self.cur_node.get();
         let mut node = match new_state {
-            State::Char => {
-                let mut node = Context::make_node( &self.ctx, (&self.ctx, "( Char )").into(), 0 ).unwrap();
-                let mut grid = r3vi::buffer::index_hashmap::IndexBuffer::new();
-
-                grid.insert_iter(
-                    vec![
-                        (Point2::new(0,0), crate::terminal::make_label("'")),
-                        (Point2::new(1,0), node.view.clone().unwrap()),
-                        (Point2::new(2,0), crate::terminal::make_label("'")),
-                    ]
-                );
-                
-                node.close_char.set(Some('\''));
-                node.view = Some(
-                    grid.get_port()
-                        .flatten()
-                );
-
-                self.data.write().unwrap().insert_leaf(
-                    vec![].into_iter(),
-                    node.data.read().unwrap()
-                        .get_port::<dyn SingletonView<Item = char>>().unwrap()
-                        .map(
-                            |c| TypeTerm::Char(c)
-                        )
-                        .into()
-                );
-                
-                node
-            }
             State::App => {
-                let mut node = Context::make_node( &self.ctx, (&self.ctx, "( List TypeTerm )").into(), 0 ).unwrap();
-
-                PTYListController::for_node( &mut node, Some(' '), Some('>') );
-                PTYListStyle::for_node( &mut node, ("<"," ",">") );
-
-                self.data.write().unwrap().insert_leaf(
-                    vec![].into_iter(),
-                    node.data.read().unwrap()
-                        .get_port::<dyn SequenceView<Item = NestedNode>>().unwrap()
-                        .map(
-                            |node| {
-                                node.data.read().unwrap().get_port::<dyn SingletonView<Item = TypeTerm>>().unwrap()
-                            }
-                        )
-                        .into()
-                );
-                
+                let mut node = Context::make_node( &self.ctx, (&self.ctx, "( List Type )").into(), 0 ).unwrap();
+                node = node.morph( (&self.ctx, "( Type::App )").into() );
                 node
             }
             State::Ladder => {
-                let mut node = Context::make_node( &self.ctx, (&self.ctx, "( List TypeTerm )").into(), 0 ).unwrap();
-
-                PTYListController::for_node( &mut node, Some('~'), None );
-                PTYListStyle::for_node( &mut node, ("","~","") );
-
-                self.data.write().unwrap().insert_leaf(
-                    vec![].into_iter(),
-                    node.data.read().unwrap()
-                        .get_port::<dyn SequenceView<Item = NestedNode>>().unwrap()
-                        .map(
-                            |node| {
-                                node.data.read().unwrap().get_port::<dyn SingletonView<Item = TypeTerm>>().unwrap()
-                            }
-                        )
-                        .into()
-                );
-                
+                let mut node = Context::make_node( &self.ctx, (&self.ctx, "( List Type )").into(), 0 ).unwrap();
+                node = node.morph( (&self.ctx, "( Type::Ladder )").into() );
                 node
             }
             State::AnySymbol => {
                 let mut node = Context::make_node( &self.ctx, (&self.ctx, "( List Char )").into(), 0 ).unwrap();
-                node = node.morph( (&self.ctx, "( TypeSymbol )").into() );
+                node = node.morph( (&self.ctx, "( Type::Sym )").into() );
                 node
             },
             State::FunSymbol => {
                 let mut node = Context::make_node( &self.ctx, (&self.ctx, "( List Char )").into(), 0 ).unwrap();
-                node = node.morph( (&self.ctx, "( TypeSymbol::Function )").into() );
+                node = node.morph( (&self.ctx, "( Type::Sym::Fun )").into() );                
                 node
             },
             State::VarSymbol => {
                 let mut node = Context::make_node( &self.ctx, (&self.ctx, "( List Char )").into(), 0 ).unwrap();
-                node = node.morph( (&self.ctx, "( TypeSymbol::Variable )").into() );
+                node = node.morph( (&self.ctx, "( Type::Sym::Var )").into() );
                 node
             }
             State::Num => {
-                Context::make_node( &self.ctx, (&self.ctx, "( PosInt 10 BigEndian )").into(), 0 ).unwrap()
+                let mut int_edit = crate::editors::integer::PosIntEditor::new(self.ctx.clone(), 10);
+                let mut node = int_edit.into_node();
+
+                node = node.morph( (&self.ctx, "( Type::Lit::Num )").into() );
+                node
+            }
+            State::Char => {
+                let mut node = Context::make_node( &self.ctx, (&self.ctx, "( Char )").into(), 0 ).unwrap();
+                node = node.morph( (&self.ctx, "( Type::Lit::Char )").into() );
+                node
             }
             _ => {
                 old_node
@@ -317,14 +270,18 @@ impl TypeTermEditor {
 
         node.goto(TreeCursor::home());
 
-        self.editor.set(node.editor.get());
+        let editor = node.editor.get();
+        eprintln!("set_state:editor = {:?}", Arc::into_raw(editor.clone().unwrap()));
+
+        self.editor.set(editor);
         self.cur_node.set(node);
+
         self.state = new_state;
     }
 
     pub fn new_node(ctx: Arc<RwLock<Context>>, depth: usize) -> NestedNode {
         let mut symb_node = Context::make_node( &ctx, (&ctx, "( List Char )").into(), 0 ).unwrap();
-        symb_node = symb_node.morph( (&ctx, "( TypeSymbol::Variable )").into() );
+        symb_node = symb_node.morph( (&ctx, "( Type::Sym )").into() );
 
         Self::with_node(
             ctx.clone(),
@@ -338,7 +295,7 @@ impl TypeTermEditor {
         let buffer = SingletonBuffer::<Option<TypeTerm>>::new( None );
 
         let data = Arc::new(RwLock::new(ReprTree::new(
-            (&ctx, "( TypeTerm )")
+            (&ctx, "( Type )")
         )));
 
         let mut editor = TypeTermEditor {
@@ -402,7 +359,7 @@ impl TypeTermEditor {
                         (&ctx, "( MachineInt )").into()
                     ]
                 );
-*/
+                 */
                 Some(TypeTerm::new(TypeID::Fun(0)))
             },
             State::App => {                
@@ -456,9 +413,8 @@ impl ObjCommander for TypeTermEditor {
     fn send_cmd_obj(&mut self, co: Arc<RwLock<ReprTree>>) -> TreeNavResult {
         let cmd_obj = co.clone();
         let cmd_obj = cmd_obj.read().unwrap();
-        let cmd_type = cmd_obj.get_type().clone();
 
-        if cmd_type == (&self.ctx, "( Char )").into() {
+        if cmd_obj.get_type().clone() == (&self.ctx, "( Char )").into() {
             if let Some(cmd_view) = cmd_obj.get_view::<dyn SingletonView<Item = char>>() {
                 let c = cmd_view.get();
 
@@ -477,6 +433,9 @@ impl ObjCommander for TypeTermEditor {
                             '\'' => {
                                 self.set_state( State::Char );
                                 TreeNavResult::Continue
+                            }
+                            '~' => {
+                                TreeNavResult::Exit
                             }
                             _ => {
                                 self.set_state( State::AnySymbol );
@@ -498,8 +457,32 @@ impl ObjCommander for TypeTermEditor {
                         }
                     }
 
-                    _ => {
-                        self.cur_node.get_mut().send_cmd_obj( co )
+//                    State::App | State::AnySymbol | State::FunSymbol | State::VarSymbol
+                        _ => {
+                        match self.cur_node.get_mut().send_cmd_obj( co ) {
+                            TreeNavResult::Exit => {
+                                match c {
+                                    '~' => {
+                                        // todo:
+                                        
+                                        // in case previous item is not ladder
+                                        // create new intermediary ladder-node
+                                        // with the previous item as one step
+
+                                        // in case previous item is ladder
+                                        // goto end
+
+                                        eprintln!("TypeEdit: child exit ~");
+                                    }
+                                    _ => {}
+                                }
+
+                                TreeNavResult::Exit
+                            }
+                            TreeNavResult::Continue => {
+                                TreeNavResult::Continue
+                            }
+                        }
                     }
                 }
             } else {
@@ -509,22 +492,14 @@ impl ObjCommander for TypeTermEditor {
             match &self.state {
                 State::Any => {
                     eprintln!("undefined comd object set to listl");
-                    self.set_state( State::App );
+                    self.set_state( State::Ladder );
                     self.cur_node.get_mut().goto(TreeCursor::home());
+                    let res = self.cur_node.get().cmd.get().unwrap().write().unwrap().send_cmd_obj( co );
+                    self.cur_node.get_mut().goto(TreeCursor::none());
+                    res
                 }
-                _ => {}
-            }
-
-            match self.state {
-                State::App => {
-                    self.cur_node.get().send_cmd_obj( co )
-                },
-                State::Ladder => {
-                    self.cur_node.get().send_cmd_obj( co )
-                },
                 _ => {
-                    eprintln!("undefined cmd object");
-                    TreeNavResult::Exit
+                    self.cur_node.get().cmd.get().unwrap().write().unwrap().send_cmd_obj( co )
                 }
             }
         }
