@@ -9,7 +9,7 @@ use {
     },
     crate::{
         type_system::{Context, TypeID, TypeTerm, ReprTree},
-        editors::{list::{ListCursorMode}},
+        editors::{list::{ListCursorMode, ListEditor, ListCmd}},
         tree::{NestedNode, TreeNav, TreeNavResult, TreeCursor},
         commander::ObjCommander
     },
@@ -17,7 +17,7 @@ use {
     cgmath::{Vector2}
 };
 
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum State {
     Any,
     Num,
@@ -135,40 +135,33 @@ impl TypeTermEditor {
 
         let mut node = match new_state {
             State::App => {
-                let mut node = Context::make_node( &self.ctx, (&self.ctx, "( List Type )").into(), 0 ).unwrap();
-                node = node.morph( (&self.ctx, "( Type::App )").into() );
-                node
+                Context::make_node( &self.ctx, (&self.ctx, "( List Type )").into(), 0 ).unwrap()
+                    .morph( (&self.ctx, "( Type::App )").into() )
             }
             State::Ladder => {
-                let mut node = Context::make_node( &self.ctx, (&self.ctx, "( List Type )").into(), 0 ).unwrap();
-                node = node.morph( (&self.ctx, "( Type::Ladder )").into() );
-                node
+                Context::make_node( &self.ctx, (&self.ctx, "( List Type )").into(), 0 ).unwrap()
+                    .morph( (&self.ctx, "( Type::Ladder )").into() )
             }
             State::AnySymbol => {
-                let mut node = Context::make_node( &self.ctx, (&self.ctx, "( List Char )").into(), 0 ).unwrap();
-                node = node.morph( (&self.ctx, "( Type::Sym )").into() );
-                node
+                Context::make_node( &self.ctx, (&self.ctx, "( List Char )").into(), 0 ).unwrap()
+                    .morph( (&self.ctx, "( Type::Sym )").into() )
             },
             State::FunSymbol => {
-                let mut node = Context::make_node( &self.ctx, (&self.ctx, "( List Char )").into(), 0 ).unwrap();
-                node = node.morph( (&self.ctx, "( Type::Sym::Fun )").into() );
-                node
+                Context::make_node( &self.ctx, (&self.ctx, "( List Char )").into(), 0 ).unwrap()
+                    .morph( (&self.ctx, "( Type::Sym::Fun )").into() )
             },
             State::VarSymbol => {
-                let mut node = Context::make_node( &self.ctx, (&self.ctx, "( List Char )").into(), 0 ).unwrap();
-                node = node.morph( (&self.ctx, "( Type::Sym::Var )").into() );
-                node
+                Context::make_node( &self.ctx, (&self.ctx, "( List Char )").into(), 0 ).unwrap()
+                    .morph( (&self.ctx, "( Type::Sym::Var )").into() )
             }
             State::Num => {
-                let int_edit = crate::editors::integer::PosIntEditor::new(self.ctx.clone(), 10);
-                let mut node = int_edit.into_node();
-                node = node.morph( (&self.ctx, "( Type::Lit::Num )").into() );
-                node
+                crate::editors::integer::PosIntEditor::new(self.ctx.clone(), 10)
+                    .into_node()
+                    .morph( (&self.ctx, "( Type::Lit::Num )").into() )
             }
             State::Char => {
-                let mut node = Context::make_node( &self.ctx, (&self.ctx, "( Char )").into(), 0 ).unwrap();
-                node = node.morph( (&self.ctx, "( Type::Lit::Char )").into() );
-                node
+                Context::make_node( &self.ctx, (&self.ctx, "( Char )").into(), 0 ).unwrap()
+                    .morph( (&self.ctx, "( Type::Lit::Char )").into() )
             }
             _ => {
                 old_node
@@ -216,21 +209,11 @@ impl TypeTermEditor {
 
         let view = editor.cur_node
             .get_port()
-            .map(
-                |node| {
-                    match node.view.clone() {
-                        Some(v) => {
-                            v
-                        }
-                        None => {
-                            r3vi::view::ViewPort::new().into_outer()
-                        }
-                    }
-                }
-            )
+            .map(|node| {
+                node.view.clone().unwrap_or(r3vi::view::ViewPort::new().into_outer())
+            })
             .to_grid()
             .flatten();
-
         let cc = editor.cur_node.get().close_char;
         let editor = Arc::new(RwLock::new(editor));
 
@@ -270,7 +253,7 @@ impl TypeTermEditor {
                  */
                 Some(TypeTerm::new(TypeID::Fun(0)))
             },
-            State::App => {                
+            State::App => {
                 Some(TypeTerm::new(TypeID::Fun(0)))
             },
 
