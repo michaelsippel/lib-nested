@@ -5,8 +5,11 @@ use {
 pub fn bg_style_from_depth(depth: usize) -> TerminalStyle {
     match depth {
         0 => TerminalStyle::bg_color((150,80,230)),
-        1 => TerminalStyle::bg_color((35,35,35)),
-        2 => TerminalStyle::bg_color((20,20,20)),
+        1 => TerminalStyle::bg_color((75,75,75)),
+        2 => TerminalStyle::bg_color((40,40,40)),
+        3 => TerminalStyle::bg_color((30,30,30)),
+        4 => TerminalStyle::bg_color((25,25,25)),
+        5 => TerminalStyle::bg_color((20,20,20)),
         _ => TerminalStyle::default(),
     }
 }
