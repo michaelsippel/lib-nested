@@ -274,13 +274,11 @@ impl TreeNav for TypeTermEditor {
     }
 
     fn get_addr_view(&self) -> OuterViewPort<dyn SequenceView<Item = isize>> {
-        // fixme this is wrong
-        self.cur_node.get().get_addr_view()
+        self.cur_node.get_port().map(|x| x.get_addr_view()).to_sequence().flatten()   
     }
 
     fn get_mode_view(&self) -> OuterViewPort<dyn SingletonView<Item = ListCursorMode>> {
-        // this is wrong
-        self.cur_node.get().get_mode_view()
+        self.cur_node.get_port().map(|x| x.get_mode_view()).flatten()
     }
 
     fn get_cursor_warp(&self) -> TreeCursor {
