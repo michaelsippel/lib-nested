@@ -33,7 +33,20 @@ pub fn init_ctx(ctx: &mut Context) {
         MorphismTypePattern { src_tyid: ctx.get_typeid("List"), dst_tyid: ctx.get_typeid("Type::Ladder").unwrap() },
         Arc::new(|mut node, _dst_type: _| {
             PTYListController::for_node( &mut node, Some('~'), None );
-            PTYListStyle::for_node( &mut node, ("","~","") );
+
+            let vertical_view = true;
+            if vertical_view {
+                let editor = node.get_edit::<crate::editors::list::ListEditor>().unwrap();
+                let mut e = editor.write().unwrap();
+                let mut seg_view = PTYListStyle::new( ("","~",""), 0 ).get_seg_seq_view( &mut e );
+
+                node = node.set_view(
+                    seg_view.to_grid_vertical().flatten()
+                );
+            } else {
+                PTYListStyle::for_node( &mut node, ("","~","") );
+            }
+
             Some(node)
         }));
 
@@ -95,7 +108,7 @@ pub fn init_ctx(ctx: &mut Context) {
             );
             
             node.close_char.set(Some('\''));
-            node.view = Some(
+            node = node.set_view(
                 grid.get_port()
                     .flatten()
             );
