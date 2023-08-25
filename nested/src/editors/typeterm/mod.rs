@@ -4,7 +4,7 @@ pub use ctx::init_ctx;
 
 use {
     r3vi::{
-        buffer::singleton::*,
+        buffer::{singleton::*, vec::*},
         view::{singleton::*, sequence::*, OuterViewPort}
     },
     crate::{
@@ -13,7 +13,7 @@ use {
         tree::{NestedNode, TreeNav, TreeNavResult, TreeCursor},
         commander::ObjCommander
     },
-    std::{sync::{Arc, RwLock}, any::Any},
+    std::{sync::{Arc, RwLock, Mutex}, any::Any},
     cgmath::{Vector2}
 };
 
@@ -33,13 +33,9 @@ pub struct TypeTermEditor {
     ctx: Arc<RwLock<Context>>,
     data: Arc<RwLock<ReprTree>>,
 
-    // forward the editor to the node that references TypeTermEditor
-    // will be removed once the node includes a spill buffer using which joins can be implemented
-    editor: SingletonBuffer<
-                Option< Arc<dyn Any + Send + Sync> >
-            >,
-
+    // references to Node pointing to TypeTermEditor
     close_char: SingletonBuffer<Option<char>>,
+    spillbuf: Arc<RwLock<Vec<Arc<RwLock<NestedNode>>>>>,
 
     state: State,
     cur_node: SingletonBuffer< NestedNode >
@@ -110,8 +106,6 @@ impl TypeTermEditor {
 
                 let int_edit = crate::editors::integer::PosIntEditor::from_u64(parent_ctx, 10, *n as u64);
                 let node = int_edit.into_node();
-
-                editor.write().unwrap().editor.set(node.editor.get());
                 editor.write().unwrap().cur_node.set(node);
                 editor.write().unwrap().state = State::Num;
             }
@@ -131,6 +125,8 @@ impl TypeTermEditor {
     }
     
     fn set_state(&mut self, new_state: State) {
+        eprintln!("TypeEdit: set state to {:?}", new_state);
+        
         let old_node = self.cur_node.get();
 
         let mut node = match new_state {
@@ -171,15 +167,15 @@ impl TypeTermEditor {
         node.goto(TreeCursor::home());
 
         let editor = node.editor.get();
-
-        self.editor.set(editor);
         self.close_char.set(node.close_char.get());
-
         self.cur_node.set(node);
         self.state = new_state;
     }
 
-    pub fn new_node(ctx: Arc<RwLock<Context>>, depth: usize) -> NestedNode {        
+    pub fn new_node(ctx: Arc<RwLock<Context>>, depth: usize) -> NestedNode {
+        let ctx : Arc<RwLock<Context>> = Arc::new(RwLock::new(Context::with_parent(Some(ctx))));
+        ctx.write().unwrap().meta_chars.push('~');
+
         let mut symb_node = Context::make_node( &ctx, (&ctx, "( List Char )").into(), 0 ).unwrap();
         symb_node = symb_node.morph( (&ctx, "( Type::Sym )").into() );
 
@@ -203,8 +199,9 @@ impl TypeTermEditor {
             state,
             data: data.clone(),
             cur_node: SingletonBuffer::new(node),
-            editor: SingletonBuffer::new(None),
-            close_char: SingletonBuffer::new(None)
+            //editor: SingletonBuffer::new(None),
+            close_char: SingletonBuffer::new(None),
+            spillbuf: Arc::new(RwLock::new(Vec::new()))
         };
 
         let view = editor.cur_node
@@ -224,11 +221,28 @@ impl TypeTermEditor {
             .set_editor(editor.clone());
 
         editor.write().unwrap().close_char = node.close_char.clone();
-        editor.write().unwrap().editor = node.editor.clone();
+        node.spillbuf = editor.read().unwrap().spillbuf.clone();
         
         node
     }
 
+    fn forward_spill(&mut self) {
+        eprintln!("forward spill");
+        let node = self.cur_node.get();
+        let mut buf = node.spillbuf.write().unwrap();
+        for n in buf.iter() {
+            self.spillbuf.write().unwrap().push(n.clone());
+        }
+        buf.clear();
+    }
+
+    fn send_child_cmd(&mut self, cmd: Arc<RwLock<ReprTree>>) -> TreeNavResult {
+        eprintln!("typterm forward cmd");
+        let res = self.cur_node.get_mut().send_cmd_obj( cmd );
+        self.forward_spill();
+        res
+    }
+    
     fn get_typeterm(&self) -> Option<TypeTerm> {
         match self.state {
             State::Any => None,
@@ -316,7 +330,7 @@ impl ObjCommander for TypeTermEditor {
                             }
                             '0'|'1'|'2'|'3'|'4'|'5'|'6'|'7'|'8'|'9' => {
                                 self.set_state( State::Num );
-                                self.cur_node.get_mut().send_cmd_obj( co );
+                                self.send_child_cmd( co );
                                 TreeNavResult::Continue
                             }
                             '\'' => {
@@ -329,11 +343,10 @@ impl ObjCommander for TypeTermEditor {
                             _ => {
                                 self.set_state( State::AnySymbol );
                                 self.cur_node.get_mut().goto(TreeCursor::home());
-                                self.cur_node.get_mut().send_cmd_obj( co )
+                                self.send_child_cmd( co )
                             }
                         }
                     }
-
                     State::Char => {
                         match c {
                             '\'' => {
@@ -341,36 +354,180 @@ impl ObjCommander for TypeTermEditor {
                                 TreeNavResult::Exit
                             }
                             _ => {
-                                self.cur_node.get_mut().send_cmd_obj( co )
+                                self.send_child_cmd( co )
                             }
                         }
                     }
 
-                    _ => {
-                        match self.cur_node.get_mut().send_cmd_obj( co ) {
+                    State::Ladder => {
+                        eprintln!("have LADDER, send cmd tochild");
+                        let res = self.send_child_cmd( co );
+                        let cur = self.get_cursor();
+                        
+                        match res {
+                            TreeNavResult::Continue => {
+                                if cur.tree_addr.len() == 3 {
+                                    match c {
+                                        '~' => {
+                                            let mut ladder_node = self.cur_node.get().clone();
+                                            let mut ladder_edit = ladder_node.get_edit::<ListEditor>().unwrap();
+
+                                            let item = ladder_edit.write().unwrap().get_item().clone();
+
+                                            if let Some(mut it_node) = item {
+                                                if it_node.get_type() == (&self.ctx, "( Type )").into() {
+                                                    let other_tt = it_node.get_edit::<TypeTermEditor>().unwrap();
+                                                    let other = other_tt.read().unwrap().cur_node.get().get_edit::<ListEditor>().unwrap();
+                                                    let buf = other.read().unwrap().data.clone();
+
+                                                    ladder_edit.write().unwrap().up();
+                                                    ladder_edit.write().unwrap().up();
+
+                                                    ladder_node.send_cmd_obj(
+                                                        ListCmd::DeleteNexd.into_repr_tree( &self.ctx )
+                                                    );
+                                                    //ladder_edit.write().unwrap().delete_nexd();
+
+                                                    let l = buf.len();
+                                                    for i in 0..l {
+                                                        ladder_edit.write().unwrap().insert( buf.get(i) );
+                                                    }
+                                                    ladder_node.dn();
+
+                                                    TreeNavResult::Continue
+                                                } else {
+                                                    TreeNavResult::Continue
+                                                }
+                                            } else {
+                                                TreeNavResult::Continue
+                                            }
+                                        }
+                                        _=> res
+                                    }
+                                } else {
+                                    TreeNavResult::Continue
+                                }
+                            }
+                            res => res,
+                        }
+                    }
+
+                    State::App => {
+                        let res = self.send_child_cmd( co );
+
+                        match res {
                             TreeNavResult::Exit => {
                                 match c {
                                     '~' => {
-                                        // todo:
-                                        
-                                        // in case previous item is not ladder
-                                        // create new intermediary ladder-node
-                                        // with the previous item as one step
+                                        // if item at cursor is Ladder
+                                        let app_edit = self.cur_node.get().get_edit::<ListEditor>().expect("editor");
+                                        let mut app_edit = app_edit.write().unwrap();
+                                        app_edit.delete_nexd();
+                                        app_edit.pxev();
 
-                                        // in case previous item is ladder
-                                        // goto end
+                                        if let Some(item_node) = app_edit.get_item() {
 
-                                        eprintln!("TypeEdit: child exit ~");
-                                    }
-                                    _ => {}
+                                            let item_typterm = item_node.get_edit::<TypeTermEditor>().expect("typetermedit");
+                                            let mut item_typterm = item_typterm.write().unwrap();
+                                            match item_typterm.state {
+                                                State::Ladder => {
+                                                    drop(item_typterm);
+
+                                                    app_edit.dn();
+                                                    app_edit.qnexd();
+                                                }
+                                                _ => {
+                                                    eprintln!("create new ladder");
+                                                    
+                                                    // else create enw ladder
+                                                    let mut new_node = Context::make_node( &self.ctx, (&self.ctx, "( List Type )").into(), 0 ).unwrap();
+                                                    new_node = new_node.morph( (&self.ctx, "( Type::Ladder )").into() );
+                                                    // insert old node and split
+                                                    new_node.goto(TreeCursor::home());
+
+                                                    new_node.send_cmd_obj(
+                                                        ReprTree::new_leaf(
+                                                            (&self.ctx, "( NestedNode )"),
+                                                            SingletonBuffer::<NestedNode>::new( item_node ).get_port().into()
+                                                        )
+                                                    );
+
+                                                    drop(item_typterm);
+                                                    *app_edit.get_item_mut().unwrap().write().unwrap() = new_node;
+                                                    app_edit.dn();
+                                                }
+                                            }
+                                        }
+
+                                        TreeNavResult::Continue
+                                    },
+                                    _ => {TreeNavResult::Exit}
                                 }
+                            },
+                            res => res
+                        }
+                }
 
-                                TreeNavResult::Exit
+                    State::AnySymbol | State::FunSymbol | State::VarSymbol | State::App => {
+                        let res = self.send_child_cmd( co );
+                        match res {
+                            TreeNavResult::Exit => {
+                                match c {
+                                    '~' => {
+                                        eprintln!("typeterm: ~ ");
+
+                                        let old_node = self.cur_node.get().clone();
+
+                                        // create a new NestedNode with TerminaltypeEditor,
+                                        // that has same data as current node.
+                                        let mut old_edit_node = TypeTermEditor::new_node( self.ctx.clone(), 0 );
+                                        let mut old_edit_clone = old_edit_node.get_edit::<TypeTermEditor>().unwrap();
+                                        old_edit_clone.write().unwrap().set_state( self.state );
+                                        old_edit_clone.write().unwrap().close_char.set( old_node.close_char.get() );
+                                        old_edit_clone.write().unwrap().cur_node.set( old_node );
+
+                                        // create new list-edit node for the ladder
+                                        let mut new_node = Context::make_node( &self.ctx, (&self.ctx, "( List Type )").into(), 0 ).unwrap();
+                                        new_node = new_node.morph( (&self.ctx, "( Type::Ladder )").into() );
+
+                                        eprintln!("insert old node into new node");
+                                        
+                                        // insert old node and split
+                                        new_node.goto(TreeCursor::home());
+                                        new_node.send_cmd_obj(
+                                            ReprTree::new_leaf(
+                                                (&self.ctx, "( NestedNode )"),
+                                                SingletonBuffer::new( old_edit_node ).get_port().into()
+                                            )
+                                        );
+
+                                        new_node.set_addr(0);
+                                        new_node.dn();
+
+                                        let res = new_node.send_cmd_obj(
+                                            ListCmd::Split.into_repr_tree( &self.ctx )
+                                        );
+
+                                        // reconfigure current node to display new_node
+                                        self.close_char.set(new_node.close_char.get());
+                                        self.cur_node.set(new_node);
+                                        self.state = State::Ladder;
+
+                                        TreeNavResult::Continue
+                                    }
+                                    _ => {
+                                        TreeNavResult::Exit
+                                    }
+                                }
                             }
                             TreeNavResult::Continue => {
                                 TreeNavResult::Continue
                             }
                         }
+                    }
+
+                    _ => {
+                        self.send_child_cmd( co )
                     }
                 }
             } else {
@@ -379,17 +536,14 @@ impl ObjCommander for TypeTermEditor {
         } else {
             match &self.state {
                 State::Any => {
-                    eprintln!("undefined comd object set to ladder");
-                    self.set_state( State::Ladder );
+                    self.set_state( State::AnySymbol );
                     self.cur_node.get_mut().goto(TreeCursor::home());
-                    let res = self.cur_node.get().cmd.get().unwrap().write().unwrap().send_cmd_obj( co );
-                    self.cur_node.get_mut().goto(TreeCursor::none());
-                    res
                 }
                 _ => {
-                    self.cur_node.get().cmd.get().unwrap().write().unwrap().send_cmd_obj( co )
                 }
             }
+
+            self.send_child_cmd( co )
         }
     }
 }

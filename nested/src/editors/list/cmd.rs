@@ -35,7 +35,7 @@ impl ListCmd {
 impl ObjCommander for ListEditor {
     fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
         let cmd_repr = cmd_obj.read().unwrap();
-        
+
         if let Some(view) = cmd_repr.get_view::<dyn SingletonView<Item = NestedNode>>() {
             let node = view.get();
             let cur = self.cursor.get();
@@ -144,12 +144,8 @@ impl ObjCommander for ListEditor {
                                 TreeNavResult::Continue
                             }
                             ListCmd::Split => {
-/*
-                                self.split(self.spill_node);
-                                */
-                                self.listlist_split();
-
-                                TreeNavResult::Continue
+                                self.split();
+                                TreeNavResult::Exit
                             }
                             ListCmd::Clear => {
                                 self.clear();

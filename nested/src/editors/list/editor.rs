@@ -1,23 +1,29 @@
 use {
     r3vi::{
-        view::{port::UpdateTask, OuterViewPort, singleton::*, sequence::*},
+        view::{ChannelSender, ChannelReceiver, port::UpdateTask, OuterViewPort, singleton::*, sequence::*},
         buffer::{singleton::*, vec::*}
     },
     crate::{
         type_system::{Context, TypeTerm, ReprTree},
-        editors::list::{ListCursor, ListCursorMode},
+        editors::list::{ListCursor, ListCursorMode, ListCmd},
         tree::{NestedNode, TreeNav, TreeCursor},
-        diagnostics::Diagnostics
+        diagnostics::Diagnostics,
+        commander::ObjCommander
     },
-    std::sync::{Arc, RwLock}
+    std::sync::{Arc, RwLock, Mutex},
+    std::ops::Deref
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub struct ListEditor {
     pub(super) cursor: SingletonBuffer<ListCursor>,
+
+    // todo: (?) remove RwLock<..> around NestedNode ??
     pub data: VecBuffer< Arc<RwLock<NestedNode>> >,
 
+    pub spillbuf: Arc<RwLock<Vec<Arc<RwLock<NestedNode>>>>>,
+    
     pub(super) addr_port: OuterViewPort<dyn SequenceView<Item = isize>>,
     pub(super) mode_port: OuterViewPort<dyn SingletonView<Item = ListCursorMode>>,
 
@@ -33,7 +39,7 @@ impl ListEditor {
         typ: TypeTerm,
     ) -> Self {
         let cursor = SingletonBuffer::new(ListCursor::default());
-        let data = VecBuffer::<Arc<RwLock<NestedNode>>>::new();
+        let data : VecBuffer<Arc<RwLock<NestedNode>>> = VecBuffer::new();
 
         ListEditor {
             mode_port: cursor
@@ -83,8 +89,9 @@ impl ListEditor {
                 .flatten(),
             cursor,
             data,
+            spillbuf: Arc::new(RwLock::new(Vec::new())),
             ctx,
-            typ,
+            typ
         }
     }
 
@@ -95,7 +102,7 @@ impl ListEditor {
 
         let e = editor.read().unwrap();
 
-        NestedNode::new(ctx, data, depth)
+        let mut node = NestedNode::new(ctx, data, depth)
             .set_editor(editor.clone())
             .set_nav(editor.clone())
             .set_cmd(editor.clone())
@@ -117,7 +124,10 @@ impl ListEditor {
                           }
                       )
                       .flatten()
-            )
+            );
+
+        node.spillbuf = e.spillbuf.clone();
+        node
     }
 
     pub fn get_item_type(&self) -> TypeTerm {
@@ -235,26 +245,18 @@ impl ListEditor {
     }
 
     /// split the list off at the current cursor position and return the second half
-    pub fn split(&mut self, le_node: &mut NestedNode) {
+    pub fn split(&mut self) {        
         let cur = self.cursor.get();
         if let Some(idx) = cur.idx {
             let idx = idx as usize;
-            le_node.goto(TreeCursor::home());
             for _ in idx .. self.data.len() {
-
-                eprintln!("send items to new tail");
-                le_node.cmd.get().unwrap().write().unwrap().send_cmd_obj(
-                    self.data.get(idx).read().unwrap().data.clone()
-/*
-                    ReprTree::new_leaf(
-                        self.ctx.read().unwrap().type_term_from_str("( NestedNode )").unwrap(),
-                        SingletonBuffer::<NestedNode>::new( self.data.get(idx).clone().read().unwrap().clone() ).get_port().into()
-                    )
-*/
+                self.spillbuf.write().unwrap().push(
+                    self.data.get(idx)
                 );
                 self.data.remove(idx);
             }
-            le_node.goto(TreeCursor::none());
+
+            /* TODO
 
             if self.is_listlist() {
                 if idx > 0 && idx < self.data.len()+1 {
@@ -276,7 +278,8 @@ impl ListEditor {
                         }
                     }
                 }
-            }
+        }
+            */
         }
     }
 
@@ -317,53 +320,44 @@ impl ListEditor {
     pub fn listlist_split(&mut self) {
         let cur = self.get_cursor();
 
-        if let Some(item) = self.get_item() {
-//            let item = item.read().unwrap();
-            let _depth = item.depth;
-            
-            if let Some(head_editor) = item.editor.get() {
-                eprintln!("listlistsplit:editor = {:?}", Arc::into_raw(head_editor.clone()));
+        if let Some(mut item) = self.get_item().clone() {
+            item.send_cmd_obj(ListCmd::Split.into_repr_tree(&self.ctx));
 
-                let head = head_editor.downcast::<RwLock<ListEditor>>().unwrap();
-                let mut head = head.write().unwrap();
+            let mut tail_node = Context::make_node(&self.ctx, self.typ.clone(), 0).unwrap();
+            tail_node.goto(TreeCursor::home());
 
-                let mut tail_node = Context::make_node(&self.ctx, self.typ.clone(), 0).unwrap();
-
-                if head.data.len() > 0 {
-                    if cur.tree_addr.len() > 2 {
-                        eprintln!("call child head listlist split");
-                        head.listlist_split();
-                        eprintln!("return");
-                    }
-
-                    /*
-                    TODO: replace this by: (does not require  ListEditor downcast)
-                    head.send_cmd_obj(ListCmd::Split.into_repr());
-                    tail_node = head.spill_buf.clone();
-                     */
-
-                    head.split( &mut tail_node );
-                }
-
-                head.goto(TreeCursor::none());
-                drop(head);
-
-                tail_node.goto(
-                    TreeCursor {
-                        tree_addr: vec![0],
-                        leaf_mode: if cur.tree_addr.len() > 2 {
-                            ListCursorMode::Select
-                        } else {
-                            ListCursorMode::Insert
-                        }
-                    }
-                );
-                self.insert(
-                    Arc::new(RwLock::new(tail_node))
-                );
-
-                eprintln!("made insert");
+            let mut b = item.spillbuf.write().unwrap();
+            for node in b.iter() {
+                tail_node
+                    .send_cmd_obj(
+                        ReprTree::new_leaf(
+                            (&self.ctx, "( NestedNode )"),
+                            SingletonBuffer::<NestedNode>::new(
+                                node.read().unwrap().clone()
+                            ).get_port().into()
+                        )
+                    );
             }
+            b.clear();
+            drop(b);
+
+            item.goto(TreeCursor::none());
+            drop(item);
+
+            tail_node.goto(
+                TreeCursor {
+                    tree_addr: vec![0],
+                    leaf_mode: if cur.tree_addr.len() > 2 {
+                        ListCursorMode::Select
+                    } else {
+                        ListCursorMode::Insert
+                    }
+                }
+            );
+
+            self.insert(
+                Arc::new(RwLock::new(tail_node))
+            );
         }
     }
 
@@ -412,6 +406,7 @@ impl ListEditor {
         self.data.remove(next_idx);
     }
 }
+
 /*
 use crate::{
     type_system::TypeLadder,
@@ -432,4 +427,5 @@ impl TreeType for ListEditor {
         }
     }
 }
-*/
+ */
+

@@ -1,9 +1,9 @@
 use {
-    std::{sync::{Arc, RwLock}, any::Any},
+    std::{sync::{Arc, RwLock, Mutex}, any::Any},
     cgmath::{Vector2, Point2},
     r3vi::{
-        view::{View, ViewPort, OuterViewPort, AnyOuterViewPort, singleton::*, sequence::*},
-        buffer::{singleton::*}
+        view::{ChannelReceiver, View, ViewPort, OuterViewPort, AnyOuterViewPort, singleton::*, sequence::*},
+        buffer::{singleton::*, vec::*}
     },
     crate::{
         type_system::{ReprTree, Context, TypeTerm},
@@ -34,7 +34,8 @@ struct NestedNodeEdit {
                     Option< Arc<dyn Any + Send + Sync> >
 >,
 
-    pub spill_buf: VecBuffer< NestedNode >,
+    pub input_buf:: VecBuffer< NestedNode >,
+    pub output_buf: VecBuffer< NestedNode >,
 
     /// commander & navigation
     pub cmd: SingletonBuffer<
@@ -91,7 +92,8 @@ pub struct NestedNode {
     /* TODO:
      * - spill buffer (contains overflowing elements as well as 'split-off' parts)
      */
-    
+    pub spillbuf: Arc<RwLock<Vec<Arc<RwLock<NestedNode>>>>>,
+
     /// commander & navigation
     pub cmd: SingletonBuffer<
                  Option< Arc<RwLock<dyn ObjCommander + Send + Sync>> >
@@ -113,6 +115,7 @@ impl NestedNode {
             diag: None,
             depth: SingletonBuffer::new(depth),
             editor: SingletonBuffer::new(None),
+            spillbuf: Arc::new(RwLock::new(Vec::new())),
             cmd: SingletonBuffer::new(None),
             close_char: SingletonBuffer::new(None),
             tree_nav: SingletonBuffer::new(None)
