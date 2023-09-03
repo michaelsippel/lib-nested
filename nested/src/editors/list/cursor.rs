@@ -1,4 +1,4 @@
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum ListCursorMode {
     Insert,
     Select
@@ -10,7 +10,7 @@ impl Default for ListCursorMode {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub struct ListCursor {
     pub mode: ListCursorMode,
     pub idx: Option<isize>,
@@ -34,7 +34,7 @@ impl ListCursor {
 
 impl Default for ListCursor {
     fn default() -> Self {
-        ListCursor::none()
+        ListCursor::home()
     }
 }
 

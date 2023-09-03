@@ -152,7 +152,9 @@ impl PTYListController {
         let cur = e.cursor.get();
         
         if Some(c) == self.split_char {
+            eprintln!("handle meta char: --> e.listlist_split()");
             e.listlist_split();
+            eprintln!("e.listlist_split() DONE");
             TreeNavResult::Continue
         } else if Some(c) == child_close_char {
             e.goto(TreeCursor::none());

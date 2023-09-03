@@ -4,7 +4,7 @@ use {
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub struct TreeCursor {
     pub leaf_mode: ListCursorMode,
     pub tree_addr: Vec<isize>,

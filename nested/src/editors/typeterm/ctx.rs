@@ -4,7 +4,7 @@ use {
     },
     crate::{
         type_system::{Context, TypeTerm, MorphismTypePattern},
-        terminal::{TerminalStyle},
+        terminal::{TerminalStyle, TerminalProjections},
         editors::{list::{PTYListStyle, PTYListController}, typeterm::{State, TypeTermEditor}}
     },
     std::{sync::{Arc, RwLock}},
@@ -34,11 +34,11 @@ pub fn init_ctx(ctx: &mut Context) {
         Arc::new(|mut node, _dst_type: _| {
             PTYListController::for_node( &mut node, Some('~'), None );
 
-            let vertical_view = true;
+            let vertical_view = false;
             if vertical_view {
                 let editor = node.get_edit::<crate::editors::list::ListEditor>().unwrap();
                 let mut e = editor.write().unwrap();
-                let mut seg_view = PTYListStyle::new( ("","~",""), 0 ).get_seg_seq_view( &mut e );
+                let mut seg_view = PTYListStyle::new( ("","~",""), node.depth.get() ).get_seg_seq_view( &mut e );
 
                 node = node.set_view(
                     seg_view.to_grid_vertical().flatten()
@@ -95,14 +95,14 @@ pub fn init_ctx(ctx: &mut Context) {
         }));
 
     ctx.add_morphism(
-        MorphismTypePattern { src_tyid: ctx.get_typeid("List"), dst_tyid: ctx.get_typeid("Type::Lit::Char").unwrap() },
+        MorphismTypePattern { src_tyid: ctx.get_typeid("Char"), dst_tyid: ctx.get_typeid("Type::Lit::Char").unwrap() },
         Arc::new(|mut node, _dst_type:_| {
             let mut grid = r3vi::buffer::index_hashmap::IndexBuffer::new();
 
             grid.insert_iter(
                 vec![
                     (Point2::new(0,0), crate::terminal::make_label("'")),
-                    (Point2::new(1,0), node.view.clone().unwrap()),
+                    (Point2::new(1,0), node.view.clone().unwrap_or( crate::terminal::make_label(".").with_fg_color((220,200,20))) ),
                     (Point2::new(2,0), crate::terminal::make_label("'")),
                 ]
             );
