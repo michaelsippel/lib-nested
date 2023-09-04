@@ -59,7 +59,7 @@ pub trait TreeNav {
         TreeCursor::default()
     }
 
-    fn get_max_depth(&self) -> usize {
+    fn get_height(&self) -> usize {
         0
     }
 

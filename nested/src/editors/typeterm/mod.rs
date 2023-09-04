@@ -483,8 +483,8 @@ impl TreeNav for TypeTermEditor {
         self.cur_node.get().get_cursor_warp()
     }
 
-    fn get_max_depth(&self) -> usize {
-        self.cur_node.get().get_max_depth()
+    fn get_height(&self) -> usize {
+        self.cur_node.get().get_height()
     }
 
     fn goby(&mut self, dir: Vector2<isize>) -> TreeNavResult {

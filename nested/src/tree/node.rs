@@ -304,8 +304,12 @@ impl TreeNav for NestedNode {
         }
     }
 
-    fn get_max_depth(&self) -> usize {
-        0
+    fn get_height(&self) -> usize {
+        if let Some(tn) = self.tree_nav.get() {
+            tn.read().unwrap().get_height()
+        } else {
+            0
+        }
     }
 
     fn goby(&mut self, direction: Vector2<isize>) -> TreeNavResult {
