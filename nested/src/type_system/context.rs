@@ -119,11 +119,11 @@ impl Default for Context {
     fn default() -> Context {
         let mut ctx = Context::new();
 
-        ctx.add_list_typename("Seq".into());
-        ctx.add_list_typename("Sequence".into());
-        ctx.add_list_typename("SepSeq".into());
-        ctx.add_typename("NestedNode".into());
-        ctx.add_typename("TerminalEvent".into());
+        ctx.add_list_typename("Sequence");
+        ctx.add_synonym("Seq", "Sequence");
+        ctx.add_list_typename("SepSeq");
+        ctx.add_typename("NestedNode");
+        ctx.add_typename("TerminalEvent");
         
         crate::editors::list::init_ctx( &mut ctx );
         crate::editors::char::init_ctx( &mut ctx );
@@ -181,8 +181,12 @@ impl Context {
         self.type_dict.write().unwrap().add_varname(vn.to_string())
     }
 
-    pub fn add_list_typename(&mut self, tn: String) {
-        let tid = self.add_typename(&tn);
+    pub fn add_synonym(&mut self, new: &str, old: &str) {
+        self.type_dict.write().unwrap().add_synonym(new.to_string(), old.to_string());
+    }
+
+    pub fn add_list_typename(&mut self, tn: &str) {
+        let tid = self.add_typename(tn);
         self.list_types.push( tid );
     }
 

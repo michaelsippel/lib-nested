@@ -46,6 +46,12 @@ impl TypeDict {
         tyid
     }
 
+    pub fn add_synonym(&mut self, new: String, old: String) {
+        if let Some(tyid) = self.get_typeid(&old) {
+            self.typenames.insert(new, tyid);
+        }
+    }
+
     pub fn get_typename(&self, tid: &TypeID) -> Option<String> {
         self.typenames.my.get(tid).cloned()
     }
