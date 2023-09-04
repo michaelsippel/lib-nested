@@ -12,7 +12,7 @@ use {
 };
 
 #[derive(Copy, Clone, PartialEq, Eq)]
-pub enum ListCmd {    
+pub enum ListCmd {
     DeletePxev,
     DeleteNexd,
     JoinNexd,
@@ -154,7 +154,6 @@ impl ObjCommander for ListEditor {
 
                 }
             }
-            
 
         } else {
             if let Some(cur_item) = self.get_item_mut() {

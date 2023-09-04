@@ -196,7 +196,6 @@ impl ListEditor {
 
     /// delete all items
     pub fn clear(&mut self) {
-        eprintln!("list editor: clear");
         let mut b = self.spillbuf.write().unwrap();
         for i in 0..self.data.len() {
             b.push( self.data.get(i) );
@@ -266,50 +265,25 @@ impl ListEditor {
                 );
                 self.data.remove(idx);
             }
-
-            /* TODO
-             */
-            /*
-            if self.is_listlist() {
-                if idx > 0 && idx < self.data.len()+1 {
-
-                    let prev_idx = idx - 1; // get last element before cursor (we are in insert mode)
-                    let prev_node = self.data.get(prev_idx);
-                    let prev_node = prev_node.read().unwrap();
-
-                    if let Some(prev_editor) = prev_node.editor.get() {
-                        let prev_editor = prev_editor.downcast::<RwLock<ListEditor>>().unwrap();
-                        let prev_editor = prev_editor.write().unwrap();
-                        prev_editor.get_data_port().0.update();
-
-                        if prev_editor.get_data_port().get_view().unwrap().iter()
-                            .filter_map(|x| x.get_data_view::<dyn SingletonView<Item = Option<char>>>(vec![].into_iter())?.get()).count() == 0
-                        {
-                            drop(prev_editor);
-                            self.data.remove(prev_idx);
-                        }
-                    }
-                }
-        }
-            */
         }
     }
 
     pub fn listlist_split(&mut self) {
         let cur = self.get_cursor();
-        eprintln!("listlist_split(): cur = {:?}", cur);
+
         if let Some(mut item) = self.get_item().clone() {
-            eprintln!("listlist_split(): split child item");
             item.send_cmd_obj(ListCmd::Split.into_repr_tree(&self.ctx));
-            eprintln!("listlist_split(): done child split");
 
             if cur.tree_addr.len() < 3 {
                 item.goto(TreeCursor::none());
-                let mut tail_node = Context::make_node(&self.ctx, self.typ.clone(), 0).unwrap();
-                //tail_node = tail_node.morph(  );
-                tail_node.goto(TreeCursor::home());
+
+                self.set_leaf_mode(ListCursorMode::Insert);
+                self.nexd();
 
                 let mut b = item.spillbuf.write().unwrap();
+                let mut tail_node = Context::make_node(&self.ctx, self.typ.clone(), 0).unwrap();
+                tail_node.goto(TreeCursor::home());
+
                 for node in b.iter() {
                     tail_node
                         .send_cmd_obj(
@@ -325,23 +299,19 @@ impl ListEditor {
                 drop(b);
                 drop(item);
 
-                self.set_leaf_mode(ListCursorMode::Insert);
-                self.nexd();
-
                 tail_node.goto(TreeCursor::home());
                 if cur.tree_addr.len() > 2 {
                     tail_node.dn();
                 }
 
-                eprintln!("insert tail node");
                 self.insert(
                     Arc::new(RwLock::new(tail_node))
                 );
+
             } else {
                 self.up();
                 self.listlist_split();
                 self.dn();
-                eprintln!("tree depth >= 3");
             }
         }
     }
@@ -404,7 +374,6 @@ impl ListEditor {
     }
 
     pub fn listlist_join_nexd(&mut self, idx: usize) {
-        eprintln!("listilst_join_nexd");
         {
             let cur_editor = self.data.get(idx);
             let nxd_editor = self.data.get(idx + 1);
@@ -426,7 +395,7 @@ impl ListEditor {
             });
  
             let data = nxd_editor.spillbuf.read().unwrap();
-            eprintln!("spillbuf of next : {} elements", data.len());
+
             for x in data.iter() {
                 cur_editor.send_cmd_obj(
                     ReprTree::new_leaf(
@@ -447,7 +416,7 @@ impl ListEditor {
             } else {
                 cur_editor.goto(TreeCursor {
                     tree_addr: vec![ old_cur.tree_addr[0] ],
-                    leaf_mode: ListCursorMode::Insert                
+                    leaf_mode: ListCursorMode::Insert
                 });
             }
         }

@@ -25,7 +25,10 @@ pub fn init_ctx(ctx: &mut Context) {
     ctx.add_morphism(
         MorphismTypePattern { src_tyid: ctx.get_typeid("List"), dst_tyid: ctx.get_typeid("Type").unwrap() },
         Arc::new(move |node, _dst_type:_| {
-            let new_node = TypeTermEditor::with_node( node.ctx.clone(), node.depth.get(), node.clone(), State::Any );
+            let ctx : Arc<RwLock<Context>> = Arc::new(RwLock::new(Context::with_parent(Some(node.ctx.clone()))));
+            ctx.write().unwrap().meta_chars.push('~');
+
+            let new_node = TypeTermEditor::with_node( ctx, node.depth.get(), node.clone(), State::Any );
             Some(new_node)
         }));
 
