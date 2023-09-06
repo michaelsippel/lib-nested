@@ -1,9 +1,9 @@
 use {
-    std::{sync::{Arc, RwLock, Mutex}, any::Any},
+    std::{sync::{Arc, RwLock}, any::Any},
     cgmath::{Vector2, Point2},
     r3vi::{
-        view::{ChannelReceiver, View, ViewPort, OuterViewPort, AnyOuterViewPort, singleton::*, sequence::*},
-        buffer::{singleton::*, vec::*}
+        view::{View, ViewPort, OuterViewPort, AnyOuterViewPort, singleton::*, sequence::*},
+        buffer::{singleton::*}
     },
     crate::{
         type_system::{ReprTree, Context, TypeTerm},

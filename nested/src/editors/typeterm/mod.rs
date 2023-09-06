@@ -6,8 +6,8 @@ pub use ctx::init_ctx;
 
 use {
     r3vi::{
-        buffer::{singleton::*, vec::*},
-        view::{singleton::*, sequence::*, OuterViewPort}
+        buffer::{singleton::*},
+        view::{singleton::*, sequence::*}
     },
     crate::{
         type_system::{Context, TypeID, TypeTerm, ReprTree},
@@ -15,8 +15,7 @@ use {
         tree::{NestedNode, TreeNav, TreeNavResult, TreeCursor},
         commander::ObjCommander
     },
-    std::{sync::{Arc, RwLock, Mutex}, any::Any},
-    cgmath::{Vector2}
+    std::{sync::{Arc, RwLock}}
 };
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
@@ -176,7 +175,7 @@ impl TypeTermEditor {
 
         node.goto(TreeCursor::home());
 
-        let editor = node.editor.get();
+        let _editor = node.editor.get();
         self.close_char.set(node.close_char.get());
         self.cur_node.set(node);
         self.state = new_state;
@@ -221,7 +220,7 @@ impl TypeTermEditor {
             })
             .to_grid()
             .flatten();
-        let cc = editor.cur_node.get().close_char;
+        let _cc = editor.cur_node.get().close_char;
         let editor = Arc::new(RwLock::new(editor));
 
         let mut node = NestedNode::new(ctx, data, depth)
@@ -292,8 +291,8 @@ impl TypeTermEditor {
 
     pub fn normalize_empty(&mut self) {
         eprintln!("normalize singleton");
-        let mut subladder_list_node = self.cur_node.get().clone();
-        let mut subladder_list_edit = subladder_list_node.get_edit::<ListEditor>().unwrap();
+        let subladder_list_node = self.cur_node.get().clone();
+        let subladder_list_edit = subladder_list_node.get_edit::<ListEditor>().unwrap();
 
         let subladder_list_edit = subladder_list_edit.read().unwrap();
         if subladder_list_edit.data.len() == 0 {
@@ -307,8 +306,8 @@ impl TypeTermEditor {
      */
     pub fn normalize_singleton(&mut self) {
         eprintln!("normalize singleton");
-        let mut subladder_list_node = self.cur_node.get().clone();
-        let mut subladder_list_edit = subladder_list_node.get_edit::<ListEditor>().unwrap();
+        let subladder_list_node = self.cur_node.get().clone();
+        let subladder_list_edit = subladder_list_node.get_edit::<ListEditor>().unwrap();
 
         let subladder_list_edit = subladder_list_edit.read().unwrap();
         if subladder_list_edit.data.len() == 1 {
@@ -333,11 +332,11 @@ impl TypeTermEditor {
      */
     pub fn normalize_nested_ladder(&mut self) {
         let mut subladder_list_node = self.cur_node.get().clone(); 
-        let mut subladder_list_edit = subladder_list_node.get_edit::<ListEditor>().unwrap();
+        let subladder_list_edit = subladder_list_node.get_edit::<ListEditor>().unwrap();
 
         let item = subladder_list_edit.write().unwrap().get_item().clone();
 
-        if let Some(mut it_node) = item {
+        if let Some(it_node) = item {
             if it_node.get_type() == (&self.ctx, "( Type )").into() {
                 let other_tt = it_node.get_edit::<TypeTermEditor>().unwrap();
 
@@ -441,8 +440,8 @@ impl TypeTermEditor {
         /* create a new NestedNode with TerminaltypeEditor,
          * that has same state & child-node as current node.
          */
-        let mut old_edit_node = TypeTermEditor::new_node( self.ctx.clone(), self.depth );
-        let mut old_edit_clone = old_edit_node.get_edit::<TypeTermEditor>().unwrap();
+        let old_edit_node = TypeTermEditor::new_node( self.ctx.clone(), self.depth );
+        let old_edit_clone = old_edit_node.get_edit::<TypeTermEditor>().unwrap();
         old_edit_clone.write().unwrap().set_state( self.state );
         old_edit_clone.write().unwrap().close_char.set( old_node.close_char.get() );
         old_edit_clone.write().unwrap().cur_node.set( old_node );

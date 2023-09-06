@@ -1,6 +1,6 @@
 use {
     r3vi::{
-        view::{ChannelSender, ChannelReceiver, port::UpdateTask, OuterViewPort, singleton::*, sequence::*},
+        view::{OuterViewPort, singleton::*, sequence::*},
         buffer::{singleton::*, vec::*}
     },
     crate::{
@@ -10,8 +10,7 @@ use {
         diagnostics::Diagnostics,
         commander::ObjCommander
     },
-    std::sync::{Arc, RwLock, Mutex},
-    std::ops::Deref
+    std::sync::{Arc, RwLock}
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>

@@ -1,23 +1,21 @@
 use {
     r3vi::{
-        buffer::{singleton::*, vec::*},
-        view::{singleton::*, sequence::*, OuterViewPort}
+        view::{singleton::*, sequence::*}
     },
     crate::{
-        type_system::{Context, TypeID, TypeTerm, ReprTree},
-        editors::{list::{ListCursorMode, ListEditor, ListCmd}},
+        type_system::{ReprTree},
+        editors::{list::{ListEditor, ListCmd}},
         tree::{NestedNode, TreeNav, TreeNavResult, TreeCursor},
         commander::ObjCommander
     },
-    std::{sync::{Arc, RwLock, Mutex}, any::Any},
-    cgmath::{Vector2},
+    std::{sync::{Arc, RwLock}},
 
     super::{TypeTermEditor, State}
 };
 
 impl ObjCommander for TypeTermEditor {
     fn send_cmd_obj(&mut self, co: Arc<RwLock<ReprTree>>) -> TreeNavResult {
-        let cur = self.get_cursor();
+        let _cur = self.get_cursor();
 
         let cmd_obj = co.clone();
         let cmd_obj = cmd_obj.read().unwrap();

@@ -41,7 +41,7 @@ pub fn init_ctx(ctx: &mut Context) {
             if vertical_view {
                 let editor = node.get_edit::<crate::editors::list::ListEditor>().unwrap();
                 let mut e = editor.write().unwrap();
-                let mut seg_view = PTYListStyle::new( ("","~",""), node.depth.get() ).get_seg_seq_view( &mut e );
+                let seg_view = PTYListStyle::new( ("","~",""), node.depth.get() ).get_seg_seq_view( &mut e );
 
                 node = node.set_view(
                     seg_view.to_grid_vertical().flatten()

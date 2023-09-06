@@ -46,7 +46,7 @@ pub trait TreeNav {
         TreeCursor::default()
     }
 
-    fn get_height(&self, op: &TreeHeightOp) -> usize {
+    fn get_height(&self, _op: &TreeHeightOp) -> usize {
         0
     }
 

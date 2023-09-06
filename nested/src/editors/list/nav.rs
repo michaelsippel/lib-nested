@@ -248,7 +248,7 @@ impl TreeNav for ListEditor {
                                 let cur_item = self.data.get(cur.tree_addr[0] as usize);
                                 let cur_height = cur_item.read().unwrap().get_height(&TreeHeightOp::Max);
 
-                                let mut new_item = self.data
+                                let new_item = self.data
                                     .get_mut(idx as usize);
 
                                 let height = new_item.read().unwrap().get_height(
@@ -356,7 +356,7 @@ impl TreeNav for ListEditor {
 
                                         let pxv_height = pxv_item.read().unwrap().get_height(&TreeHeightOp::Q) as isize;
                                         let cur_height = cur_item.read().unwrap().get_height(&TreeHeightOp::P) as isize;
-                                        let dist_from_ground = (cur_height - (depth as isize - 1));
+                                        let dist_from_ground = cur_height - (depth as isize - 1);
                                         let n_steps_down =
                                             if gravity {
                                                 pxv_height - dist_from_ground
@@ -366,7 +366,7 @@ impl TreeNav for ListEditor {
 
                                         eprintln!("<- LEFT CROSS: pxv_height = {}, cur_height = {}, dist_from_ground = {}, n_steps_down = {}", pxv_height, cur_height, dist_from_ground, n_steps_down);
                                         new_addr.push( cur.tree_addr[0] - 1 );
-                                        for i in 0..n_steps_down {
+                                        for _i in 0..n_steps_down {
                                             new_addr.push( -1 );
                                         }
                                         
@@ -376,7 +376,7 @@ impl TreeNav for ListEditor {
 
                                         let cur_height = cur_item.read().unwrap().get_height(&TreeHeightOp::Q) as isize;
                                         let nxd_height = nxd_item.read().unwrap().get_height(&TreeHeightOp::P) as isize;
-                                        let dist_from_ground = (cur_height - (depth as isize - 1));
+                                        let dist_from_ground = cur_height - (depth as isize - 1);
                                         let n_steps_down =
                                             if gravity {
                                                 nxd_height - dist_from_ground
@@ -386,7 +386,7 @@ impl TreeNav for ListEditor {
 
                                         eprintln!("-> RIGHT CROSS: cur_height = {}, nxd_height = {}, dist_from_ground = {}, n_steps_down = {}", cur_height, nxd_height, dist_from_ground, n_steps_down);
                                         new_addr.push( cur.tree_addr[0] + 1 );
-                                        for i in 0..n_steps_down {
+                                        for _i in 0..n_steps_down {
                                             new_addr.push( 0 );
                                         }
                                     }
