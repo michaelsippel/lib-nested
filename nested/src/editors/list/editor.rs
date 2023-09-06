@@ -52,7 +52,7 @@ impl ListEditor {
                             ListCursorMode::Insert => ip,
                             ListCursorMode::Select => {
                                 if let Some(idx) = c.idx {
-                                    if idx > 0 && idx < data.len() as isize {
+                                    if idx >= 0 && idx < data.len() as isize {
                                         data.get(idx as usize).read().unwrap().get_mode_view()
                                     } else {
                                         eprintln!("ListEditor::mode_port invalid cursor idx");
