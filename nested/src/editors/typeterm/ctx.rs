@@ -1,7 +1,4 @@
 use {
-    r3vi::{
-        view::{singleton::*, sequence::*}
-    },
     crate::{
         type_system::{Context, TypeTerm, MorphismTypePattern},
         terminal::{TerminalStyle, TerminalProjections},

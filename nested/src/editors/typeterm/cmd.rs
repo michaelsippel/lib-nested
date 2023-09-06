@@ -1,6 +1,6 @@
 use {
     r3vi::{
-        view::{singleton::*, sequence::*}
+        view::{singleton::*}
     },
     crate::{
         type_system::{ReprTree},

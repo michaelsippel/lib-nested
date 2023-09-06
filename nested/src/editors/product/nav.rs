@@ -179,7 +179,6 @@ impl TreeNav for ProductEditor {
                                 match e.goby(direction) {
                                     TreeNavResult::Exit => {
                                        // *cur_depth = 1;
-                                        drop(e);
 
                                         if direction.y < 0 {
                                             if depth <= (1-direction.y) as usize {

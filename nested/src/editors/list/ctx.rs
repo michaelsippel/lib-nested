@@ -1,7 +1,4 @@
 use {
-    r3vi::{
-        view::{sequence::*}
-    },
     crate::{
         type_system::{Context, TypeTerm},
         editors::list::{ListEditor, PTYListController, PTYListStyle}

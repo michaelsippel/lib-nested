@@ -6,8 +6,7 @@ pub use ctx::init_ctx;
 
 use {
     r3vi::{
-        buffer::{singleton::*},
-        view::{singleton::*, sequence::*}
+        buffer::{singleton::*}
     },
     crate::{
         type_system::{Context, TypeID, TypeTerm, ReprTree},
@@ -122,17 +121,13 @@ impl TypeTermEditor {
                 editor.set_state( State::Char );
                 editor.send_cmd_obj(ReprTree::from_char(&ctx, *c));
             }
-            
-            _ => {}
         }
 
         node.goto(TreeCursor::none());
         node
     }
-    
-    fn set_state(&mut self, new_state: State) {        
-        let old_node = self.cur_node.get();
 
+    fn set_state(&mut self, new_state: State) {
         let mut node = match new_state {
             State::Any => {
                 Context::make_node( &self.ctx, (&self.ctx, "( List Char )").into(), self.depth ).unwrap()
@@ -167,9 +162,6 @@ impl TypeTermEditor {
             State::Char => {
                 Context::make_node( &self.ctx, (&self.ctx, "( Char )").into(), self.depth ).unwrap()
                     .morph( (&self.ctx, "( Type::Lit::Char )").into() )
-            }
-            _ => {
-                old_node
             }
         };
 
