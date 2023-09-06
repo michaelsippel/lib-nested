@@ -176,7 +176,7 @@ impl PTYListController {
 
         match cur.mode {
             ListCursorMode::Insert => {
-                let mut new_edit = Context::make_node(&e.ctx, e.typ.clone(), self.depth).unwrap();
+                let mut new_edit = Context::make_node(&e.ctx, e.typ.clone(), self.depth+1).unwrap();
                 new_edit.goto(TreeCursor::home());
 
                 match new_edit.send_cmd_obj(cmd_obj.clone()) {

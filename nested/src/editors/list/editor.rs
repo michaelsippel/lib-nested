@@ -281,7 +281,7 @@ impl ListEditor {
                 self.nexd();
 
                 let mut b = item.spillbuf.write().unwrap();
-                let mut tail_node = Context::make_node(&self.ctx, self.typ.clone(), 0).unwrap();
+                let mut tail_node = Context::make_node(&self.ctx, self.typ.clone(), item.depth.get()).unwrap();
                 tail_node.goto(TreeCursor::home());
 
                 for node in b.iter() {

@@ -287,7 +287,7 @@ impl Context {
         let _new_depth = depth;
 
         mk_node(
-            NestedNode::new(new_ctx, ReprTree::new_arc(type_term.clone()), 0),
+            NestedNode::new(new_ctx, ReprTree::new_arc(type_term.clone()), depth),
             type_term
         )
     }
