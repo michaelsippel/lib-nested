@@ -7,14 +7,14 @@ use {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct TreeCursor {
     pub leaf_mode: ListCursorMode,
-    pub tree_addr: Vec<isize>,
+    pub tree_addr: Vec<isize>
 }
 
 impl TreeCursor {
     pub fn home() -> Self {
         TreeCursor {
             leaf_mode: ListCursorMode::Insert,
-            tree_addr: vec![0]
+            tree_addr: vec![0],
         }
     }
 

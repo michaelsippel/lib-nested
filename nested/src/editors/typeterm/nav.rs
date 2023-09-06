@@ -7,7 +7,7 @@ use {
         }
     },
     crate::{
-        tree::{TreeNav, TreeCursor, TreeNavResult},
+        tree::{TreeNav, TreeCursor, TreeNavResult, TreeHeightOp},
         editors::{typeterm::TypeTermEditor, list::ListCursorMode}
     },
     cgmath::Vector2
@@ -30,8 +30,8 @@ impl TreeNav for TypeTermEditor {
         self.cur_node.get().get_cursor_warp()
     }
 
-    fn get_height(&self) -> usize {
-        self.cur_node.get().get_height()
+    fn get_height(&self, op: &TreeHeightOp) -> usize {
+        self.cur_node.get().get_height(op)
     }
 
     fn goby(&mut self, dir: Vector2<isize>) -> TreeNavResult {

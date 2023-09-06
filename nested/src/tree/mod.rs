@@ -7,7 +7,7 @@ pub mod treetype;
 pub use {
     addr::TreeAddr,
     cursor::TreeCursor,
-    nav::{TreeNav, TreeNavResult},
+    nav::{TreeNav, TreeNavResult, TreeHeightOp},
     treetype::{TreeType},
     node::NestedNode
 };

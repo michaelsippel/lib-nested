@@ -176,6 +176,9 @@ impl ObjCommander for TypeTermEditor {
 
                     self.cur_node.get_mut().goto(TreeCursor::home());
                 }
+                State::Ladder | State::App => {
+                    // todo: if backspace cmd and empty list, reset to Any
+                }
                 _ => {
                 }
             }

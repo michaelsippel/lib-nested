@@ -22,23 +22,10 @@ use {
 };
 
 #[derive(Clone, Copy, Eq, PartialEq)]
-pub enum TreeNavResult {
-    Continue,
-    Exit,
-}
+pub enum TreeNavResult { Continue, Exit }
 
-/*
-impl From<TreeNavResult> for TerminalEditorResult {
-    fn from(v: TreeNavResult) -> TerminalEditorResult {
-        match v {
-            TreeNavResult::Continue => TerminalEditorResult::Continue,
-            TreeNavResult::Exit => TerminalEditorResult::Exit
-        }
-    }
-}
- */
-
-
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub enum TreeHeightOp { P, Q, Max }
 
 pub trait TreeNav {
     /* CORE
@@ -59,7 +46,7 @@ pub trait TreeNav {
         TreeCursor::default()
     }
 
-    fn get_height(&self) -> usize {
+    fn get_height(&self, op: &TreeHeightOp) -> usize {
         0
     }
 
@@ -127,13 +114,11 @@ pub trait TreeNav {
                 if c.tree_addr[depth-1] != 0 {
                     c.tree_addr[depth-1] = 0;
                 } else {
-                    for i in (0..depth-1).rev() {
-                        if c.tree_addr[i] == 0 {
-                            c.tree_addr[i] = -1;
-                        } else {
-                            c.tree_addr[i] -=1;
-                            break;
-                        }
+                    self.pxev();
+                    c = self.get_cursor();
+                    let d = c.tree_addr.len();
+                    if d > 0 {
+                        c.tree_addr[d-1] = 0;
                     }
                 }
 
@@ -152,16 +137,14 @@ pub trait TreeNav {
                 if c.tree_addr[depth-1] != -1 {
                     c.tree_addr[depth-1] = -1;
                 } else {
-                    for i in (0..depth-1).rev() {
-                        if c.tree_addr[i] == -1 {
-                            c.tree_addr[i] = 0;
-                        } else {
-                            c.tree_addr[i] += 1;
-                            break;
-                        }
+                    self.nexd();
+                    c = self.get_cursor();
+                    let d = c.tree_addr.len();
+                    if d > 0 {
+                        c.tree_addr[d-1] = -1;
                     }
                 }
-                
+
                 self.goto(c)
             }
         }

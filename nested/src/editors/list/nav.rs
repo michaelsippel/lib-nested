@@ -11,7 +11,7 @@ use {
             ListCursor, ListCursorMode,
             editor::ListEditor
         },
-        tree::{TreeCursor, TreeNav, TreeNavResult}
+        tree::{TreeCursor, TreeNav, TreeNavResult, TreeHeightOp}
     },
     cgmath::Vector2
 };
@@ -26,6 +26,31 @@ impl TreeNav for ListEditor {
     fn get_mode_view(&self) -> OuterViewPort<dyn SingletonView<Item = ListCursorMode>> {
         self.mode_port.clone()
     }
+    
+    fn get_height(&self, op: &TreeHeightOp) -> usize {
+        match op {
+            TreeHeightOp::P | TreeHeightOp::Q => {
+                if self.data.len() > 0 {
+                    1 + self.data.get(match op {
+                        TreeHeightOp::P => 0,
+                        TreeHeightOp::Q => self.data.len() - 1,
+                        _ => 0
+                    }).read().unwrap().get_height(op)
+                } else {
+                    1
+                }
+            }
+            TreeHeightOp::Max => {
+                1 + (0..self.data.len() as usize)
+                    .map(|i| self.data
+                         .get(i).read().unwrap()
+                         .get_height(&TreeHeightOp::Max)
+                    )
+                    .max()
+                    .unwrap_or(0)
+            }
+        }
+    }
 
     fn get_cursor_warp(&self) -> TreeCursor {
         let cur = self.cursor.get();
@@ -38,7 +63,7 @@ impl TreeNav for ListEditor {
                     ]
                 } else {
                     vec![]
-                },
+                }
             },
             ListCursorMode::Select => {
                 if let Some(i) = cur.idx {
@@ -158,17 +183,14 @@ impl TreeNav for ListEditor {
 
     fn goby(&mut self, direction: Vector2<isize>) -> TreeNavResult {
         let mut cur = self.get_cursor();
+
+        let gravity = true;
+
         match cur.tree_addr.len() {
             0 => {
 
                 if direction.y < 0 {
                     // up
-                    /*
-                    self.cursor.set(ListCursor {
-                        mode: cur.leaf_mode,
-                        idx: None
-                });
-                     */
                     self.cursor.set(ListCursor::none());
                     TreeNavResult::Exit
                 } else if direction.y > 0 {
@@ -219,20 +241,71 @@ impl TreeNav for ListEditor {
                          + if cur.leaf_mode == ListCursorMode::Insert { 1 } else { 0 })
                     {
                         let idx = cur.tree_addr[0] + direction.x;
-                        self.cursor.set(ListCursor {
-                            mode: if self.data.len() == 0 { ListCursorMode::Insert } else { cur.leaf_mode },
-                            idx: Some(idx)
-                        });
+                        let mut new_addr = Vec::new();
 
-                        if idx < self.data.len() as isize {
-                            self.data
-                                .get_mut(idx as usize)
-                                .write().unwrap()
-                                .goto(TreeCursor {
-                                    leaf_mode: cur.leaf_mode,
-                                    tree_addr: vec![]
-                                });
+                        match cur.leaf_mode {
+                            ListCursorMode::Select => {
+                                let cur_item = self.data.get(cur.tree_addr[0] as usize);
+                                let cur_height = cur_item.read().unwrap().get_height(&TreeHeightOp::Max);
+
+                                let mut new_item = self.data
+                                    .get_mut(idx as usize);
+
+                                let height = new_item.read().unwrap().get_height(
+                                    if direction.x < 0 {
+                                        &TreeHeightOp::Q
+                                    } else {
+                                        &TreeHeightOp::P
+                                    }
+                                );
+
+                                new_addr.push(idx);
+                                if gravity && cur_height < 2 {
+                                    for _ in 1..height {
+                                        new_addr.push( if direction.x >= 0 {
+                                            0
+                                        } else {
+                                            -1
+                                        });
+                                    }
+                                }
+                            }
+                            ListCursorMode::Insert => {
+                                let gravity = false;
+                                if direction.x > 0
+                                {
+                                    if (cur.tree_addr[0] as usize) < self.data.len() {
+                                        let cur_item = self.data.get(cur.tree_addr[0] as usize);
+                                        let cur_height = cur_item.read().unwrap().get_height(&TreeHeightOp::P);
+
+                                        if gravity && cur_height > 1 {
+                                            new_addr.push( cur.tree_addr[0] );
+                                            new_addr.push(0);
+                                        } else {
+                                            new_addr.push( idx );           
+                                        }
+                                    }
+                                } else {
+                                    if (idx as usize) < self.data.len() {
+                                        let pxv_item = self.data.get(idx as usize);
+                                        let pxv_height = pxv_item.read().unwrap().get_height(&TreeHeightOp::P);
+
+                                        if gravity && pxv_height > 1 {
+                                            new_addr.push( idx );
+                                            new_addr.push( -1 );
+                                        } else {
+                                            new_addr.push( idx );           
+                                        }
+                                    }                                    
+                                }
+                            }
                         }
+
+                        if self.data.len() == 0 {
+                            cur.leaf_mode = ListCursorMode::Insert
+                        }
+                        cur.tree_addr = new_addr;
+                        self.goto(cur);
 
                         TreeNavResult::Continue
                     } else {
@@ -255,8 +328,6 @@ impl TreeNav for ListEditor {
 
                     let result = cur_item.write().unwrap().goby(direction);
 
-                    drop(cur_item);
-                    
                     match result
                     {
                         TreeNavResult::Exit => {
@@ -277,19 +348,54 @@ impl TreeNav for ListEditor {
                                 if (cur.tree_addr[0]+direction.x >= 0) &&
                                     (cur.tree_addr[0]+direction.x < self.data.len() as isize)
                                 {
+                                    let mut new_addr = Vec::new();
+
                                     if direction.x < 0 {
-                                        cur.tree_addr[0] -= 1;
-                                        for i in 1..depth {
-                                            cur.tree_addr[i] = -1;
+                                        let pxv_item = self.data
+                                            .get_mut(cur.tree_addr[0] as usize - 1);
+
+                                        let pxv_height = pxv_item.read().unwrap().get_height(&TreeHeightOp::Q) as isize;
+                                        let cur_height = cur_item.read().unwrap().get_height(&TreeHeightOp::P) as isize;
+                                        let dist_from_ground = (cur_height - (depth as isize - 1));
+                                        let n_steps_down =
+                                            if gravity {
+                                                pxv_height - dist_from_ground
+                                            } else {
+                                                depth as isize - 1
+                                            };
+
+                                        eprintln!("<- LEFT CROSS: pxv_height = {}, cur_height = {}, dist_from_ground = {}, n_steps_down = {}", pxv_height, cur_height, dist_from_ground, n_steps_down);
+                                        new_addr.push( cur.tree_addr[0] - 1 );
+                                        for i in 0..n_steps_down {
+                                            new_addr.push( -1 );
                                         }
+                                        
                                     } else {
-                                        cur.tree_addr[0] += 1;
-                                        for i in 1..depth {
-                                            cur.tree_addr[i] = 0;
+                                        let nxd_item = self.data
+                                            .get_mut(cur.tree_addr[0] as usize + 1);
+
+                                        let cur_height = cur_item.read().unwrap().get_height(&TreeHeightOp::Q) as isize;
+                                        let nxd_height = nxd_item.read().unwrap().get_height(&TreeHeightOp::P) as isize;
+                                        let dist_from_ground = (cur_height - (depth as isize - 1));
+                                        let n_steps_down =
+                                            if gravity {
+                                                nxd_height - dist_from_ground
+                                            } else {
+                                                depth as isize - 1
+                                            };
+
+                                        eprintln!("-> RIGHT CROSS: cur_height = {}, nxd_height = {}, dist_from_ground = {}, n_steps_down = {}", cur_height, nxd_height, dist_from_ground, n_steps_down);
+                                        new_addr.push( cur.tree_addr[0] + 1 );
+                                        for i in 0..n_steps_down {
+                                            new_addr.push( 0 );
                                         }
                                     }
 
-                                    self.goto(cur)                    
+                                    drop(cur_item);
+
+                                    eprintln!("CROSS: goto {:?}", new_addr);
+                                    cur.tree_addr = new_addr;
+                                    self.goto(cur)
                                 } else {
                                     self.cursor.set(ListCursor {
                                         mode: cur.leaf_mode,

@@ -9,7 +9,7 @@ use {
         type_system::{ReprTree, Context, TypeTerm},
         terminal::{TerminalView, TerminalEvent, TerminalEditor, TerminalEditorResult, TerminalAtom},
         diagnostics::{Diagnostics, Message},
-        tree::{TreeNav, TreeCursor, TreeNavResult},
+        tree::{TreeNav, TreeCursor, TreeNavResult, TreeHeightOp},
         editors::list::{ListCursorMode},
         commander::ObjCommander,
     }
@@ -304,9 +304,9 @@ impl TreeNav for NestedNode {
         }
     }
 
-    fn get_height(&self) -> usize {
+    fn get_height(&self, op: &TreeHeightOp) -> usize {
         if let Some(tn) = self.tree_nav.get() {
-            tn.read().unwrap().get_height()
+            tn.read().unwrap().get_height( op )
         } else {
             0
         }
