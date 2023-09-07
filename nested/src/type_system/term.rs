@@ -33,6 +33,10 @@ pub enum TypeTerm {
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 impl TypeTerm {
+    pub fn unit() -> Self {
+        TypeTerm::Ladder(vec![])
+    }
+
     pub fn new(id: TypeID) -> Self {
         TypeTerm::TypeID(id)
     }
@@ -130,6 +134,17 @@ impl TypeTerm {
         }
     }
 
+    pub fn get_lnf_vec(self) -> Vec<TypeTerm> {
+        match self.normalize() {
+            TypeTerm::Ladder( v ) => {
+                v
+            },
+            _ => {
+                unreachable!();
+            }
+        }
+    }
+
     /// transmute self into Ladder-Normal-Form
     ///
     /// Example:
@@ -194,48 +209,43 @@ impl TypeTerm {
         TypeTerm::Ladder( new_ladder )
     }
 
-    /*
-    pub fn is_supertype_of(&self, t: &TypeTerm) -> bool {
+    pub fn is_semantic_supertype_of(&self, t: &TypeTerm) -> Option<( usize, TypeTerm )> {
         t.is_semantic_subtype_of(self)
     }
-     */
+    
+    // returns ladder-step of first match and provided representation-type
+    pub fn is_semantic_subtype_of(&self, expected_type: &TypeTerm) -> Option<( usize, TypeTerm )> {
+        let provided_lnf = self.clone().get_lnf_vec();
+        let expected_lnf = expected_type.clone().get_lnf_vec();
 
-    // returns provided syntax-type, 
-    pub fn is_semantic_subtype_of(&self, expected_type: &TypeTerm) -> Option< TypeTerm > {
-        let provided_lnf = self.clone();
-        let expected_lnf = expected_type.clone();
-
-        match
-            (provided_lnf.normalize(),
-             expected_lnf.normalize())
-        {
-            ( TypeTerm::Ladder( provided_ladder ),
-              TypeTerm::Ladder( expected_ladder )
-            ) => {
-
-                for i in 0..provided_ladder.len() {
-                    if provided_ladder[i] == expected_ladder[0] {
-                        return Some(TypeTerm::Ladder(
-                            provided_ladder[i..].into_iter().cloned().collect()
-                        ))
-                    }
-                }
-
-                None
-            },
-
-            _ => {
-                // both are in LNF!
-                unreachable!()
+        for i in 0..provided_lnf.len() {
+            if provided_lnf[i] == expected_lnf[0] {
+                return Some((i, TypeTerm::Ladder(
+                    provided_lnf[i..].into_iter().cloned().collect()
+                )))
             }
         }
+
+        None
     }
 
-    pub fn is_syntactic_subtype_of(&self, expected_type: &TypeTerm) -> bool {
-        if let Some(provided_type) = self.is_semantic_subtype_of( expected_type ) {
-            &provided_type == expected_type
+    pub fn is_syntactic_subtype_of(&self, expected_type: &TypeTerm) -> Result<usize, Option<(usize, usize)>> {
+        if let Some((first_match, provided_type)) = self.is_semantic_subtype_of( expected_type ) {
+            let provided_lnf = self.clone().get_lnf_vec();
+            let expected_lnf = expected_type.clone().get_lnf_vec();
+
+            let l = usize::min( provided_lnf.len(), expected_lnf.len() );
+            
+            for i in 0..l {
+
+                if provided_lnf[i] != expected_lnf[i] {
+                    return Err(Some((first_match, i)))
+                }
+            }
+
+            Ok(l-1)
         } else {
-            false
+            Err(None)
         }
     }
 
