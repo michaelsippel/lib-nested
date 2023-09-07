@@ -4,7 +4,7 @@ use {
     },
     crate::{
         type_system::{ReprTree},
-        editors::{list::{ListEditor, ListCmd}},
+        editors::{list::{ListEditor, ListCmd, ListCursorMode}},
         tree::{NestedNode, TreeNav, TreeNavResult, TreeCursor},
         commander::ObjCommander
     },
@@ -64,25 +64,26 @@ impl ObjCommander for TypeTermEditor {
                     }
 
                     State::Ladder => {
-                        let res = self.send_child_cmd( co.clone() );
-                        
-                        match res {
-                            TreeNavResult::Continue => {
-                                match c {
-                                    '~' => {
-                                        self.normalize_nested_ladder();
+                        if c == '~' {
+                            let i0 = self.cur_node.get().get_edit::<ListEditor>().unwrap();
+
+                            let cur_it = i0.clone().read().unwrap().get_item().clone();
+                            
+                            if let Some(i) = cur_it {
+                                    let tte = i.get_edit::<TypeTermEditor>().unwrap();
+
+                                    if tte.read().unwrap().state != State::App {
+                                        drop(tte);
+                                        drop(i);
+
+                                        return self.send_child_cmd(
+                                            ListCmd::Split.into_repr_tree( &self.ctx )
+                                        );
                                     }
-                                    _ => {}
                                 }
-                                TreeNavResult::Continue
-                            }
-                            TreeNavResult::Exit => {
-                                match c {
-                                    '~' => TreeNavResult::Continue,
-                                    _   => TreeNavResult::Exit
-                                }
-                            }
                         }
+
+                        self.send_child_cmd( co.clone() )
                     }
 
                     State::App => {

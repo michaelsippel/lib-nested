@@ -316,45 +316,6 @@ impl TypeTermEditor {
                 self.cur_node.set(other_tt.cur_node.get());
                 self.state = other_tt.state;
             }
-        } else {
-        }
-    }
-
-    /* flatten ladder of ladders into one ladder editor
-     */
-    pub fn normalize_nested_ladder(&mut self) {
-        let mut subladder_list_node = self.cur_node.get().clone(); 
-        let subladder_list_edit = subladder_list_node.get_edit::<ListEditor>().unwrap();
-
-        let item = subladder_list_edit.write().unwrap().get_item().clone();
-
-        if let Some(it_node) = item {
-            if it_node.get_type() == (&self.ctx, "( Type )").into() {
-                let other_tt = it_node.get_edit::<TypeTermEditor>().unwrap();
-
-                if other_tt.write().unwrap().state == State::Ladder {
-                    let other = other_tt.read().unwrap().cur_node.get().get_edit::<ListEditor>().unwrap();
-                    let buf = other.read().unwrap().data.clone();
-
-                    subladder_list_edit.write().unwrap().up();
-                    subladder_list_edit.write().unwrap().up();
-                    subladder_list_node.send_cmd_obj(
-                        ListCmd::DeleteNexd.into_repr_tree( &self.ctx )
-                    );
-
-                    if subladder_list_edit.read().unwrap().get_cursor_warp().tree_addr.len() > 0 {
-                        if subladder_list_edit.read().unwrap().get_cursor_warp().tree_addr[0] == -1 {
-                            subladder_list_edit.write().unwrap().delete_nexd();
-                        }
-                    }
-
-                    let l = buf.len();
-                    for i in 0..l {
-                        subladder_list_edit.write().unwrap().insert( buf.get(i) );
-                    }
-                    subladder_list_node.dn();
-                }
-            }
         }
     }
 
