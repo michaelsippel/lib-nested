@@ -84,7 +84,7 @@ impl CharEditor {
         )
             .set_view(data
                       .get_port()
-                      .map(move |c| TerminalAtom::from(c))
+                      .map(move |c| TerminalAtom::from(if c == '\0' { ' ' } else { c }))
                       .to_grid()
             )
             .set_cmd( editor.clone() )
