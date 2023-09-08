@@ -1,8 +1,15 @@
 use {
+    r3vi::{
+        view::{OuterViewPort, singleton::*}
+    },
     crate::{
         type_system::{Context, TypeTerm, MorphismTypePattern},
         terminal::{TerminalStyle, TerminalProjections},
-        editors::{list::{PTYListStyle, PTYListController}, typeterm::{State, TypeTermEditor}}
+        editors::{
+            list::{PTYListStyle, PTYListController, ListEditor, ListSegmentSequence},
+            typeterm::{State, TypeTermEditor}
+        },
+        PtySegment
     },
     std::{sync::{Arc, RwLock}},
     cgmath::{Point2}
@@ -25,7 +32,7 @@ pub fn init_ctx(ctx: &mut Context) {
             let ctx : Arc<RwLock<Context>> = Arc::new(RwLock::new(Context::with_parent(Some(node.ctx.clone()))));
             ctx.write().unwrap().meta_chars.push('~');
 
-            let new_node = TypeTermEditor::with_node( ctx, node.depth.get(), node.clone(), State::Any );
+            let new_node = TypeTermEditor::with_node( ctx, node.clone(), State::Any );
             Some(new_node)
         }));
 
@@ -38,7 +45,7 @@ pub fn init_ctx(ctx: &mut Context) {
             if vertical_view {
                 let editor = node.get_edit::<crate::editors::list::ListEditor>().unwrap();
                 let mut e = editor.write().unwrap();
-                let seg_view = PTYListStyle::new( ("","~",""), node.depth.get() ).get_seg_seq_view( &mut e );
+                let seg_view = PTYListStyle::new( ("","~","") ).get_seg_seq_view( &mut e );
 
                 node = node.set_view(
                     seg_view.to_grid_vertical().flatten()
@@ -71,6 +78,7 @@ pub fn init_ctx(ctx: &mut Context) {
         Arc::new(|mut node, _dst_type:_| {
             PTYListController::for_node( &mut node, Some(' '), None );
             PTYListStyle::for_node( &mut node, ("","","") );
+
             Some(node)
         }));
 
@@ -80,11 +88,6 @@ pub fn init_ctx(ctx: &mut Context) {
             PTYListController::for_node( &mut node, Some(' '), None );
             PTYListStyle::for_node( &mut node, ("","","") );
 
-            // display variables blue color
-            if let Some(v) = node.view {
-                node.view = Some(
-                    v.map_item(|_i,p| p.add_style_front(TerminalStyle::fg_color((5, 120, 240)))));
-            }
             Some(node)
         }));
 
@@ -117,7 +120,7 @@ pub fn init_ctx(ctx: &mut Context) {
         }));
 
     ctx.add_node_ctor("Type", Arc::new(
-        |ctx: Arc<RwLock<Context>>, _ty: TypeTerm, depth: usize| {
+        |ctx: Arc<RwLock<Context>>, _ty: TypeTerm, depth: OuterViewPort<dyn SingletonView<Item = usize>>| {
             Some(TypeTermEditor::new_node(ctx, depth))
         }));
 }

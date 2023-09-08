@@ -19,8 +19,8 @@ use {
 pub fn init_ctx( ctx: &mut Context ) {
     ctx.add_node_ctor(
         "Char",
-        Arc::new(|ctx: Arc<RwLock<Context>>, _ty: TypeTerm, _depth: usize| {
-            Some(CharEditor::new_node(ctx))
+        Arc::new(|ctx: Arc<RwLock<Context>>, _ty: TypeTerm, depth: OuterViewPort<dyn SingletonView<Item = usize>>| {
+            Some(CharEditor::new_node(ctx, depth))
         }));
 }
 
@@ -69,7 +69,7 @@ impl CharEditor {
         self.get_port().get_view().unwrap().get()
     }
 
-    pub fn new_node(ctx0: Arc<RwLock<Context>>) -> NestedNode {
+    pub fn new_node(ctx0: Arc<RwLock<Context>>, depth: OuterViewPort<dyn SingletonView<Item = usize>>) -> NestedNode {
         let data = SingletonBuffer::new('\0');
         let ctx = ctx0.clone();
         let editor = Arc::new(RwLock::new(CharEditor{ ctx, data: data.clone() }));
@@ -80,7 +80,7 @@ impl CharEditor {
                 ctx0.read().unwrap().type_term_from_str("( Char )").unwrap(),
                 data.get_port().into()
             ),
-            0 // fixme
+            depth
         )
             .set_view(data
                       .get_port()

@@ -1,4 +1,8 @@
+
 use {
+    r3vi::{
+        view::{OuterViewPort, singleton::*}
+    },
     crate::{
         type_system::{Context, TypeTerm},
         editors::{
@@ -19,7 +23,7 @@ pub fn init_ctx(ctx: &mut Context) {
 
     ctx.add_node_ctor(
         "Digit", Arc::new(
-            |ctx: Arc<RwLock<Context>>, ty: TypeTerm, depth: usize| {
+            |ctx: Arc<RwLock<Context>>, ty: TypeTerm, depth: OuterViewPort<dyn SingletonView<Item = usize>>| {
                 match ty {
                     TypeTerm::App(args) => {
                         if args.len() > 1 {
@@ -50,9 +54,6 @@ pub fn init_ctx(ctx: &mut Context) {
     ctx.add_morphism(pattern,
         Arc::new(
             |mut node, dst_type| {
-                let _depth = node.depth.get();
-                let _editor = node.editor.get().unwrap().downcast::<RwLock<ListEditor>>().unwrap();
-
                 // todo: check src_type parameter to be ( Digit radix )
 
                 match dst_type {
@@ -87,7 +88,7 @@ pub fn init_ctx(ctx: &mut Context) {
 
     ctx.add_node_ctor(
         "PosInt", Arc::new(
-            |ctx0: Arc<RwLock<Context>>, dst_typ: TypeTerm, depth: usize| {
+            |ctx0: Arc<RwLock<Context>>, dst_typ: TypeTerm, depth: OuterViewPort<dyn SingletonView<Item = usize>>| {
                 match dst_typ.clone() {
                     TypeTerm::App(args) => {
                         if args.len() > 1 {
@@ -105,7 +106,7 @@ pub fn init_ctx(ctx: &mut Context) {
                                                 .clone()
                                                 .into()
                                         ]),
-                                        depth+1
+                                        depth.map(|d| d+1)
                                     ).unwrap();
 
                                     node = node.morph(dst_typ);

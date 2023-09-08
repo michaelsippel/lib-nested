@@ -60,7 +60,7 @@ impl SumEditor {
         NestedNode::new(
             ctx.clone(),
             ReprTree::new_arc(TypeTerm::TypeID(ctx.read().unwrap().get_typeid("Sum").unwrap())),
-            0
+            r3vi::buffer::singleton::SingletonBuffer::new(0).get_port()
         )
             .set_view(view)
             .set_editor(editor.clone())

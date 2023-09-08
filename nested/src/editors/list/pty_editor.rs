@@ -1,6 +1,6 @@
 use {
     r3vi::{
-        view::{OuterViewPort, sequence::*},
+        view::{ViewPort, OuterViewPort, sequence::*},
         projection::decorate_sequence::*,
     },
     crate::{
@@ -18,23 +18,20 @@ use {
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub struct PTYListStyle {
-    style: (String, String, String),
-    depth: usize
+    style: (String, String, String)
 }
 
 impl PTYListStyle {
-    pub fn new(style: (&str, &str, &str), depth: usize) -> PTYListStyle {
+    pub fn new(style: (&str, &str, &str)) -> PTYListStyle {
         PTYListStyle {
-            style: (style.0.into(), style.1.into(), style.2.into()),
-            depth
+            style: (style.0.into(), style.1.into(), style.2.into())
         }
     }
 
     pub fn get_seg_seq_view(&self, editor: &ListEditor) -> OuterViewPort<dyn SequenceView<Item = OuterViewPort<dyn TerminalView>>> {
         let seg_seq = ListSegmentSequence::new(
             editor.get_cursor_port(),
-            editor.get_data_port(),
-            self.depth
+            editor.get_data_port()
         );
         let se = seg_seq.read().unwrap();
         se.get_view().map(move |segment| segment.pty_view())
@@ -43,8 +40,7 @@ impl PTYListStyle {
     pub fn pty_view(&self, editor: &ListEditor) -> OuterViewPort<dyn TerminalView> {
         let seg_seq = ListSegmentSequence::new(
             editor.get_cursor_port(),
-            editor.get_data_port(),
-            self.depth
+            editor.get_data_port()
         );
         let seg_seq = seg_seq.read().unwrap();
 
@@ -59,7 +55,7 @@ impl PTYListStyle {
 
     pub fn for_node(node: &mut NestedNode, style: (&str, &str, &str)) {
         node.view = Some(
-            Self::new(style, node.depth.get())
+            Self::new(style)
                 .pty_view(
                     &node.get_edit::<ListEditor>().unwrap().read().unwrap()
                 )
@@ -75,7 +71,7 @@ pub struct PTYListController {
     split_char: Option<char>,
     close_char: Option<char>,
 
-    depth: usize
+    depth: OuterViewPort<dyn SingletonView<Item = usize>>
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
@@ -85,7 +81,7 @@ impl PTYListController {
         editor: Arc<RwLock<ListEditor>>,
         split_char: Option<char>,
         close_char: Option<char>,
-        depth: usize
+        depth: OuterViewPort<dyn SingletonView<Item = usize>>
     ) -> Self {
         PTYListController {
             editor,
@@ -113,7 +109,7 @@ impl PTYListController {
         }
         
         let editor = node.get_edit::<ListEditor>().unwrap();
-        let controller = Arc::new(RwLock::new(PTYListController::from_editor( editor, split_char, close_char, node.depth.get() )));
+        let controller = Arc::new(RwLock::new(PTYListController::from_editor( editor, split_char, close_char, node.depth.clone() )));
 
         node.cmd.set(Some(controller.clone()));
         node.close_char.set(close_char);
@@ -129,10 +125,6 @@ impl PTYListController {
 
     pub fn get_item(&self) -> Option<NestedNode> {
         self.editor.read().unwrap().get_item()
-    }
-
-    pub fn set_depth(&mut self, depth: usize) {
-        self.depth = depth;
     }
 
     pub fn handle_term_event(&mut self, event: &TerminalEvent, _cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
@@ -176,7 +168,7 @@ impl PTYListController {
 
         match cur.mode {
             ListCursorMode::Insert => {
-                let mut new_edit = Context::make_node(&e.ctx, e.typ.clone(), self.depth+1).unwrap();
+                let mut new_edit = Context::make_node(&e.ctx, e.typ.clone(), self.depth.map(|d| d+1)).unwrap();
                 new_edit.goto(TreeCursor::home());
 
                 match new_edit.send_cmd_obj(cmd_obj.clone()) {

@@ -84,7 +84,7 @@ impl DigitEditor {
         }
     }
 
-    pub fn into_node(self, depth: usize) -> NestedNode {
+    pub fn into_node(self, depth: OuterViewPort<dyn SingletonView<Item = usize>>) -> NestedNode {
         let data = self.get_data();        
         let editor = Arc::new(RwLock::new(self));
         let ed = editor.write().unwrap();
@@ -99,7 +99,7 @@ impl DigitEditor {
                         TerminalAtom::new(
                             c.unwrap_or('?'),
                             if c.unwrap_or('?').to_digit(r).is_some() {
-                                TerminalStyle::fg_color((100, 140, 100))
+                                TerminalStyle::fg_color((90, 160, 90))
                             } else {
                                 //TerminalStyle::bg_color((90, 10, 10))
                                 TerminalStyle::fg_color((200, 40, 40))
@@ -146,7 +146,7 @@ impl PosIntEditor {
         let mut node = Context::make_node(
             &ctx,
             (&ctx, format!("( List ( Digit {} ) )", radix).as_str()).into(),
-            0
+            r3vi::buffer::singleton::SingletonBuffer::new(0).get_port()
         ).unwrap();
 
         // Set Type

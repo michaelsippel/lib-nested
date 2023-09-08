@@ -6,6 +6,7 @@ pub use ctx::init_ctx;
 
 use {
     r3vi::{
+        view::{OuterViewPort, singleton::*},
         buffer::{singleton::*}
     },
     crate::{
@@ -36,9 +37,10 @@ pub struct TypeTermEditor {
     data: Arc<RwLock<ReprTree>>,
     close_char: SingletonBuffer<Option<char>>,
     spillbuf: Arc<RwLock<Vec<Arc<RwLock<NestedNode>>>>>,
+    depth: OuterViewPort<dyn SingletonView<Item = usize>>,
 
-    depth: usize,
-
+    buf: SingletonBuffer< TypeTerm >,
+    
     // editing/parsing state
     state: State,
 
@@ -47,8 +49,8 @@ pub struct TypeTermEditor {
 }
 
 impl TypeTermEditor {
-    pub fn from_type_term(ctx: Arc<RwLock<Context>>, depth: usize, term: &TypeTerm) -> NestedNode {
-        let mut node = TypeTermEditor::new_node(ctx.clone(), depth);
+    pub fn from_type_term(ctx: Arc<RwLock<Context>>, depth: OuterViewPort<dyn SingletonView<Item = usize>>, term: &TypeTerm) -> NestedNode {
+        let mut node = TypeTermEditor::new_node(ctx.clone(), depth.clone());
         node.goto(TreeCursor::home());
 
         match term {
@@ -74,7 +76,7 @@ impl TypeTermEditor {
                 let parent_ctx = editor.read().unwrap().cur_node.get().ctx.clone();
 
                 for x in args.iter() {                    
-                    let arg_node = TypeTermEditor::from_type_term( parent_ctx.clone(), depth+1, x );
+                    let arg_node = TypeTermEditor::from_type_term( parent_ctx.clone(), depth.map(|d| d+1), x );
 
                     node.send_cmd_obj(
                         ReprTree::new_leaf(
@@ -92,7 +94,7 @@ impl TypeTermEditor {
                 let parent_ctx = editor.read().unwrap().cur_node.get().ctx.clone();
 
                 for x in args.iter() {
-                    let arg_node = TypeTermEditor::from_type_term( parent_ctx.clone(), depth+1, x );
+                    let arg_node = TypeTermEditor::from_type_term( parent_ctx.clone(), depth.map(|d| d+1), x );
 
                     node.send_cmd_obj(
                         ReprTree::new_leaf(
@@ -130,28 +132,27 @@ impl TypeTermEditor {
     fn set_state(&mut self, new_state: State) {
         let mut node = match new_state {
             State::Any => {
-                Context::make_node( &self.ctx, (&self.ctx, "( List Char )").into(), self.depth ).unwrap()
+                Context::make_node( &self.ctx, (&self.ctx, "( List Char )").into(), self.depth.map(|x| x) ).unwrap()
                     .morph( (&self.ctx, "( Type::Sym )").into() )
-
             }
             State::App => {
-                Context::make_node( &self.ctx, (&self.ctx, "( List Type )").into(), self.depth ).unwrap()
+                Context::make_node( &self.ctx, (&self.ctx, "( List Type )").into(), self.depth.map(|x| x) ).unwrap()
                     .morph( (&self.ctx, "( Type::App )").into() )
             }
             State::Ladder => {
-                Context::make_node( &self.ctx, (&self.ctx, "( List Type )").into(), self.depth ).unwrap()
+                Context::make_node( &self.ctx, (&self.ctx, "( List Type )").into(), self.depth.map(|x| x) ).unwrap()
                     .morph( (&self.ctx, "( Type::Ladder )").into() )
             }
             State::AnySymbol => {
-                Context::make_node( &self.ctx, (&self.ctx, "( List Char )").into(), self.depth ).unwrap()
+                Context::make_node( &self.ctx, (&self.ctx, "( List Char )").into(), self.depth.map(|x| x) ).unwrap()
                     .morph( (&self.ctx, "( Type::Sym )").into() )
             },
             State::FunSymbol => {
-                Context::make_node( &self.ctx, (&self.ctx, "( List Char )").into(), self.depth ).unwrap()
+                Context::make_node( &self.ctx, (&self.ctx, "( List Char )").into(), self.depth.map(|x| x) ).unwrap()
                     .morph( (&self.ctx, "( Type::Sym::Fun )").into() )
             },
             State::VarSymbol => {
-                Context::make_node( &self.ctx, (&self.ctx, "( List Char )").into(), self.depth ).unwrap()
+                Context::make_node( &self.ctx, (&self.ctx, "( List Char )").into(), self.depth.map(|x| x) ).unwrap()
                     .morph( (&self.ctx, "( Type::Sym::Var )").into() )
             }
             State::Num => {
@@ -160,7 +161,7 @@ impl TypeTermEditor {
                     .morph( (&self.ctx, "( Type::Lit::Num )").into() )
             }
             State::Char => {
-                Context::make_node( &self.ctx, (&self.ctx, "( Char )").into(), self.depth ).unwrap()
+                Context::make_node( &self.ctx, (&self.ctx, "( Char )").into(), self.depth.map(|x| x) ).unwrap()
                     .morph( (&self.ctx, "( Type::Lit::Char )").into() )
             }
         };
@@ -173,7 +174,7 @@ impl TypeTermEditor {
         self.state = new_state;
     }
 
-    pub fn new_node(ctx: Arc<RwLock<Context>>, depth: usize) -> NestedNode {
+    pub fn new_node(ctx: Arc<RwLock<Context>>, depth: OuterViewPort<dyn SingletonView<Item = usize>>) -> NestedNode {
         let ctx : Arc<RwLock<Context>> = Arc::new(RwLock::new(Context::with_parent(Some(ctx))));
         ctx.write().unwrap().meta_chars.push('~');
 
@@ -182,14 +183,13 @@ impl TypeTermEditor {
 
         Self::with_node(
             ctx.clone(),
-            depth,
             symb_node,
             State::Any
         )
     }
 
-    fn with_node(ctx: Arc<RwLock<Context>>, depth: usize, node: NestedNode, state: State) -> NestedNode {
-        let _buffer = SingletonBuffer::<Option<TypeTerm>>::new( None );
+    fn with_node(ctx: Arc<RwLock<Context>>, cur_node: NestedNode, state: State) -> NestedNode {
+        let buf = SingletonBuffer::<TypeTerm>::new( TypeTerm::unit() );
 
         let data = Arc::new(RwLock::new(ReprTree::new(
             (&ctx, "( Type )")
@@ -199,10 +199,11 @@ impl TypeTermEditor {
             ctx: ctx.clone(),
             data: data.clone(),
             state,
-            cur_node: SingletonBuffer::new(node),
+            buf,
+            cur_node: SingletonBuffer::new(cur_node.clone()),
             close_char: SingletonBuffer::new(None),
             spillbuf: Arc::new(RwLock::new(Vec::new())),
-            depth
+            depth: cur_node.depth.clone()
         };
 
         let view = editor.cur_node
@@ -215,16 +216,16 @@ impl TypeTermEditor {
         let _cc = editor.cur_node.get().close_char;
         let editor = Arc::new(RwLock::new(editor));
 
-        let mut node = NestedNode::new(ctx, data, depth)
+        let mut super_node = NestedNode::new(ctx, data, cur_node.depth)
             .set_view(view)
             .set_nav(editor.clone())
             .set_cmd(editor.clone())
             .set_editor(editor.clone());
 
-        editor.write().unwrap().close_char = node.close_char.clone();
-        node.spillbuf = editor.read().unwrap().spillbuf.clone();
-        
-        node
+        editor.write().unwrap().close_char = super_node.close_char.clone();
+        super_node.spillbuf = editor.read().unwrap().spillbuf.clone();
+
+        super_node
     }
 
     fn forward_spill(&mut self) {
@@ -288,16 +289,17 @@ impl TypeTermEditor {
 
         let subladder_list_edit = subladder_list_edit.read().unwrap();
         if subladder_list_edit.data.len() == 0 {
-
             self.set_state( State::Any );
         }
     }
-
     
     /* unwrap a ladder if it only contains one element
      */
     pub fn normalize_singleton(&mut self) {
         eprintln!("normalize singleton");
+
+        if self.state == State::Ladder{
+        
         let subladder_list_node = self.cur_node.get().clone();
         let subladder_list_edit = subladder_list_node.get_edit::<ListEditor>().unwrap();
 
@@ -312,10 +314,14 @@ impl TypeTermEditor {
 
                 other_tt.normalize_singleton();
 
+                other_tt.depth.0.set_view( self.depth.map(|x| x).get_view() );
+
                 self.close_char.set(other_tt.close_char.get());
                 self.cur_node.set(other_tt.cur_node.get());
                 self.state = other_tt.state;
             }
+        }
+
         }
     }
 
@@ -352,14 +358,13 @@ impl TypeTermEditor {
                     _ => {
                         item_typterm.goto(TreeCursor::none());
                         drop(item_typterm);
-                        
+
                         // else create new ladder
-                        let mut list_node = Context::make_node( &self.ctx, (&self.ctx, "( List Type )").into(), self.depth ).unwrap();
+                        let mut list_node = Context::make_node( &self.ctx, (&self.ctx, "( List Type )").into(), self.depth.map(|d| d+1) ).unwrap();
                         list_node = list_node.morph( (&self.ctx, "( Type::Ladder )").into() );
 
                         let mut new_node = TypeTermEditor::with_node(
                             self.ctx.clone(),
-                            self.depth,
                             list_node,
                             State::Ladder
                         );
@@ -382,18 +387,20 @@ impl TypeTermEditor {
         }
     }
 
+    // TODO: morph_to_app() / morph_to_list(state)
+    
     /* replace with new ladder node with self as first element
      */
     pub fn morph_to_ladder(&mut self) {
         eprintln!("morph into ladder");
+        
         let old_node = self.cur_node.get().clone();
-
-        *old_node.depth.get_mut() += 1;
 
         /* create a new NestedNode with TerminaltypeEditor,
          * that has same state & child-node as current node.
          */
-        let old_edit_node = TypeTermEditor::new_node( self.ctx.clone(), self.depth );
+        let old_edit_node = TypeTermEditor::new_node( self.ctx.clone(), self.depth.map(|d| d + 1));
+        old_node.depth.0.set_view( self.depth.map(|d| d + 1).get_view() );
         let old_edit_clone = old_edit_node.get_edit::<TypeTermEditor>().unwrap();
         old_edit_clone.write().unwrap().set_state( self.state );
         old_edit_clone.write().unwrap().close_char.set( old_node.close_char.get() );
@@ -401,7 +408,7 @@ impl TypeTermEditor {
 
         /* create new list-edit node for the ladder
          */
-        let mut new_node = Context::make_node( &self.ctx, (&self.ctx, "( List Type )").into(), self.depth ).unwrap();
+        let mut new_node = Context::make_node( &self.ctx, (&self.ctx, "( List Type )").into(), self.depth.map(|x| x) ).unwrap();
         new_node = new_node.morph( (&self.ctx, "( Type::Ladder )").into() );
 
         /* reconfigure current node to display new_node list-editor

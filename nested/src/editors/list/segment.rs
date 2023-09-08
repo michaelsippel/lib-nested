@@ -22,7 +22,6 @@ pub enum ListSegment {
     InsertCursor,
     Item {
         editor: NestedNode,
-        depth: usize,
         cur_dist: isize,
     }
 }
@@ -37,9 +36,8 @@ impl PtySegment for ListSegment {
                         .add_style_front(TerminalStyle::bold(true))
                     })
             }
-            ListSegment::Item{ editor, depth, cur_dist } => {
+            ListSegment::Item{ editor, cur_dist } => {
                 let e = editor.clone();
-                let d = *depth;
                 let cur_dist = *cur_dist;
                 editor.get_view().map_item(move |_pt, atom| {
                     let c = e.get_cursor();
@@ -50,10 +48,11 @@ impl PtySegment for ListSegment {
                         } else {
                             usize::MAX
                         };
+                    
                     atom
                         .add_style_back(bg_style_from_depth(select))
                         .add_style_back(TerminalStyle::bold(select==1))
-                        .add_style_back(fg_style_from_depth(d))
+                        .add_style_back(fg_style_from_depth(e.depth.get_view().get()))
                 })
             }
         }
@@ -64,7 +63,6 @@ pub struct ListSegmentSequence {
     data: Arc<dyn SequenceView<Item = NestedNode>>,
     cursor: Arc<dyn SingletonView<Item = ListCursor>>,
 
-    depth: usize,
     cur_cursor: ListCursor,
 
     port: ViewPort<dyn SequenceView<Item = ListSegment>>,
@@ -95,7 +93,6 @@ impl SequenceView for ListSegmentSequence {
                 ListCursorMode::Select => {
                     ListSegment::Item {
                         editor: self.data.get(idx)?,
-                        depth: self.depth,
                         cur_dist: cur - *idx as isize
                     }
                 }
@@ -103,7 +100,6 @@ impl SequenceView for ListSegmentSequence {
                     if *idx < cur as usize {
                         ListSegment::Item {
                             editor: self.data.get(idx)?,
-                            depth: self.depth,
                             cur_dist: cur - *idx as isize
                         }
                     } else if *idx == cur as usize {
@@ -111,7 +107,6 @@ impl SequenceView for ListSegmentSequence {
                     } else {
                         ListSegment::Item {
                             editor: self.data.get(&(*idx - 1))?,
-                            depth: self.depth,
                             cur_dist: cur - *idx as isize
                         }
                     }
@@ -120,7 +115,6 @@ impl SequenceView for ListSegmentSequence {
         } else {
             ListSegment::Item {
                 editor: self.data.get(&idx)?,
-                depth: self.depth,
                 cur_dist: *idx as isize + 1
             }
         })
@@ -131,14 +125,12 @@ impl ListSegmentSequence {
     pub fn new(
         cursor_port: OuterViewPort<dyn SingletonView<Item = ListCursor>>,
         data_port: OuterViewPort<dyn SequenceView<Item = NestedNode>>,
-        depth: usize
     ) -> Arc<RwLock<Self>> {
         let out_port = ViewPort::new();
         let mut proj_helper = ProjectionHelper::new(out_port.update_hooks.clone());
         let proj = Arc::new(RwLock::new(ListSegmentSequence {
             cur_cursor: cursor_port.get_view().get(),
             port: out_port.clone(),
-            depth,
 
             cursor: proj_helper.new_singleton_arg(0, cursor_port, |s: &mut Self, _msg| {
                 let _old_cursor = s.cur_cursor;

@@ -1,4 +1,5 @@
 use {
+    r3vi::{view::{OuterViewPort, singleton::*}},
     crate::{
         type_system::{Context, TypeTerm},
         editors::list::{ListEditor, PTYListController, PTYListStyle}
@@ -14,7 +15,7 @@ pub fn init_ctx(ctx: &mut Context) {
 
     ctx.add_node_ctor(
         "List", Arc::new(
-            |ctx: Arc<RwLock<Context>>, ty: TypeTerm, depth: usize| {
+            |ctx: Arc<RwLock<Context>>, ty: TypeTerm, depth: OuterViewPort<dyn SingletonView<Item = usize>>| {
                 match ty {
                     TypeTerm::App(args) => {
                         if args.len() > 1 {

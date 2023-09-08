@@ -1,6 +1,6 @@
 use {
     r3vi::{
-        view::{OuterViewPort, singleton::*, sequence::*},
+        view::{ViewPort, OuterViewPort, singleton::*, sequence::*},
         buffer::{singleton::*, vec::*}
     },
     crate::{
@@ -22,9 +22,11 @@ pub struct ListEditor {
     pub data: VecBuffer< Arc<RwLock<NestedNode>> >,
 
     pub spillbuf: Arc<RwLock<Vec<Arc<RwLock<NestedNode>>>>>,
-    
+
     pub(super) addr_port: OuterViewPort<dyn SequenceView<Item = isize>>,
     pub(super) mode_port: OuterViewPort<dyn SingletonView<Item = ListCursorMode>>,
+
+    depth: OuterViewPort<dyn SingletonView<Item = usize>>,
 
     pub(crate) ctx: Arc<RwLock<Context>>,
 
@@ -95,13 +97,16 @@ impl ListEditor {
             data,
             spillbuf: Arc::new(RwLock::new(Vec::new())),
             ctx,
-            typ
+            typ,
+            depth: SingletonBuffer::new(0).get_port()
         }
     }
 
-    pub fn into_node(self, depth: usize) -> NestedNode {
+    pub fn into_node(mut self, depth: OuterViewPort<dyn SingletonView<Item = usize>>) -> NestedNode {
         let data = self.get_data();
         let ctx = self.ctx.clone();
+
+        self.depth = depth.clone();
         let editor = Arc::new(RwLock::new(self));
 
         let e = editor.read().unwrap();
@@ -231,6 +236,10 @@ impl ListEditor {
         if let Some(idx) = cur.idx {
             match cur.mode {
                 ListCursorMode::Insert => {
+                    item.read().unwrap().depth.0.set_view(
+                        self.depth.map(|d| d+1).get_view()
+                    );
+
                     self.data.insert(idx as usize, item.clone());
                     if self.is_listlist() {
                         cur.mode = ListCursorMode::Select;
@@ -280,7 +289,7 @@ impl ListEditor {
                 self.nexd();
 
                 let mut b = item.spillbuf.write().unwrap();
-                let mut tail_node = Context::make_node(&self.ctx, self.typ.clone(), item.depth.get()).unwrap();
+                let mut tail_node = Context::make_node(&self.ctx, self.typ.clone(), self.depth.map(|d| d+1)).unwrap();
                 tail_node.goto(TreeCursor::home());
 
                 for node in b.iter() {

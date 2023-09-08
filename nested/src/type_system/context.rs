@@ -1,4 +1,5 @@
 use {
+    r3vi::{view::{OuterViewPort, singleton::*}, buffer::{singleton::*}},
     crate::{
         type_system::{TypeDict, TypeTerm, TypeID, ReprTree},
         tree::NestedNode
@@ -229,7 +230,7 @@ impl Context {
         self.type_dict.read().unwrap().type_term_to_str(&t)
     }
 
-    pub fn add_node_ctor(&mut self, tn: &str, mk_editor: Arc<dyn Fn(Arc<RwLock<Self>>, TypeTerm, usize) -> Option<NestedNode> + Send + Sync>) {
+    pub fn add_node_ctor(&mut self, tn: &str, mk_editor: Arc<dyn Fn(Arc<RwLock<Self>>, TypeTerm, OuterViewPort<dyn SingletonView<Item = usize>>) -> Option<NestedNode> + Send + Sync>) {
         let dict = self.type_dict.clone();
         let mut dict = dict.write().unwrap();
 
@@ -248,7 +249,7 @@ impl Context {
         drop(dict);
 
         self.add_morphism(morphism_pattern, Arc::new(move |node, dst_type| {
-            mk_editor(node.ctx.clone(), dst_type, node.depth.get())
+            mk_editor(node.ctx.clone(), dst_type, node.depth)
         }));
     }
 
@@ -275,7 +276,7 @@ impl Context {
         }
     }
 
-    pub fn make_node(ctx: &Arc<RwLock<Self>>, type_term: TypeTerm, depth: usize) -> Option<NestedNode> {
+    pub fn make_node(ctx: &Arc<RwLock<Self>>, type_term: TypeTerm, depth: OuterViewPort<dyn SingletonView<Item = usize>>) -> Option<NestedNode> {
         let mk_node = ctx.read().unwrap().get_morphism(MorphismType {
             src_type: None,
             dst_type: type_term.clone()
@@ -284,7 +285,6 @@ impl Context {
         /* create new context per node ?? too heavy.. whats the reason? TODO */
 
         let new_ctx = Arc::new(RwLock::new(Context::with_parent(Some(ctx.clone()))));
-        let _new_depth = depth;
 
         mk_node(
             NestedNode::new(new_ctx, ReprTree::new_arc(type_term.clone()), depth),
@@ -323,7 +323,7 @@ impl Context {
             .type_dict.read().unwrap()
             .type_term_from_str(typename).unwrap();
 
-        if let Some(node) = Context::make_node(&ctx, type_tag, 0) {
+        if let Some(node) = Context::make_node(&ctx, type_tag, SingletonBuffer::new(0).get_port()) {
             ctx.write().unwrap().nodes.insert(name, node);
         }
     }

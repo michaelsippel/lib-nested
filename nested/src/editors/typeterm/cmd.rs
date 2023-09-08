@@ -44,7 +44,7 @@ impl ObjCommander for TypeTermEditor {
                                 TreeNavResult::Exit
                             }
                             _ => {
-                                self.set_state( State::AnySymbol );
+                                self.set_state( State::FunSymbol );
                                 self.cur_node.get_mut().goto(TreeCursor::home());
                                 self.send_child_cmd( co )
                             }
@@ -67,9 +67,9 @@ impl ObjCommander for TypeTermEditor {
                         if c == '~' {
                             let i0 = self.cur_node.get().get_edit::<ListEditor>().unwrap();
 
-                            let cur_it = i0.clone().read().unwrap().get_item().clone();
-                            
-                            if let Some(i) = cur_it {
+                            if self.get_cursor().tree_addr.len() > 1 {
+                                let cur_it = i0.clone().read().unwrap().get_item().clone();
+                                if let Some(i) = cur_it {
                                     let tte = i.get_edit::<TypeTermEditor>().unwrap();
 
                                     if tte.read().unwrap().state != State::App {
@@ -81,6 +81,9 @@ impl ObjCommander for TypeTermEditor {
                                         );
                                     }
                                 }
+                            } else {
+                                return TreeNavResult::Continue;
+                            }
                         }
 
                         self.send_child_cmd( co.clone() )

@@ -238,7 +238,7 @@ impl ObjCommander for ProductEditor {
                                 }
                             }
                         } else {
-                            let mut e = Context::make_node(&self.ctx, t.clone(), *ed_depth+1).unwrap();
+                            let mut e = Context::make_node(&self.ctx, t.clone(), r3vi::buffer::singleton::SingletonBuffer::new(*ed_depth).get_port()).unwrap();
                             *editor = Some(e.clone());
                             update_segment = true;
 

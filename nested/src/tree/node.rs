@@ -82,16 +82,13 @@ pub struct NestedNode {
     pub diag: Option< OuterViewPort<dyn SequenceView<Item = Message>> >,
 
     /// depth
-    pub depth: SingletonBuffer< usize >,
+    pub depth: OuterViewPort< dyn SingletonView<Item = usize> >,
 
     /// abstract editor
     pub editor: SingletonBuffer<
                     Option< Arc<dyn Any + Send + Sync> >
                 >,
 
-    /* TODO:
-     * - spill buffer (contains overflowing elements as well as 'split-off' parts)
-     */
     pub spillbuf: Arc<RwLock<Vec<Arc<RwLock<NestedNode>>>>>,
 
     /// commander & navigation
@@ -107,13 +104,13 @@ pub struct NestedNode {
 }
 
 impl NestedNode {
-    pub fn new(ctx: Arc<RwLock<Context>>, data: Arc<RwLock<ReprTree>>, depth: usize) -> Self {
+    pub fn new(ctx: Arc<RwLock<Context>>, data: Arc<RwLock<ReprTree>>, depth: OuterViewPort<dyn SingletonView<Item = usize>>) -> Self {
         NestedNode {
             ctx,
             data,
             view: None,
             diag: None,
-            depth: SingletonBuffer::new(depth),
+            depth,
             editor: SingletonBuffer::new(None),
             spillbuf: Arc::new(RwLock::new(Vec::new())),
             cmd: SingletonBuffer::new(None),
@@ -133,7 +130,7 @@ impl NestedNode {
                 (&ctx, "( Char )"),
                 buf.get_port().into()
             ),
-            0
+            SingletonBuffer::new(0).get_port()
         )
             .set_view(buf.get_port()
                       .map(|c| TerminalAtom::from(c))
