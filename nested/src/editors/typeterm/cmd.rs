@@ -52,75 +52,138 @@ impl ObjCommander for TypeTermEditor {
                     }
 
                     State::Char => {
-                        match c {
-                            '\'' => {
-                                self.cur_node.get_mut().goto(TreeCursor::none());
+                        match self.send_child_cmd( co ) {
+                            TreeNavResult::Exit => {
+                                match c {
+                                    '\'' => {
+                                        self.cur_node.get_mut().goto(TreeCursor::none());
+                                    }
+                                    _ => {}
+                                }
                                 TreeNavResult::Exit
-                            }
-                            _ => {
-                                self.send_child_cmd( co )
-                            }
+                            },
+                            TreeNavResult::Continue => TreeNavResult::Continue
                         }
                     }
 
                     State::Ladder => {
-                        if c == '~' {
-                            let i0 = self.cur_node.get().get_edit::<ListEditor>().unwrap();
 
-                            if self.get_cursor().tree_addr.len() > 1 {
-                                let cur_it = i0.clone().read().unwrap().get_item().clone();
-                                if let Some(i) = cur_it {
-                                    let tte = i.get_edit::<TypeTermEditor>().unwrap();
+                        match self.get_cursor().tree_addr.len() {
 
-                                    if tte.read().unwrap().state != State::App {
-                                        drop(tte);
-                                        drop(i);
+                            // entire term is selected
+                            0 => {
+                                match c {
+                                    '<' => {
+                                        self.morph_to_list(State::App);
+                                        TreeNavResult::Continue
+                                    }
+                                    _ => { TreeNavResult::Exit }
+                                }
+                            }
 
-                                        return self.send_child_cmd(
-                                            ListCmd::Split.into_repr_tree( &self.ctx )
-                                        );
+                            // entire item selected or insert mode
+                            1 => {
+                                match c {
+                                    '~' => {
+                                        // ignore '~' since we are already in a ladder
+                                        // and cant split current item
+                                        TreeNavResult::Continue
+                                    }
+                                    _ => {
+                                        self.send_child_cmd( co.clone() )
                                     }
                                 }
-                            } else {
-                                return TreeNavResult::Continue;
+                            }
+
+                            // some subterm
+                            _ => {
+                                match c {
+                                    '~' => {
+                                        let i0 = self.cur_node.get().get_edit::<ListEditor>().unwrap();
+                                        let cur_it = i0.clone().read().unwrap().get_item().clone();
+                                        if let Some(i) = cur_it {
+                                            let cur_tte = i.get_edit::<TypeTermEditor>().unwrap();
+                                            if cur_tte.read().unwrap().state == State::App || cur_tte.read().unwrap().get_cursor().tree_addr.len() > 1 {
+                                                self.send_child_cmd( co.clone() )
+                                            } else {
+                                                drop(cur_tte);
+                                                drop(i);
+
+                                                self.send_child_cmd(
+                                                    ListCmd::Split.into_repr_tree( &self.ctx )
+                                                )
+                                            }
+                                        } else {
+                                            self.send_child_cmd( co.clone() )
+                                        }
+                                    }
+                                    _ => {
+                                        self.send_child_cmd( co.clone() )
+                                    }
+                                }
                             }
                         }
-
-                        self.send_child_cmd( co.clone() )
                     }
 
                     State::App => {
-                        let res = self.send_child_cmd( co.clone() );
 
-                        match res {
-                            TreeNavResult::Exit => {
+                        match self.get_cursor().tree_addr.len() {
+
+                            // entire Term is selected
+                            0 => {
+                                
                                 match c {
                                     '~' => {
-                                        self.previous_item_into_ladder();
+                                        self.morph_to_list(State::Ladder);
+                                        self.goto(TreeCursor {
+                                            tree_addr: vec![ -1 ],
+                                            leaf_mode: ListCursorMode::Insert
+                                        });
                                         TreeNavResult::Continue
-                                    },
-                                    _ => {TreeNavResult::Exit}
+                                    }
+                                    '<' => {
+                                        self.morph_to_list(State::App);
+                                        TreeNavResult::Continue
+                                    }
+                                    _ => {
+                                        TreeNavResult::Exit
+                                    }
                                 }
-                            },
-                            TreeNavResult::Continue => {
-                                match c {
-                                    '>'|
-                                    ' ' => {
-                                        let i = self.cur_node.get().get_edit::<ListEditor>().unwrap();
-                                        let i = i.read().unwrap();
-                                        if let Some(i) = i.get_item() {
-                                            let tte = i.get_edit::<TypeTermEditor>().unwrap();
-                                            let mut tte = tte.write().unwrap();
 
-                                            if tte.state == State::Ladder {
-                                                tte.normalize_singleton();
-                                            }
+                            },
+
+                            // some item is selected
+                            _ => {
+                                match self.send_child_cmd( co.clone() ) {
+                                    TreeNavResult::Exit => {
+                                        match c {
+                                            '~' => {
+                                                self.previous_item_into_ladder();
+                                                TreeNavResult::Continue
+                                            },
+                                            _ => {TreeNavResult::Exit}
                                         }
                                     },
-                                    _ => {}
+                                    TreeNavResult::Continue => {
+                                        match c {
+                                            '>'|
+                                            ' ' => {
+                                                let i = self.cur_node.get().get_edit::<ListEditor>().unwrap();
+                                                let i = i.read().unwrap();
+                                                if let Some(i) = i.get_item() {
+                                                    let tte = i.get_edit::<TypeTermEditor>().unwrap();
+                                                    let mut tte = tte.write().unwrap();
+
+                                                    if tte.state == State::Ladder {
+                                                        tte.normalize_singleton();
+                                                    }
+                                                }
+                                            },
+                                            _ => {}
+                                        }
+                                        TreeNavResult::Continue
+                                    }
                                 }
-                                
-                                TreeNavResult::Continue
                             }
                         }
                     }
@@ -132,11 +195,19 @@ impl ObjCommander for TypeTermEditor {
                         match res {
                             TreeNavResult::Exit => {
                                 match c {
+                                    '<' => {
+                                        self.goto(TreeCursor::none());
+                                        self.morph_to_list(State::App);
+                                        TreeNavResult::Continue
+                                    }
                                     '~' => {
-                                        self.morph_to_ladder();
+                                        self.morph_to_list(State::Ladder);
+                                        self.set_addr(0);
+                                        self.dn();
                                         self.send_cmd_obj(
                                             ListCmd::Split.into_repr_tree( &self.ctx )
-                                        )
+                                        );
+                                        TreeNavResult::Continue
                                     }
                                     _ => {
                                         TreeNavResult::Exit
@@ -188,7 +259,6 @@ impl ObjCommander for TypeTermEditor {
             let res = self.send_child_cmd( co.clone() );
 
             self.normalize_empty();
-
             if let Some(cmd) = co.read().unwrap().get_view::<dyn SingletonView<Item = ListCmd>>() {
                 match cmd.get() {
                     ListCmd::Split => {

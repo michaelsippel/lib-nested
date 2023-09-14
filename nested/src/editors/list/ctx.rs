@@ -10,7 +10,7 @@ use {
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub fn init_ctx(ctx: &mut Context) {
-    ctx.add_list_typename("ListCmd".into());
+    ctx.add_typename("ListCmd".into());
     ctx.add_list_typename("List".into());
 
     ctx.add_node_ctor(

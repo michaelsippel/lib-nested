@@ -232,14 +232,15 @@ impl ListEditor {
 
     /// insert a new element
     pub fn insert(&mut self, item: Arc<RwLock<NestedNode>>) {
+        eprintln!("list insert");
+        item.read().unwrap().depth.0.set_view(
+            self.depth.map(|d| d+1).get_view()
+        );
+
         let mut cur = self.cursor.get();
         if let Some(idx) = cur.idx {
             match cur.mode {
                 ListCursorMode::Insert => {
-                    item.read().unwrap().depth.0.set_view(
-                        self.depth.map(|d| d+1).get_view()
-                    );
-
                     self.data.insert(idx as usize, item.clone());
                     if self.is_listlist() {
                         cur.mode = ListCursorMode::Select;
@@ -263,7 +264,8 @@ impl ListEditor {
     }
 
     /// split the list off at the current cursor position and return the second half
-    pub fn split(&mut self) {        
+    pub fn split(&mut self) {
+        eprintln!("split");
         let cur = self.cursor.get();
         if let Some(idx) = cur.idx {
             let idx = idx as usize;
@@ -277,6 +279,7 @@ impl ListEditor {
     }
 
     pub fn listlist_split(&mut self) {
+        eprintln!("listlist split");
         let cur = self.get_cursor();
 
         if let Some(mut item) = self.get_item().clone() {
@@ -293,6 +296,7 @@ impl ListEditor {
                 tail_node.goto(TreeCursor::home());
 
                 for node in b.iter() {
+                    eprintln!("splid :send to tail node");
                     tail_node
                         .send_cmd_obj(
                             ReprTree::new_leaf(

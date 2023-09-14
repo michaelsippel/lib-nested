@@ -42,4 +42,3 @@ impl TreeNav for TypeTermEditor {
         self.cur_node.get_mut().goto(new_cur)
     }
 }
-

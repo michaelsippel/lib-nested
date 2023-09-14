@@ -216,10 +216,12 @@ impl TreeNav for ListEditor {
                             .write().unwrap()
                             .goby(Vector2::new(direction.x, direction.y))
                             == TreeNavResult::Continue {
-                                self.cursor.set(ListCursor {
+                                let res = self.cursor.set(ListCursor {
                                     mode: ListCursorMode::Select,
                                     idx: Some(cur.tree_addr[0])
-                                })
+                                });
+                                self.set_leaf_mode(cur.leaf_mode);
+                                res
                             }
                     }
 

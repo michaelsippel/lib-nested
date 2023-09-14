@@ -147,6 +147,7 @@ impl PTYListController {
 //            || Some(c) == child_close_char
         {
             e.listlist_split();
+            eprintln!("done listlist split");
             TreeNavResult::Continue
         } else if Some(c) == child_close_char {
             e.goto(TreeCursor::none());

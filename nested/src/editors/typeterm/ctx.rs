@@ -41,14 +41,29 @@ pub fn init_ctx(ctx: &mut Context) {
         Arc::new(|mut node, _dst_type: _| {
             PTYListController::for_node( &mut node, Some('~'), None );
 
-            let vertical_view = false;
+            let vertical_view = true;
             if vertical_view {
                 let editor = node.get_edit::<crate::editors::list::ListEditor>().unwrap();
                 let mut e = editor.write().unwrap();
                 let seg_view = PTYListStyle::new( ("","~","") ).get_seg_seq_view( &mut e );
 
                 node = node.set_view(
-                    seg_view.to_grid_vertical().flatten()
+                    seg_view.to_grid_vertical()
+                        .map_item(
+                            |pt,x|
+                            if pt.y > 0 {
+                                r3vi::buffer::vec::VecBuffer::with_data(vec![
+                                    crate::terminal::make_label("~"),
+                                    x.clone()
+                                ])
+                                    .get_port()
+                                    .to_sequence()
+                                    .to_grid_horizontal()
+                                    .flatten()
+                            } else {
+                                x.clone()
+                            }
+                    ).flatten()
                 );
             } else {
                 PTYListStyle::for_node( &mut node, ("","~","") );
@@ -100,6 +115,7 @@ pub fn init_ctx(ctx: &mut Context) {
     ctx.add_morphism(
         MorphismTypePattern { src_tyid: ctx.get_typeid("Char"), dst_tyid: ctx.get_typeid("Type::Lit::Char").unwrap() },
         Arc::new(|mut node, _dst_type:_| {
+            node.ctx.write().unwrap().meta_chars = vec![ '\'' ];
             let mut grid = r3vi::buffer::index_hashmap::IndexBuffer::new();
 
             grid.insert_iter(

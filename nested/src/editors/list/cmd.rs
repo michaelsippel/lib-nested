@@ -151,16 +151,16 @@ impl ObjCommander for ListEditor {
                     } else {
                         TreeNavResult::Exit
                     }
-
                 }
             }
 
         } else {
             if let Some(cur_item) = self.get_item_mut() {
                 drop(cmd_repr);
-                cur_item.write().unwrap().send_cmd_obj(cmd_obj)
-            } else {
+                cur_item.write().unwrap().send_cmd_obj(cmd_obj);
                 TreeNavResult::Continue
+            } else {
+                TreeNavResult::Exit
             }
         }
     }
