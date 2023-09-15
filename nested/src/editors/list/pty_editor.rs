@@ -65,6 +65,8 @@ impl PTYListStyle {
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
+// todo: rename to CharController
+
 pub struct PTYListController {
     pub editor: Arc<RwLock<ListEditor>>,
 

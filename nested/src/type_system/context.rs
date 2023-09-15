@@ -196,6 +196,18 @@ impl Context {
             TypeTerm::TypeID(id) => {
                 self.list_types.contains(id)
             }
+            TypeTerm::Ladder(args) |
+            TypeTerm::App(args) => {
+                if args.len() > 0 {
+                    if self.is_list_type(&args[0]) {
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
             _ => false
         }
     }

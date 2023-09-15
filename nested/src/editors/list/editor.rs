@@ -245,7 +245,9 @@ impl ListEditor {
                     if self.is_listlist() {
                         cur.mode = ListCursorMode::Select;
                     } else {
-                        cur.idx = Some(idx + 1);               
+                        eprintln!("list insert: is not a listlist ({:?})", self.typ);
+                        item.write().unwrap().goto(TreeCursor::none());
+                        cur.idx = Some(idx + 1);
                     }
                 }
 
