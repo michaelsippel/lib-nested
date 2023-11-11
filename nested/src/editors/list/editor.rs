@@ -194,6 +194,7 @@ impl ListEditor {
         }
     }
 
+    /// is the element-type also a list-like editor (i.e. impls TreeNav)
     pub fn is_listlist(&self) -> bool {
         self.ctx.read().unwrap().is_list_type(&self.typ)
     }
@@ -233,6 +234,7 @@ impl ListEditor {
     /// insert a new element
     pub fn insert(&mut self, item: Arc<RwLock<NestedNode>>) {
         eprintln!("list insert");
+
         item.read().unwrap().depth.0.set_view(
             self.depth.map(|d| d+1).get_view()
         );
@@ -277,6 +279,27 @@ impl ListEditor {
                 );
                 self.data.remove(idx);
             }
+
+            /* in case the split leaves an empty item-list
+             * as a last element, remove it
+             */
+/*
+            if self.is_listlist() {
+                if idx > 0 && idx < self.data.len()+1 {
+                    /* we are in insert mode,
+                     * get element before cursor
+                     */
+                    let prev_idx = idx - 1;
+                    let prev_node = self.data.get(prev_idx);
+                    let prev_node = prev_node.read().unwrap();
+
+                    if prev_node.get_data_view::<dyn SequenceView<Item = NestedNode>>(vec![].into_iter()).iter().count() == 0 {
+                        drop(prev_node);
+                        self.data.remove(prev_idx);
+                    }
+                }
+        }
+            */
         }
     }
 
@@ -314,7 +337,7 @@ impl ListEditor {
                 drop(item);
 
                 tail_node.goto(TreeCursor::home());
-                if cur.tree_addr.len() > 2 {
+                if cur.tree_addr.len() > 1 {
                     tail_node.dn();
                 }
 
@@ -364,13 +387,15 @@ impl ListEditor {
                 );
             }
 
+
+            // fixme: is it oc0 or old_cur ??
             if oc0.tree_addr.len() > 1 {
                 pxv_editor.goto(TreeCursor {
                     tree_addr: vec![ old_cur.tree_addr[0], 0 ],
                     leaf_mode: ListCursorMode::Insert                
                 });
                 pxv_editor.send_cmd_obj(ListCmd::DeletePxev.into_repr_tree( &self.ctx ));
-            } else {
+            } else if oc0.tree_addr.len() > 0 {
                 pxv_editor.goto(TreeCursor {
                     tree_addr: vec![ old_cur.tree_addr[0] ],
                     leaf_mode: ListCursorMode::Insert                
@@ -421,17 +446,20 @@ impl ListEditor {
                 );
             }
 
+            // fixme: is it oc0 or old_cur ??
             if oc0.tree_addr.len() > 1 {
                 cur_editor.goto(TreeCursor {
                     tree_addr: vec![ old_cur.tree_addr[0], -1 ],
                     leaf_mode: ListCursorMode::Insert                
                 });
                 cur_editor.send_cmd_obj(ListCmd::DeleteNexd.into_repr_tree( &self.ctx ));
-            } else {
+            } else if oc0.tree_addr.len() > 0 {
                 cur_editor.goto(TreeCursor {
                     tree_addr: vec![ old_cur.tree_addr[0] ],
                     leaf_mode: ListCursorMode::Insert
                 });
+            } else {
+                cur_editor.goto(TreeCursor::none());
             }
         }
 

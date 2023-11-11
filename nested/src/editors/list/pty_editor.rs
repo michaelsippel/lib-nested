@@ -176,7 +176,7 @@ impl PTYListController {
 
                 match new_edit.send_cmd_obj(cmd_obj.clone()) {
                     TreeNavResult::Continue => {
-                        e.insert(Arc::new(RwLock::new(new_edit)));
+                        e.insert(Arc::new(RwLock::new(new_edit.clone())));
                         TreeNavResult::Continue
                     }
                     TreeNavResult::Exit => {

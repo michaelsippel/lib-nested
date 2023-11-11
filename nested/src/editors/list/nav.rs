@@ -195,6 +195,7 @@ impl TreeNav for ListEditor {
                     TreeNavResult::Exit
                 } else if direction.y > 0 {
                     // dn
+                    eprintln!("dn: data.len() = {}", self.data.len());
                     self.cursor.set(ListCursor {
                         mode: if self.data.len() > 0 { cur.leaf_mode } else { ListCursorMode::Insert },
                         idx: Some(0)
@@ -210,18 +211,18 @@ impl TreeNav for ListEditor {
             1 => {
                 if direction.y > 0 {
                     // dn
+
                     if cur.tree_addr[0] < self.data.len() as isize {
                         if self.data
                             .get_mut(cur.tree_addr[0] as usize)
                             .write().unwrap()
                             .goby(Vector2::new(direction.x, direction.y))
                             == TreeNavResult::Continue {
-                                let res = self.cursor.set(ListCursor {
+                                self.cursor.set(ListCursor {
                                     mode: ListCursorMode::Select,
                                     idx: Some(cur.tree_addr[0])
                                 });
                                 self.set_leaf_mode(cur.leaf_mode);
-                                res
                             }
                     }
 

@@ -40,7 +40,7 @@ pub struct TypeTermEditor {
     depth: OuterViewPort<dyn SingletonView<Item = usize>>,
 
     buf: SingletonBuffer< TypeTerm >,
-    
+
     // editing/parsing state
     state: State,
 
