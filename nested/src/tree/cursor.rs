@@ -24,6 +24,17 @@ impl TreeCursor {
             tree_addr: vec![],
         }
     }
+
+    pub fn get_subcursor(&self, depth: usize) -> TreeCursor {
+        TreeCursor {
+            leaf_mode: self.leaf_mode,
+            tree_addr: if depth < self.tree_addr.len() {
+                self.tree_addr[ depth.. ].iter().cloned().collect()
+            } else {
+                vec![]
+            }
+        }
+    }
 }
 
 impl Default for TreeCursor {

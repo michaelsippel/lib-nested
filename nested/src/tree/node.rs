@@ -32,18 +32,15 @@ struct NestedNodeEdit {
     /// abstract editor
     pub editor: SingletonBuffer<
                     Option< Arc<dyn Any + Send + Sync> >
->,
+    >,
 
-    pub input_buf:: VecBuffer< NestedNode >,
-    pub output_buf: VecBuffer< NestedNode >,
+    pub spillbuf: VecBuffer< NestedNode >,
 
     /// commander & navigation
     pub cmd: SingletonBuffer<
                  Option< Arc<RwLock<dyn ObjCommander + Send + Sync>> >
              >,
-    pub close_char: SingletonBuffer<
-                        Option< char >
-            >,
+    pub close_char: SingletonBuffer< Option< char > >,
 
     // could be replaced by cmd when TreeNav -CmdObjects are used
     pub tree_nav: SingletonBuffer<

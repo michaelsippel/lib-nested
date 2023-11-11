@@ -7,8 +7,8 @@ use {
 };
 
 pub trait TreeType {
-    fn get_type(&self, _addr: &TreeAddr) -> TypeTerm {
-        TypeTerm::new(TypeID::Var(0))
+    fn get_type(&self, addr: &TreeAddr) -> Vec<TypeTerm> {
+        vec![]
     }
 }
 
