@@ -189,12 +189,12 @@ impl PTYListController {
                     let res = item.write().unwrap().send_cmd_obj(cmd_obj.clone());
                     let child_close_char = item.read().unwrap().close_char.get();
 
-                    match res {
+                   match res {
                         TreeNavResult::Continue => TreeNavResult::Continue,
                         TreeNavResult::Exit => {
                             // child editor returned control, probably for meta-char handling..
 
-                            if cmd_obj.read().unwrap().get_type().clone() == ctx.type_term_from_str("( Char )").unwrap() {
+                            if cmd_obj.read().unwrap().get_type().clone() == ctx.type_term_from_str("Char").unwrap() {
                                 let co = cmd_obj.read().unwrap();
                                 if let Some(cmd_view) = co.get_view::<dyn SingletonView<Item = char>>() {
                                     drop(co);
@@ -225,13 +225,13 @@ impl ObjCommander for PTYListController {
         let mut e = self.editor.write().unwrap();
         let cmd_type = cmd_obj.read().unwrap().get_type().clone();
 
-        if cmd_type == (&e.ctx, "( ListCmd )").into()
-        || cmd_type == (&e.ctx, "( NestedNode )").into()
+        if cmd_type == Context::parse(&e.ctx, "ListCmd").into()
+        || cmd_type == Context::parse(&e.ctx, "NestedNode").into()
         {
             e.send_cmd_obj( cmd_obj )
         }
 
-        else if cmd_type == (&e.ctx, "( TerminalEvent )").into() {
+        else if cmd_type == Context::parse(&e.ctx, "TerminalEvent").into() {
             let co = cmd_obj.read().unwrap();
             if let Some(view) = co.get_view::<dyn SingletonView<Item = TerminalEvent>>() {
                 drop( co );

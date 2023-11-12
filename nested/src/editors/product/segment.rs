@@ -4,8 +4,9 @@ use {
             OuterViewPort
         }
     },
+    laddertypes::{TypeTerm},
     crate::{
-        type_system::{Context, TypeTerm},
+        type_system::{Context},
         terminal::{
             TerminalStyle, TerminalView,
             make_label

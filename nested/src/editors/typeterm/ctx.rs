@@ -2,8 +2,9 @@ use {
     r3vi::{
         view::{OuterViewPort, singleton::*}
     },
+    laddertypes::{TypeTerm},
     crate::{
-        type_system::{Context, TypeTerm, MorphismTypePattern},
+        type_system::{Context, MorphismTypePattern},
         terminal::{TerminalStyle, TerminalProjections},
         editors::{
             list::{PTYListStyle, PTYListController, ListEditor, ListSegmentSequence},

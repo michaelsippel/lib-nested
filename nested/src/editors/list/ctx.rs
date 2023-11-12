@@ -1,7 +1,8 @@
 use {
     r3vi::{view::{OuterViewPort, singleton::*}},
+    laddertypes::{TypeTerm},
     crate::{
-        type_system::{Context, TypeTerm},
+        type_system::{Context},
         editors::list::{ListEditor, PTYListController, PTYListStyle}
     },
     std::sync::{Arc, RwLock}

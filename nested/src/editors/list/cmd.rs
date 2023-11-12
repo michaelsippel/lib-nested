@@ -26,7 +26,7 @@ impl ListCmd {
     pub fn into_repr_tree(self, ctx: &Arc<RwLock<Context>>) -> Arc<RwLock<ReprTree>> {
         let buf = r3vi::buffer::singleton::SingletonBuffer::new(self);
         ReprTree::new_leaf(
-            (ctx, "( ListCmd )"),
+            Context::parse(ctx, "ListCmd"),
             buf.get_port().into()
         )
     }

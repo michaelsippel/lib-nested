@@ -5,8 +5,9 @@ use {
         view::{View, ViewPort, OuterViewPort, AnyOuterViewPort, singleton::*, sequence::*},
         buffer::{singleton::*}
     },
+    laddertypes::{TypeTerm},
     crate::{
-        type_system::{ReprTree, Context, TypeTerm},
+        type_system::{ReprTree, Context},
         terminal::{TerminalView, TerminalEvent, TerminalEditor, TerminalEditorResult, TerminalAtom},
         diagnostics::{Diagnostics, Message},
         tree::{TreeNav, TreeCursor, TreeNavResult, TreeHeightOp},
@@ -124,7 +125,7 @@ impl NestedNode {
         NestedNode::new(
             ctx.clone(),
             ReprTree::new_leaf(
-                (&ctx, "( Char )"),
+                Context::parse(&ctx, "Char"),
                 buf.get_port().into()
             ),
             SingletonBuffer::new(0).get_port()
@@ -194,7 +195,7 @@ impl NestedNode {
     pub fn get_data_port<'a, V: View + ?Sized + 'static>(&'a self, type_str: impl Iterator<Item = &'a str>) -> Option<OuterViewPort<V>>
     where V::Msg: Clone {
         let ctx = self.ctx.clone();
-        let type_ladder = type_str.map(|s| ((&ctx, s)).into());
+        let type_ladder = type_str.map(|s| Context::parse(&ctx, s));
 
         let repr_tree = ReprTree::descend_ladder(&self.data, type_ladder)?;
         repr_tree.clone().read().unwrap()
@@ -256,7 +257,7 @@ impl TerminalEditor for NestedNode {
         if let Some(cmd) = self.cmd.get() {
             cmd.write().unwrap().send_cmd_obj(
                 ReprTree::new_leaf(
-                    self.ctx.read().unwrap().type_term_from_str("( TerminalEvent )").unwrap(),
+                    self.ctx.read().unwrap().type_term_from_str("TerminalEvent").unwrap(),
                     AnyOuterViewPort::from(buf.get_port())
                 ));
         }

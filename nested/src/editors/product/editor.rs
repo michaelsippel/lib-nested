@@ -9,8 +9,9 @@ use {
             index_hashmap::*
         }
     },
+    laddertypes::{TypeTerm},
     crate::{
-        type_system::{Context, TypeTerm},
+        type_system::{Context},
         terminal::{
             TerminalEditor, TerminalEditorResult,
             TerminalEvent, TerminalView
@@ -202,7 +203,7 @@ impl ObjCommander for ProductEditor {
     fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
         let co = cmd_obj.read().unwrap();
         let cmd_type = co.get_type().clone();
-        let term_event_type = (&self.ctx, "( TerminalEvent )").into();
+        let term_event_type = Context::parse(&self.ctx, "TerminalEvent").into();
 
         if cmd_type == term_event_type {
             if let Some(te_view) = co.get_view::<dyn SingletonView<Item = TerminalEvent>>() {

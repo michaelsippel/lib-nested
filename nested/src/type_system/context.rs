@@ -1,7 +1,8 @@
 use {
     r3vi::{view::{OuterViewPort, singleton::*}, buffer::{singleton::*}},
+    laddertypes::{TypeDict, TypeTerm, TypeID},
     crate::{
-        type_system::{TypeDict, TypeTerm, TypeID, ReprTree},
+        type_system::{ReprTree},
         tree::NestedNode
     },
     std::{
@@ -135,12 +136,6 @@ impl Default for Context {
     }
 }
 
-impl Into<TypeTerm> for (&Arc<RwLock<Context>>, &str) {
-    fn into(self) -> TypeTerm {
-        self.0.read().unwrap().type_term_from_str(self.1).expect("could not parse type term")
-    }
-}
-
 impl Context {
     pub fn with_parent(parent: Option<Arc<RwLock<Context>>>) -> Self {
         Context {
@@ -172,6 +167,10 @@ impl Context {
         } else {
             0
         }
+    }
+
+    pub fn parse(ctx: &Arc<RwLock<Self>>, s: &str) -> TypeTerm {
+        ctx.read().unwrap().type_term_from_str(s).expect("could not parse type term")
     }
 
     pub fn add_typename(&mut self, tn: &str) -> TypeID {
@@ -234,12 +233,12 @@ impl Context {
         }
     }
 
-    pub fn type_term_from_str(&self, tn: &str) -> Option<TypeTerm> {
-        self.type_dict.read().unwrap().type_term_from_str(&tn)
+    pub fn type_term_from_str(&self, tn: &str) -> Result<TypeTerm, laddertypes::parser::ParseError> {
+        self.type_dict.write().unwrap().parse(&tn)
     }
 
     pub fn type_term_to_str(&self, t: &TypeTerm) -> String {
-        self.type_dict.read().unwrap().type_term_to_str(&t)
+        self.type_dict.read().unwrap().unparse(&t)
     }
 
     pub fn add_node_ctor(&mut self, tn: &str, mk_editor: Arc<dyn Fn(Arc<RwLock<Self>>, TypeTerm, OuterViewPort<dyn SingletonView<Item = usize>>) -> Option<NestedNode> + Send + Sync>) {
@@ -332,8 +331,8 @@ impl Context {
     /// adds an object without any representations
     pub fn add_obj(ctx: Arc<RwLock<Context>>, name: String, typename: &str) {
         let type_tag = ctx.read().unwrap()
-            .type_dict.read().unwrap()
-            .type_term_from_str(typename).unwrap();
+            .type_dict.write().unwrap()
+            .parse(typename).unwrap();
 
         if let Some(node) = Context::make_node(&ctx, type_tag, SingletonBuffer::new(0).get_port()) {
             ctx.write().unwrap().nodes.insert(name, node);

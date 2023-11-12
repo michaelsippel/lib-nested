@@ -6,8 +6,9 @@ use {
         },
         buffer::singleton::*
     },
+    laddertypes::{TypeTerm},
     crate::{
-        type_system::{Context, ReprTree, TypeTerm},
+        type_system::{Context, ReprTree},
         terminal::{TerminalAtom},
         tree::{NestedNode, TreeNavResult},
         commander::{ObjCommander}
@@ -34,7 +35,7 @@ impl ObjCommander for CharEditor {
         let cmd_obj = cmd_obj.read().unwrap();
         let cmd_type = cmd_obj.get_type().clone();
 
-        if cmd_type == (&self.ctx, "( Char )").into() {
+        if cmd_type == Context::parse(&self.ctx, "Char") {
             if let Some(cmd_view) = cmd_obj.get_view::<dyn SingletonView<Item = char>>() {
                 let value = cmd_view.get();
 
@@ -77,7 +78,7 @@ impl CharEditor {
         NestedNode::new(
             ctx0.clone(),
             ReprTree::new_leaf(
-                ctx0.read().unwrap().type_term_from_str("( Char )").unwrap(),
+                ctx0.read().unwrap().type_term_from_str("Char").unwrap(),
                 data.get_port().into()
             ),
             depth

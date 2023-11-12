@@ -3,7 +3,7 @@ use {
         view::{singleton::*}
     },
     crate::{
-        type_system::{ReprTree},
+        type_system::{Context, ReprTree},
         editors::{list::{ListEditor, ListCmd, ListCursorMode}},
         tree::{NestedNode, TreeNav, TreeNavResult, TreeCursor},
         commander::ObjCommander
@@ -20,7 +20,7 @@ impl ObjCommander for TypeTermEditor {
         let cmd_obj = co.clone();
         let cmd_obj = cmd_obj.read().unwrap();
 
-        if cmd_obj.get_type().clone() == (&self.ctx, "( Char )").into() {
+        if cmd_obj.get_type().clone() == Context::parse(&self.ctx, "Char") {
             if let Some(cmd_view) = cmd_obj.get_view::<dyn SingletonView<Item = char>>() {
                 let c = cmd_view.get();
 
@@ -231,11 +231,11 @@ impl ObjCommander for TypeTermEditor {
             match &self.state {
                 State::Any => {
                     let cmd_repr = co.read().unwrap();
-                    if cmd_repr.get_type().clone() == (&self.ctx, "( NestedNode )").into() {
+                    if cmd_repr.get_type().clone() == Context::parse(&self.ctx, "NestedNode") {
                         if let Some(view) = cmd_repr.get_view::<dyn SingletonView<Item = NestedNode>>() {
                             let node = view.get();
 
-                            if node.data.read().unwrap().get_type().clone() == (&self.ctx, "( Char )").into() {
+                            if node.data.read().unwrap().get_type().clone() == Context::parse(&self.ctx, "Char") {
                                 self.set_state( State::AnySymbol );
                             } else {
                                 self.set_state( State::Ladder );

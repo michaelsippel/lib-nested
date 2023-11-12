@@ -10,8 +10,9 @@ use {
             index_hashmap::*
         }
     },
+    laddertypes::{TypeTerm},
     crate::{
-        type_system::{Context, TypeTerm, ReprTree},
+        type_system::{Context, ReprTree},
         editors::list::{ListCmd, PTYListController, PTYListStyle},
         terminal::{
             TerminalAtom, TerminalStyle, make_label
@@ -40,7 +41,7 @@ impl ObjCommander for DigitEditor {
         let cmd_obj = cmd_obj.read().unwrap();
         let cmd_type = cmd_obj.get_type().clone();
 
-        if cmd_type == (&self.ctx, "( Char )").into() {
+        if cmd_type == Context::parse(&self.ctx, "Char") {
             if let Some(cmd_view) = cmd_obj.get_view::<dyn SingletonView<Item = char>>() {
                 let c = cmd_view.get();
 
@@ -125,7 +126,7 @@ impl DigitEditor {
     pub fn get_data(&self) -> Arc<RwLock<ReprTree>> {
         ReprTree::ascend(
             &ReprTree::new_leaf(
-                self.ctx.read().unwrap().type_term_from_str("( Seq u32 )").unwrap(),
+                self.ctx.read().unwrap().type_term_from_str("<Seq u32>").unwrap(),
                 self.get_data_port().into()
             ),
             self.get_type()
@@ -145,7 +146,7 @@ impl PosIntEditor {
     pub fn new(ctx: Arc<RwLock<Context>>, radix: u32) -> Self {
         let mut node = Context::make_node(
             &ctx,
-            (&ctx, format!("( List ( Digit {} ) )", radix).as_str()).into(),
+            Context::parse(&ctx, format!("<List <Digit {}>>", radix).as_str()),
             r3vi::buffer::singleton::SingletonBuffer::new(0).get_port()
         ).unwrap();
 

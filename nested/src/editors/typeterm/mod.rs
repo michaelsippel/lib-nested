@@ -9,8 +9,9 @@ use {
         view::{OuterViewPort, singleton::*},
         buffer::{singleton::*}
     },
+    laddertypes::{TypeID, TypeTerm},
     crate::{
-        type_system::{Context, TypeID, TypeTerm, ReprTree},
+        type_system::{Context, ReprTree},
         editors::{list::{ListCursorMode, ListEditor, ListCmd}},
         tree::{NestedNode, TreeNav, TreeNavResult, TreeCursor},
         commander::ObjCommander
@@ -80,7 +81,7 @@ impl TypeTermEditor {
 
                     node.send_cmd_obj(
                         ReprTree::new_leaf(
-                            (&ctx, "( NestedNode )"),
+                            Context::parse(&ctx, "NestedNode"),
                             SingletonBuffer::new(arg_node).get_port().into()
                         )
                     );
@@ -98,7 +99,7 @@ impl TypeTermEditor {
 
                     node.send_cmd_obj(
                         ReprTree::new_leaf(
-                            (&ctx, "( NestedNode )"),
+                            Context::parse(&ctx, "NestedNode"),
                             SingletonBuffer::new(arg_node).get_port().into()
                         )
                     );
@@ -132,37 +133,37 @@ impl TypeTermEditor {
     fn set_state(&mut self, new_state: State) {
         let mut node = match new_state {
             State::Any => {
-                Context::make_node( &self.ctx, (&self.ctx, "( List Char )").into(), self.depth.map(|x| x) ).unwrap()
-                    .morph( (&self.ctx, "( Type::Sym )").into() )
+                Context::make_node( &self.ctx, Context::parse(&self.ctx, "<List Char>"), self.depth.map(|x| x) ).unwrap()
+                    .morph( Context::parse(&self.ctx, "Type::Sym") )
             }
             State::App => {
-                Context::make_node( &self.ctx, (&self.ctx, "( List Type )").into(), self.depth.map(|x| x) ).unwrap()
-                    .morph( (&self.ctx, "( Type::App )").into() )
+                Context::make_node( &self.ctx, Context::parse(&self.ctx, "<List Type>"), self.depth.map(|x| x) ).unwrap()
+                    .morph( Context::parse(&self.ctx, "Type::App") )
             }
             State::Ladder => {
-                Context::make_node( &self.ctx, (&self.ctx, "( List Type )").into(), self.depth.map(|x| x) ).unwrap()
-                    .morph( (&self.ctx, "( Type::Ladder )").into() )
+                Context::make_node( &self.ctx, Context::parse(&self.ctx, "<List Type>"), self.depth.map(|x| x) ).unwrap()
+                    .morph( Context::parse(&self.ctx, "Type::Ladder") )
             }
             State::AnySymbol => {
-                Context::make_node( &self.ctx, (&self.ctx, "( List Char )").into(), self.depth.map(|x| x) ).unwrap()
-                    .morph( (&self.ctx, "( Type::Sym )").into() )
+                Context::make_node( &self.ctx, Context::parse(&self.ctx, "<List Char>"), self.depth.map(|x| x) ).unwrap()
+                    .morph( Context::parse(&self.ctx, "Type::Sym") )
             },
             State::FunSymbol => {
-                Context::make_node( &self.ctx, (&self.ctx, "( List Char )").into(), self.depth.map(|x| x) ).unwrap()
-                    .morph( (&self.ctx, "( Type::Sym::Fun )").into() )
+                Context::make_node( &self.ctx, Context::parse(&self.ctx, "<List Char>"), self.depth.map(|x| x) ).unwrap()
+                    .morph( Context::parse(&self.ctx, "Type::Sym::Fun") )
             },
             State::VarSymbol => {
-                Context::make_node( &self.ctx, (&self.ctx, "( List Char )").into(), self.depth.map(|x| x) ).unwrap()
-                    .morph( (&self.ctx, "( Type::Sym::Var )").into() )
+                Context::make_node( &self.ctx, Context::parse(&self.ctx, "<List Char>"), self.depth.map(|x| x) ).unwrap()
+                    .morph( Context::parse(&self.ctx, "Type::Sym::Var") )
             }
             State::Num => {
                 crate::editors::integer::PosIntEditor::new(self.ctx.clone(), 10)
                     .into_node()
-                    .morph( (&self.ctx, "( Type::Lit::Num )").into() )
+                    .morph( Context::parse(&self.ctx, "Type::Lit::Num") )
             }
             State::Char => {
-                Context::make_node( &self.ctx, (&self.ctx, "( Char )").into(), self.depth.map(|x| x) ).unwrap()
-                    .morph( (&self.ctx, "( Type::Lit::Char )").into() )
+                Context::make_node( &self.ctx, Context::parse(&self.ctx, "Char"), self.depth.map(|x| x) ).unwrap()
+                    .morph( Context::parse(&self.ctx, "Type::Lit::Char") )
             }
         };
 
@@ -179,8 +180,8 @@ impl TypeTermEditor {
         ctx.write().unwrap().meta_chars.push('~');
         ctx.write().unwrap().meta_chars.push('<');
 
-        let mut symb_node = Context::make_node( &ctx, (&ctx, "( List Char )").into(), depth ).unwrap();
-        symb_node = symb_node.morph( (&ctx, "( Type::Sym )").into() );
+        let mut symb_node = Context::make_node( &ctx, Context::parse(&ctx, "<List Char>"), depth ).unwrap();
+        symb_node = symb_node.morph( Context::parse(&ctx, "Type::Sym") );
 
         Self::with_node(
             ctx.clone(),
@@ -193,7 +194,7 @@ impl TypeTermEditor {
         let buf = SingletonBuffer::<TypeTerm>::new( TypeTerm::unit() );
 
         let data = Arc::new(RwLock::new(ReprTree::new(
-            (&ctx, "( Type )")
+            Context::parse(&ctx, "Type")
         )));
 
         let editor = TypeTermEditor {
@@ -307,7 +308,7 @@ impl TypeTermEditor {
             if subladder_list_edit.data.len() == 1 {
                 let it_node = subladder_list_edit.data.get(0);
                 let it_node = it_node.read().unwrap();
-                if it_node.get_type() == (&self.ctx, "( Type )").into() {
+                if it_node.get_type() == Context::parse(&self.ctx, "Type") {
                     let other_tt = it_node.get_edit::<TypeTermEditor>().unwrap();
 
                     let mut other_tt = other_tt.write().unwrap();
@@ -384,7 +385,7 @@ impl TypeTermEditor {
         self.goto(TreeCursor::home());
         self.send_child_cmd(
             ReprTree::new_leaf(
-                (&self.ctx, "( NestedNode )"),
+                Context::parse(&self.ctx, "NestedNode"),
                 SingletonBuffer::new( old_edit_node ).get_port().into()
             )
         );

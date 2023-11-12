@@ -1,7 +1,7 @@
 
 use {
+    laddertypes::{TypeTerm, TypeID},
     crate::{
-        type_system::{TypeTerm, TypeID},
         tree::{TreeAddr}
     }
 };

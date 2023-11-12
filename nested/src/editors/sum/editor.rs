@@ -6,10 +6,11 @@ use {
             sequence::*,            
         }
     },
+    laddertypes::{TypeTerm},
     crate::{
         terminal::TerminalView,
         editors::list::ListCursorMode,
-        type_system::{Context, TypeTerm, ReprTree},
+        type_system::{Context, ReprTree},
         tree::{TreeNav, TreeCursor, TreeNavResult},
         diagnostics::{Diagnostics, Message},
         tree::NestedNode,

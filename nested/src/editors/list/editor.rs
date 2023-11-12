@@ -3,8 +3,9 @@ use {
         view::{ViewPort, OuterViewPort, singleton::*, sequence::*},
         buffer::{singleton::*, vec::*}
     },
+    laddertypes::{TypeTerm},
     crate::{
-        type_system::{Context, TypeTerm, ReprTree},
+        type_system::{Context, ReprTree},
         editors::list::{ListCursor, ListCursorMode, ListCmd},
         tree::{NestedNode, TreeNav, TreeCursor},
         diagnostics::Diagnostics,
@@ -325,7 +326,7 @@ impl ListEditor {
                     tail_node
                         .send_cmd_obj(
                             ReprTree::new_leaf(
-                                (&self.ctx, "( NestedNode )"),
+                                Context::parse(&self.ctx, "NestedNode"),
                                 SingletonBuffer::<NestedNode>::new(
                                     node.read().unwrap().clone()
                                 ).get_port().into()
@@ -379,7 +380,7 @@ impl ListEditor {
             for x in data.iter() {
                 pxv_editor.send_cmd_obj(
                     ReprTree::new_leaf(
-                        (&self.ctx, "( NestedNode )"),
+                        Context::parse(&self.ctx, "NestedNode"),
                         SingletonBuffer::<NestedNode>::new(
                             x.read().unwrap().clone()
                         ).get_port().into()
@@ -438,7 +439,7 @@ impl ListEditor {
             for x in data.iter() {
                 cur_editor.send_cmd_obj(
                     ReprTree::new_leaf(
-                        (&self.ctx, "( NestedNode )"),
+                        Context::parse(&self.ctx, "NestedNode"),
                         SingletonBuffer::<NestedNode>::new(
                             x.read().unwrap().clone()
                         ).get_port().into()

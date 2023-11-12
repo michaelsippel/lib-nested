@@ -1,7 +1,8 @@
 use {
     r3vi::view::{AnyOuterViewPort, OuterViewPort, View},
+    laddertypes::{TypeTerm},
     crate::{
-        type_system::{TypeTerm, Context}
+        type_system::{Context}
     },
     std::{
         collections::HashMap,
@@ -50,7 +51,7 @@ impl ReprTree {
     pub fn from_char(ctx: &Arc<RwLock<Context>>, c: char) -> Arc<RwLock<Self>> {
         let buf = r3vi::buffer::singleton::SingletonBuffer::<char>::new(c);
         ReprTree::new_leaf(
-            (ctx, "( Char )"),
+            Context::parse(ctx, "Char"),
             buf.get_port().into()
         )
     }

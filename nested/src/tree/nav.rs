@@ -21,10 +21,10 @@ use {
     cgmath::Vector2,
 };
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum TreeNavResult { Continue, Exit }
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum TreeHeightOp { P, Q, Max }
 
 pub trait TreeNav {
