@@ -1,0 +1,22 @@
+[package]
+authors = ["Michael Sippel <micha@fragmental.art>"]
+name = "nested-tty"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+r3vi = { path = "../../lib-r3vi" }
+nested = { path = "../lib-nested-core" }
+cgmath = { version = "0.18.0", features = ["serde"] }
+serde = { version = "1.0", features = ["serde_derive"] }
+termion = "2.0.3"
+vte = "0.10.1"
+ansi_colours = "1.0"
+signal-hook = "*"
+signal-hook-async-std = "*"
+
+[dependencies.async-std]
+version = "1.9.0"
+features = ["unstable", "attributes"]
+
+
