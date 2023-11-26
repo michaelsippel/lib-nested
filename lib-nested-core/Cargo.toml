@@ -5,12 +5,7 @@ name = "nested"
 version = "0.1.0"
 
 [dependencies]
-#r3vi = { git = "https://git.exobiont.de/senvas/lib-r3vi.git" }
 r3vi = { path = "../../lib-r3vi" }
 laddertypes = { path = "../../lib-laddertypes" }
-no_deadlocks = "*"
 cgmath = { version = "0.18.0", features = ["serde"] }
 
-serde = { version = "1.0", features = ["derive"] }
-bincode = "1.3.3"
-serde_json = "*"
