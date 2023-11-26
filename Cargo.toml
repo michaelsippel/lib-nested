@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "lib-nested-core",
-    "lib-nested-tty"
+    "lib-nested-tty",
+    "examples/tty-01-hello"
 ]
 
