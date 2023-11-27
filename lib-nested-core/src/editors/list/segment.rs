@@ -9,7 +9,7 @@ use {
     },
     crate::{
         editors::list::{ListCursor, ListCursorMode},
-        tree::{NestedNode}
+        editTree::{NestedNode}
     },
     std::sync::Arc,
     std::sync::RwLock,

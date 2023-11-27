@@ -3,9 +3,9 @@ use {
         view::{singleton::*}
     },
     crate::{
-        type_system::{Context, ReprTree},
+        reprTree::{Context, ReprTree},
+        editTree::{NestedNode, TreeNav, TreeNavResult, TreeCursor},
         editors::{list::{ListEditor, ListCmd, ListCursorMode}, ObjCommander},
-        tree::{NestedNode, TreeNav, TreeNavResult, TreeCursor},
     },
     std::{sync::{Arc, RwLock}},
 

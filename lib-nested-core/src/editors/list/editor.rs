@@ -5,9 +5,9 @@ use {
     },
     laddertypes::{TypeTerm},
     crate::{
-        type_system::{Context, ReprTree},
+        reprTree::{Context, ReprTree},
+        editTree::{NestedNode, TreeNav, TreeCursor, diagnostics::Diagnostics},
         editors::{list::{ListCursor, ListCursorMode, ListCmd}, ObjCommander},
-        tree::{NestedNode, TreeNav, TreeCursor, diagnostics::Diagnostics},
     },
     std::sync::{Arc, RwLock}
 };
@@ -117,8 +117,7 @@ impl ListEditor {
             .set_diag(e
                       .get_data_port()
                       .enumerate()
-                      .map(
-                          |(idx, item_editor)| {
+                      .map(|(idx, item_editor)| {
                               let idx = *idx;
                               item_editor
                                   .get_msg_port()
@@ -129,8 +128,7 @@ impl ListEditor {
                                           msg
                                       }
                                   )
-                          }
-                      )
+                          })
                       .flatten()
             );
 

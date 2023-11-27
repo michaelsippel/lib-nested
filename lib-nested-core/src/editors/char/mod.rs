@@ -8,8 +8,8 @@ use {
     },
     laddertypes::{TypeTerm},
     crate::{
-        type_system::{Context, ReprTree},
-        tree::{NestedNode, TreeNavResult},
+        reprTree::{Context, ReprTree},
+        editTree::{NestedNode, TreeNavResult},
         editors::ObjCommander,
     },
     std::sync::Arc,

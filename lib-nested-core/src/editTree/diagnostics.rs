@@ -4,7 +4,7 @@ use {
         buffer::{vec::*, index_hashmap::*}
     },
     crate::{
-        type_system::ReprTree
+        reprTree::ReprTree
     },
     std::sync::{Arc, RwLock},
     cgmath::Point2

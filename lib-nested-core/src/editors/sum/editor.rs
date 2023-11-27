@@ -9,8 +9,8 @@ use {
     laddertypes::{TypeTerm},
     crate::{
         editors::{list::ListCursorMode, ObjCommander},
-        type_system::{Context, ReprTree},
-        tree::{TreeNav, TreeCursor, TreeNavResult, diagnostics::{Diagnostics, Message}, NestedNode},
+        reprTree::{Context, ReprTree},
+        editTree::{TreeNav, TreeCursor, TreeNavResult, diagnostics::{Diagnostics, Message}, NestedNode},
     },
     cgmath::{Vector2},
     std::sync::{Arc, RwLock}

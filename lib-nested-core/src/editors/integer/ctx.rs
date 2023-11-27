@@ -5,12 +5,12 @@ use {
     },
     laddertypes::{TypeTerm},
     crate::{
-        type_system::{Context},
+        reprTree::{Context},
+        reprTree::{MorphismTypePattern},
         editors::{
             list::*,
             integer::*
         },
-        type_system::{MorphismTypePattern},
     },
     std::sync::{Arc, RwLock}
 };

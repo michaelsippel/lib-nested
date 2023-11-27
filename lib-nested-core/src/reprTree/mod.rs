@@ -1,9 +1,12 @@
+pub mod context;
+
+pub use {
+    context::{Context, MorphismMode, MorphismType, MorphismTypePattern},
+};
+
 use {
     r3vi::view::{AnyOuterViewPort, OuterViewPort, View},
     laddertypes::{TypeTerm},
-    crate::{
-        type_system::{Context}
-    },
     std::{
         collections::HashMap,
         sync::{Arc, RwLock},

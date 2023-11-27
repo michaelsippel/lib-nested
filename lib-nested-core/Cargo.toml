@@ -7,5 +7,5 @@ version = "0.1.0"
 [dependencies]
 r3vi = { path = "../../lib-r3vi" }
 laddertypes = { path = "../../lib-laddertypes" }
-cgmath = { version = "0.18.0", features = ["serde"] }
+cgmath = { version = "0.18.0", features = ["serde"]  }
 

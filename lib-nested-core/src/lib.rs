@@ -1,8 +1,5 @@
 pub mod utils;
 pub mod editors;
-pub mod tree;
-pub mod type_system;
+pub mod editTree;
+pub mod reprTree;
 
-pub fn magic_header() {
-    eprintln!("<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>");
-}

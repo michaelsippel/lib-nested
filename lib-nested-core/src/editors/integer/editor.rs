@@ -12,9 +12,9 @@ use {
     },
     laddertypes::{TypeTerm},
     crate::{
-        type_system::{Context, ReprTree},
         editors::{list::{ListCmd}, ObjCommander},
-        tree::{NestedNode, TreeNav, TreeNavResult, TreeCursor, diagnostics::{Message}},
+        reprTree::{Context, ReprTree},
+        editTree::{NestedNode, TreeNav, TreeNavResult, TreeCursor, diagnostics::{Message}},
     },
     std::sync::Arc,
     std::sync::RwLock,
