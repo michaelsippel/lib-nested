@@ -31,22 +31,24 @@ pub trait TerminalView = GridView<Item = TerminalAtom>;
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-pub enum TerminalEditorResult {
-    Continue,
-    Exit,
-}
-
-pub trait TerminalEditor {
-    fn get_term_view(&self) -> OuterViewPort<dyn TerminalView>;
-    fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult;
-}
-
-//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
-
 use r3vi::view::OuterViewPort;
 
 pub trait DisplaySegment {
     fn display_view(&self) -> OuterViewPort<dyn TerminalView>;
+}
+
+
+use nested::reprTree::Context;
+use std::sync::{Arc, RwLock};
+
+impl DisplaySegment for nested::editTree::NestedNode {
+    fn display_view(&self) -> OuterViewPort<dyn TerminalView> {
+        self.view.as_ref().unwrap()
+            .read().unwrap()
+            .descend( Context::parse(&self.ctx, "TerminalView") ).expect("terminal backend not supported by view")
+            .read().unwrap()
+            .get_port::<dyn TerminalView>().unwrap()
+    }
 }
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
