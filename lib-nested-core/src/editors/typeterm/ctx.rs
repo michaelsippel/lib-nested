@@ -4,7 +4,7 @@ use {
     },
     laddertypes::{TypeTerm},
     crate::{
-        reprTree::{Context, MorphismTypePattern},
+        repr_tree::{Context, MorphismTypePattern},
         editors::{
             list::{ListEditor, ListSegmentSequence},
             typeterm::{State, TypeTermEditor}

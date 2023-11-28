@@ -7,7 +7,8 @@ use {
             index::*,
         }
     },
-    super::{TerminalStyle, TerminalView},
+    crate::atom::{TerminalStyle},
+    crate::{TerminalView},
     async_std::{stream::StreamExt, task},
     cgmath::{Point2, Vector2},
     signal_hook,

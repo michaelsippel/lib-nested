@@ -2,7 +2,7 @@
 use {
     laddertypes::{TypeTerm, TypeID},
     crate::{
-        editTree::{TreeAddr}
+        edit_tree::{TreeAddr}
     }
 };
 

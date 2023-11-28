@@ -7,8 +7,8 @@ use {
     },
     laddertypes::{TypeTerm},
     crate::{
-        reprTree::{ReprTree, Context},
-        editTree::{TreeNav, TreeCursor, TreeNavResult, TreeHeightOp, diagnostics::{Diagnostics, Message}},
+        repr_tree::{ReprTree, Context},
+        edit_tree::{TreeNav, TreeCursor, TreeNavResult, TreeHeightOp, diagnostics::{Diagnostics, Message}},
         editors::{list::{ListCursorMode}, ObjCommander}
     }
 };

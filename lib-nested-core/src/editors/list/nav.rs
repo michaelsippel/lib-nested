@@ -11,7 +11,7 @@ use {
             ListCursor, ListCursorMode,
             editor::ListEditor
         },
-        editTree::{TreeCursor, TreeNav, TreeNavResult, TreeHeightOp}
+        edit_tree::{TreeCursor, TreeNav, TreeNavResult, TreeHeightOp}
     },
     cgmath::Vector2
 };

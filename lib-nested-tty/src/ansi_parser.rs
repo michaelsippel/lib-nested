@@ -10,7 +10,8 @@ use {
         projection::projection_helper::ProjectionHelper,
     },
     crate::{
-        TerminalAtom, TerminalStyle, TerminalView,
+        atom::{TerminalAtom, TerminalStyle},
+        TerminalView,
     },
     cgmath::{Point2, Vector2},
     std::io::Read,

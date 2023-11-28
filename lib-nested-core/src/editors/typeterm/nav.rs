@@ -7,7 +7,7 @@ use {
         }
     },
     crate::{
-        editTree::{TreeNav, TreeCursor, TreeNavResult, TreeHeightOp},
+        edit_tree::{TreeNav, TreeCursor, TreeNavResult, TreeHeightOp},
         editors::{typeterm::TypeTermEditor, list::ListCursorMode}
     },
     cgmath::Vector2

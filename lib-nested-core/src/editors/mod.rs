@@ -16,8 +16,8 @@ pub trait Commander {
 
 use std::sync::{Arc, RwLock};
 use crate::{
-    reprTree::ReprTree,
-    editTree::nav::TreeNavResult
+    repr_tree::ReprTree,
+    edit_tree::nav::TreeNavResult
 };
 
 pub trait ObjCommander {

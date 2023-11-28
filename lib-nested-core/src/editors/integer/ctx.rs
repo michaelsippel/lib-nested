@@ -5,8 +5,8 @@ use {
     },
     laddertypes::{TypeTerm},
     crate::{
-        reprTree::{Context},
-        reprTree::{MorphismTypePattern},
+        repr_tree::{Context},
+        repr_tree::{MorphismTypePattern},
         editors::{
             list::*,
             integer::*

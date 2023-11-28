@@ -7,8 +7,8 @@ extern crate termion;
 use {
     cgmath::Vector2,
     nested::{
-        editTree::NestedNode,
-        reprTree::{Context, ReprTree},
+        edit_tree::NestedNode,
+        repr_tree::{Context, ReprTree},
     },
     nested_tty::{
         terminal::TermOutWriter, DisplaySegment, Terminal, TerminalAtom, TerminalCompositor,
@@ -23,17 +23,36 @@ use {
     termion::event::{Event, Key},
 };
 
+fn node_make_char_view(
+    node: NestedNode
+) -> NestedNode {
+    let char_view = node.data
+        .read()
+        .unwrap()
+        .get_port::<dyn SingletonView<Item = char>>()
+        .expect("unable to get Char-view")
+        .map(move |c| TerminalAtom::from(if c == '\0' { ' ' } else { c }))
+        .to_grid();
+
+    let mut display_rt = ReprTree::new(Context::parse(&node.ctx, "Display"));
+
+    display_rt.insert_branch(ReprTree::new_leaf(
+        Context::parse(&node.ctx, "TerminalView"),
+        char_view.into(),
+    ));
+
+    node.set_view(
+        Arc::new(RwLock::new(display_rt))
+    )
+}
+
 #[async_std::main]
 async fn main() {
     let app = TTYApplication::new( |ev| { /* event handler */ } );
-    let compositor = TerminalCompositor::new(app.port.inner());
 
     /* setup context & create Editor-Tree
      */
     let ctx = Arc::new(RwLock::new(Context::default()));
-
-    // abstract data
-    let rt = ReprTree::from_char(&ctx, 'λ');
 
     let mut node = Context::make_node(
         &ctx,
@@ -44,25 +63,17 @@ async fn main() {
     )
     .unwrap();
 
-    /* add a display view to the node
+    // set abstract data
+    node.data = ReprTree::from_char(&ctx, 'Λ');
+
+    // add a display view to the node
+    node = node_make_char_view( node );
+
+    /* setup display view routed to `app.port`
      */
-    let char_view = rt
-        .read()
-        .unwrap()
-        .get_port::<dyn SingletonView<Item = char>>()
-        .expect("unable to get Char-view")
-        .map(move |c| TerminalAtom::from(if c == '\0' { ' ' } else { c }))
-        .to_grid();
+    let compositor = TerminalCompositor::new(app.port.inner());
 
-    let mut display_rt = ReprTree::new(Context::parse(&ctx, "Display"));
-
-    display_rt.insert_branch(ReprTree::new_leaf(
-        Context::parse(&ctx, "TerminalView"),
-        char_view.into(),
-    ));
-
-    node = node.set_view(Arc::new(RwLock::new(display_rt)));
-
+    // add some views to the display compositor 
     compositor.write().unwrap().push(
         nested_tty::make_label("Hello World")
             .map_item(|p, a| {

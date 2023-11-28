@@ -3,8 +3,8 @@ use {
         view::{singleton::*}
     },
     crate::{
-        reprTree::{Context, ReprTree},
-        editTree::{NestedNode, TreeNav, TreeNavResult, TreeCursor},
+        repr_tree::{Context, ReprTree},
+        edit_tree::{NestedNode, TreeNav, TreeNavResult, TreeCursor},
         editors::{list::{ListEditor, ListCmd, ListCursorMode}, ObjCommander},
     },
     std::{sync::{Arc, RwLock}},

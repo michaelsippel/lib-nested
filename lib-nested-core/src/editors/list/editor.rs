@@ -5,8 +5,8 @@ use {
     },
     laddertypes::{TypeTerm},
     crate::{
-        reprTree::{Context, ReprTree},
-        editTree::{NestedNode, TreeNav, TreeCursor, diagnostics::Diagnostics},
+        repr_tree::{Context, ReprTree},
+        edit_tree::{NestedNode, TreeNav, TreeCursor, diagnostics::Diagnostics},
         editors::{list::{ListCursor, ListCursorMode, ListCmd}, ObjCommander},
     },
     std::sync::{Arc, RwLock}

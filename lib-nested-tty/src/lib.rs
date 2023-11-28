@@ -1,10 +1,9 @@
 
 #![feature(trait_alias)]
 
-//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+// <<<<>>>><<>><><<>><<< * >>><<>><><<>><<<<>>>> \\
 
 pub mod atom;
-pub mod style;
 
 pub mod compositor;
 pub mod ansi_parser;
@@ -12,26 +11,25 @@ pub mod ansi_parser;
 pub mod terminal;
 pub mod tty_application;
 
-//pub mod list_editor;
+//pub mod edit_tree;
 //pub mod widgets;
 
-//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+// <<<<>>>><<>><><<>><<< * >>><<>><><<>><<<<>>>> \\
 
 pub use {
-    atom::TerminalAtom,
-    compositor::TerminalCompositor,
-    style::TerminalStyle,
+    atom::{TerminalAtom, TerminalStyle},
     terminal::{Terminal, TerminalEvent},
-    tty_application::TTYApplication
+    tty_application::TTYApplication,
+    compositor::TerminalCompositor,
 };
 
 use r3vi::view::grid::*;
 
-//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+// <<<<>>>><<>><><<>><<< * >>><<>><><<>><<<<>>>> \\
 
 pub trait TerminalView = GridView<Item = TerminalAtom>;
 
-//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+// <<<<>>>><<>><><<>><<< * >>><<>><><<>><<<<>>>> \\
 
 use r3vi::view::OuterViewPort;
 
@@ -40,10 +38,10 @@ pub trait DisplaySegment {
 }
 
 
-use nested::reprTree::Context;
+use nested::repr_tree::Context;
 use std::sync::{Arc, RwLock};
 
-impl DisplaySegment for nested::editTree::NestedNode {
+impl DisplaySegment for nested::edit_tree::NestedNode {
     fn display_view(&self) -> OuterViewPort<dyn TerminalView> {
         self.view.as_ref().unwrap()
             .read().unwrap()

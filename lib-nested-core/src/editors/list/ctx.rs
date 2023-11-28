@@ -2,7 +2,7 @@ use {
     r3vi::{view::{OuterViewPort, singleton::*}},
     laddertypes::{TypeTerm},
     crate::{
-        reprTree::{Context},
+        repr_tree::{Context},
         editors::list::{ListEditor}//, PTYListController, PTYListStyle}
     },
     std::sync::{Arc, RwLock}

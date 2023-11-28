@@ -2,8 +2,8 @@
     r3vi::{view::{OuterViewPort, singleton::*}, buffer::{singleton::*}},
     laddertypes::{TypeDict, TypeTerm, TypeID},
     crate::{
-        reprTree::{ReprTree},
-        editTree::NestedNode
+        repr_tree::{ReprTree},
+        edit_tree::NestedNode
     },
     std::{
         collections::HashMap,

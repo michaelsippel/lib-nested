@@ -4,8 +4,8 @@ use {
     },
     crate::{
         editors::{list::{ListEditor, ListCursor, ListCursorMode}, ObjCommander},
-        reprTree::{Context, ReprTree},
-        editTree::{NestedNode, TreeNav, TreeNavResult, TreeCursor},
+        repr_tree::{Context, ReprTree},
+        edit_tree::{NestedNode, TreeNav, TreeNavResult, TreeCursor},
     },
     std::sync::{Arc, RwLock}
 };

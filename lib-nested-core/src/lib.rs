@@ -1,5 +1,6 @@
-pub mod utils;
+
+pub mod repr_tree;
+pub mod edit_tree;
 pub mod editors;
-pub mod editTree;
-pub mod reprTree;
+pub mod utils;
 

@@ -1,8 +1,8 @@
 use {
     cgmath::Vector2,
     nested::{
-        editTree::NestedNode,
-        reprTree::{Context, ReprTree},
+        edit_tree::NestedNode,
+        repr_tree::{Context, ReprTree},
     },
     crate::{
         terminal::TermOutWriter, DisplaySegment, Terminal, TerminalAtom, TerminalCompositor,

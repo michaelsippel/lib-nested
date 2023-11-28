@@ -15,7 +15,7 @@ use {
     },
     crate::{
         editors::list::ListCursorMode,
-        editTree::TreeCursor
+        edit_tree::TreeCursor
     },
     cgmath::Vector2,
 };

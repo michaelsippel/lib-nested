@@ -11,8 +11,8 @@ use {
     },
     laddertypes::{TypeID, TypeTerm},
     crate::{
-        reprTree::{Context, ReprTree},
-        editTree::{NestedNode, TreeNav, TreeNavResult, TreeCursor},
+        repr_tree::{Context, ReprTree},
+        edit_tree::{NestedNode, TreeNav, TreeNavResult, TreeCursor},
         editors::{list::{ListCursorMode, ListEditor, ListCmd}, ObjCommander},
     },
     std::{sync::{Arc, RwLock}}

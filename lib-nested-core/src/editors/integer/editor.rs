@@ -13,8 +13,8 @@ use {
     laddertypes::{TypeTerm},
     crate::{
         editors::{list::{ListCmd}, ObjCommander},
-        reprTree::{Context, ReprTree},
-        editTree::{NestedNode, TreeNav, TreeNavResult, TreeCursor, diagnostics::{Message}},
+        repr_tree::{Context, ReprTree},
+        edit_tree::{NestedNode, TreeNav, TreeNavResult, TreeCursor, diagnostics::{Message}},
     },
     std::sync::Arc,
     std::sync::RwLock,
