@@ -1,4 +1,4 @@
-use {
+ use {
     r3vi::{view::{OuterViewPort, singleton::*}, buffer::{singleton::*}},
     laddertypes::{TypeDict, TypeTerm, TypeID},
     crate::{

@@ -10,6 +10,7 @@ pub mod compositor;
 pub mod ansi_parser;
 
 pub mod terminal;
+pub mod tty_application;
 
 //pub mod list_editor;
 //pub mod widgets;
@@ -21,6 +22,7 @@ pub use {
     compositor::TerminalCompositor,
     style::TerminalStyle,
     terminal::{Terminal, TerminalEvent},
+    tty_application::TTYApplication
 };
 
 use r3vi::view::grid::*;
