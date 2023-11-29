@@ -323,7 +323,6 @@ impl Context {
                 node.clone()
             }
         } else {
-            eprintln!("could not find morphism {}", pattern.to_str(&node.ctx.read().unwrap()));
             node
         }
     }

@@ -285,7 +285,6 @@ impl TypeTermEditor {
     }
 
     pub fn normalize_empty(&mut self) {
-        eprintln!("normalize singleton");
         let subladder_list_node = self.cur_node.get().clone();
         let subladder_list_edit = subladder_list_node.get_edit::<ListEditor>().unwrap();
 
@@ -298,7 +297,6 @@ impl TypeTermEditor {
     /* unwrap a ladder if it only contains one element
      */
     pub fn normalize_singleton(&mut self) {
-        eprintln!("normalize singleton");
 
         if self.state == State::Ladder {           
             let subladder_list_node = self.cur_node.get().clone();
@@ -362,7 +360,6 @@ impl TypeTermEditor {
     /* replace with new list-node (ladder/app) with self as first element
      */
      pub(super) fn morph_to_list(&mut self, state: State) {
-        eprintln!("morph into ladder");
 
         let mut old_node = self.cur_node.get().clone();
 

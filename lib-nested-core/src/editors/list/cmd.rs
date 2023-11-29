@@ -57,7 +57,6 @@ impl ObjCommander for ListEditor {
         }
 
         else if let Some(cmd) = cmd_repr.get_view::<dyn SingletonView<Item = ListCmd>>() {
-            eprintln!("pty-list-editor some list cmmd");
 
             let cur = self.cursor.get();
             drop(cmd_repr);
@@ -76,7 +75,6 @@ impl ObjCommander for ListEditor {
                                     
                                     match cmd.get() {
                                         ListCmd::DeletePxev => {
-                                            eprintln!("SELECT: delete pxev");
                                             if idx > 0
                                                 && item_cur.tree_addr.iter().fold(
                                                     true,
@@ -118,7 +116,6 @@ impl ObjCommander for ListEditor {
                                         }
                                     }
                                 } else {
-                                    eprintln!("ptylist: no item");
                                     TreeNavResult::Exit
                                 }
                             },
@@ -126,7 +123,6 @@ impl ObjCommander for ListEditor {
                             ListCursorMode::Insert => {
                                 match cmd.get() {
                                     ListCmd::DeletePxev => {
-                                        eprintln!("INSERT: delete pxev");
                                         self.delete_pxev();
                                         TreeNavResult::Continue
                                     }
@@ -149,7 +145,6 @@ impl ObjCommander for ListEditor {
                             }
                         }
                     } else {
-                        eprintln!("ptylist: cursor has no idx");
                         TreeNavResult::Exit
                     }
                 }

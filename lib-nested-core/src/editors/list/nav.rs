@@ -195,7 +195,6 @@ impl TreeNav for ListEditor {
                     TreeNavResult::Exit
                 } else if direction.y > 0 {
                     // dn
-                    eprintln!("dn: data.len() = {}", self.data.len());
                     self.cursor.set(ListCursor {
                         mode: if self.data.len() > 0 { cur.leaf_mode } else { ListCursorMode::Insert },
                         idx: Some(0)
@@ -367,7 +366,6 @@ impl TreeNav for ListEditor {
                                                 depth as isize - 1
                                             };
 
-                                        eprintln!("<- LEFT CROSS: pxv_height = {}, cur_height = {}, dist_from_ground = {}, n_steps_down = {}", pxv_height, cur_height, dist_from_ground, n_steps_down);
                                         new_addr.push( cur.tree_addr[0] - 1 );
                                         for _i in 0..n_steps_down {
                                             new_addr.push( -1 );
@@ -387,7 +385,6 @@ impl TreeNav for ListEditor {
                                                 depth as isize - 1
                                             };
 
-                                        eprintln!("-> RIGHT CROSS: cur_height = {}, nxd_height = {}, dist_from_ground = {}, n_steps_down = {}", cur_height, nxd_height, dist_from_ground, n_steps_down);
                                         new_addr.push( cur.tree_addr[0] + 1 );
                                         for _i in 0..n_steps_down {
                                             new_addr.push( 0 );
@@ -396,7 +393,6 @@ impl TreeNav for ListEditor {
 
                                     drop(cur_item);
 
-                                    eprintln!("CROSS: goto {:?}", new_addr);
                                     cur.tree_addr = new_addr;
                                     self.goto(cur)
                                 } else {

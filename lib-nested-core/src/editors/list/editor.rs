@@ -55,7 +55,6 @@ impl ListEditor {
                                     if idx >= 0 && idx < data.len() as isize {
                                         data.get(idx as usize).read().unwrap().get_mode_view()
                                     } else {
-                                        eprintln!("ListEditor::mode_port invalid cursor idx");
                                         ip
                                     }
                                 } else {
@@ -242,7 +241,6 @@ impl ListEditor {
                     if self.is_listlist() {
                         cur.mode = ListCursorMode::Select;
                     } else {
-                        eprintln!("list insert: is not a listlist ({:?})", self.typ);
                         item.write().unwrap().goto(TreeCursor::none());
                         cur.idx = Some(idx + 1);
                     }
@@ -258,13 +256,11 @@ impl ListEditor {
 
             self.cursor.set(cur);
         } else {
-            //eprintln!("insert: no cursor");
         }
     }
 
     /// split the list off at the current cursor position and return the second half
     pub fn split(&mut self) {
-        eprintln!("split");
         let cur = self.cursor.get();
         if let Some(idx) = cur.idx {
             let idx = idx as usize;
@@ -299,7 +295,6 @@ impl ListEditor {
     }
 
     pub fn listlist_split(&mut self) {
-        eprintln!("listlist split");
         let cur = self.get_cursor();
 
         if let Some(mut item) = self.get_item().clone() {
@@ -316,7 +311,6 @@ impl ListEditor {
                 tail_node.goto(TreeCursor::home());
 
                 for node in b.iter() {
-                    eprintln!("splid :send to tail node");
                     tail_node
                         .send_cmd_obj(
                             ReprTree::new_leaf(

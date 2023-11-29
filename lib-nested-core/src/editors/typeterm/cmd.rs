@@ -240,7 +240,6 @@ impl ObjCommander for TypeTermEditor {
                                 self.set_state( State::Ladder );
                             }
                         } else {
-                            eprintln!("ERROR");
                         }
                     } else {
                         self.set_state( State::AnySymbol );

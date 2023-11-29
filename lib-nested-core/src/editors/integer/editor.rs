@@ -43,7 +43,6 @@ impl ObjCommander for DigitEditor {
                 self.msg.clear();
 
                 if self.ctx.read().unwrap().meta_chars.contains(&c) {
-                    eprintln!("digitedit: meta char");
                     return TreeNavResult::Exit;
 
                 } else if c.to_digit(self.radix).is_none() {
