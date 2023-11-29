@@ -7,7 +7,7 @@ extern crate termion;
 use {
     cgmath::Vector2,
     nested::{
-        edit_tree::NestedNode,
+        edit_tree::{NestedNode, TreeCursor, TreeNav},
         repr_tree::{Context, ReprTree},
     },
     nested_tty::{
@@ -17,7 +17,8 @@ use {
     },
     r3vi::{
         buffer::singleton::*,
-        view::{port::UpdateTask, singleton::*, ViewPort},
+        view::{port::UpdateTask, singleton::*, sequence::*, ViewPort},
+        projection::decorate_sequence::*
     },
     std::sync::{Arc, Mutex, RwLock},
     termion::event::{Event, Key},
@@ -26,48 +27,134 @@ use {
 fn node_make_char_view(
     node: NestedNode
 ) -> NestedNode {
-    let char_view = node.data
-        .read()
-        .unwrap()
-        .get_port::<dyn SingletonView<Item = char>>()
-        .expect("unable to get Char-view")
-        .map(move |c| TerminalAtom::from(if c == '\0' { ' ' } else { c }))
-        .to_grid();
+    node.display
+        .write().unwrap()
+        .insert_branch(ReprTree::new_leaf(
+            Context::parse(&node.ctx, "TerminalView"),
+            node.data
+                .read()
+                .unwrap()
+                .get_port::<dyn SingletonView<Item = char>>()
+                .expect("unable to get Char-view")
+                .map(move |c| TerminalAtom::from(if c == '\0' { ' ' } else { c }))
+                .to_grid()
+                .into(),
+        ));
 
-    let mut display_rt = ReprTree::new(Context::parse(&node.ctx, "Display"));
+    node
+}
 
-    display_rt.insert_branch(ReprTree::new_leaf(
-        Context::parse(&node.ctx, "TerminalView"),
-        char_view.into(),
-    ));
+fn node_make_list_view(
+    mut node: NestedNode
+) -> NestedNode {
+    eprintln!("add list display type");
+    node.display
+        .write().unwrap()
+        .insert_branch(ReprTree::new_leaf(
+            Context::parse(&node.ctx, "TerminalView"),
 
-    node.set_view(
-        Arc::new(RwLock::new(display_rt))
-    )
+            node.data
+                .read()
+                .unwrap()
+                .get_port::< dyn SequenceView<Item = NestedNode> >()
+                .expect("unable to get Seq-view")
+                .map(move |char_node| node_make_view(char_node.clone()).display_view() )
+                .wrap(nested_tty::make_label("("), nested_tty::make_label(")"))
+                .to_grid_horizontal()
+                .flatten()
+                .into()
+        ));
+
+//    nested_tty::editors::list::PTYListStyle::for_node( &mut node, ("(", ",", ")") );
+    nested_tty::editors::list::PTYListController::for_node( &mut node, None, None );
+
+    node
+}
+
+fn node_make_view(
+    node: NestedNode
+) -> NestedNode {
+    if node.data.read().unwrap().get_type() == &Context::parse(&node.ctx, "Char") {
+        node_make_char_view( node )
+    } else if node.data.read().unwrap().get_type() == &Context::parse(&node.ctx, "<Seq Char>") {
+        node_make_list_view( node )
+//        node
+    } else if node.data.read().unwrap().get_type() == &Context::parse(&node.ctx, "<List Char>") {
+        node_make_list_view( node )
+    } else {
+        eprintln!("couldnt add view");
+        node
+    }
 }
 
 #[async_std::main]
 async fn main() {
-    let app = TTYApplication::new( |ev| { /* event handler */ } );
-
     /* setup context & create Editor-Tree
      */
     let ctx = Arc::new(RwLock::new(Context::default()));
 
-    let mut node = Context::make_node(
+
+    /* Create a Char-Node with editor & view
+     */
+    let mut n1 = Context::make_node(
         &ctx,
         // node type
         Context::parse(&ctx, "Char"),
         // depth
         SingletonBuffer::new(0).get_port(),
-    )
-    .unwrap();
-
-    // set abstract data
-    node.data = ReprTree::from_char(&ctx, 'Λ');
+    ).unwrap();
 
     // add a display view to the node
-    node = node_make_char_view( node );
+    n1 = node_make_view( n1 );
+
+    /* Create a <List Char>-Node with editor & view
+     */
+    let mut node2 = Context::make_node(
+        &ctx,
+        // node type
+        Context::parse(&ctx, "<List Char>"),
+        // depth
+        SingletonBuffer::new(0).get_port(),
+    ).unwrap();
+
+    // add a display view to the node
+    node2 = node_make_view( node2 );
+
+    /* setup terminal
+     */
+    let app = TTYApplication::new({
+        /* event handler
+         */
+
+        let ctx = ctx.clone();
+        let mut node = n1.clone();
+        node.goto(TreeCursor::home());
+
+
+        let node2 = node2.clone();
+        move |ev| {
+
+            if let Some(cmd) =node2.cmd.get() {
+                cmd.write().unwrap().send_cmd_obj(
+                    ReprTree::new_leaf(
+                        Context::parse(&ctx, "TerminalEvent"),
+                        SingletonBuffer::new(ev.clone()).get_port().into()
+                    )
+                );
+            }
+            
+            match ev {
+                TerminalEvent::Input(Event::Key(Key::Char(c))) => {
+                    if let Some(cmd) = node.cmd.get() {
+                        cmd.write().unwrap().send_cmd_obj(
+                            ReprTree::from_char(&ctx, c)
+                        );
+                    }
+               }
+                _ => {}
+            }
+        }
+    });
 
     /* setup display view routed to `app.port`
      */
@@ -82,17 +169,21 @@ async fn main() {
             .offset(Vector2::new(5, 0)),
     );
 
+
+    let label = ctx.read().unwrap().type_term_to_str( &n1.get_type() );
     compositor.write().unwrap()
-        .push(nested_tty::make_label("Char").offset(Vector2::new(0, 2)));
+        .push(nested_tty::make_label( &label ).offset(Vector2::new(0, 2)));
 
     compositor.write().unwrap()
-        .push(node.display_view().offset(Vector2::new(15, 2)));
+        .push(n1.display_view().offset(Vector2::new(15, 2)));
+
+
+    let label2 = ctx.read().unwrap().type_term_to_str( &node2.get_type() );
+    compositor.write().unwrap()
+        .push(nested_tty::make_label( &label2 ).offset(Vector2::new(0, 3)));
 
     compositor.write().unwrap()
-        .push(nested_tty::make_label("<List Char>").offset(Vector2::new(0, 3)));
-
-    compositor.write().unwrap()
-        .push(nested_tty::make_label("---").offset(Vector2::new(15, 3)));
+        .push(node2.display_view().offset(Vector2::new(15, 3)));
 
     /* write the changes in the view of `term_port` to the terminal
      */

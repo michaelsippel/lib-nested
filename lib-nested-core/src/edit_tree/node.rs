@@ -73,7 +73,7 @@ pub struct NestedNode {
     pub data: Arc<RwLock<ReprTree>>,
 
     /// display view
-    pub view: Option< Arc<RwLock<ReprTree>> >,
+    pub display: Arc<RwLock<ReprTree>>,
 
     /// diagnostics
     pub diag: Option< OuterViewPort<dyn SequenceView<Item = Message>> >,
@@ -103,16 +103,17 @@ pub struct NestedNode {
 impl NestedNode {
     pub fn new(ctx: Arc<RwLock<Context>>, data: Arc<RwLock<ReprTree>>, depth: OuterViewPort<dyn SingletonView<Item = usize>>) -> Self {
         NestedNode {
-            ctx,
             data,
-            view: None,
+            display: Arc::new(RwLock::new(ReprTree::new(Context::parse(&ctx, "Display")))),
             diag: None,
             depth,
             editor: SingletonBuffer::new(None),
             spillbuf: Arc::new(RwLock::new(Vec::new())),
             cmd: SingletonBuffer::new(None),
             close_char: SingletonBuffer::new(None),
-            tree_nav: SingletonBuffer::new(None)
+            tree_nav: SingletonBuffer::new(None),
+
+            ctx
         }
     }
 
@@ -129,20 +130,7 @@ impl NestedNode {
             ),
             SingletonBuffer::new(0).get_port()
       )
-            /*
-            .set_view(buf.get_port()
-                      .map(|c| TerminalAtom::from(c))
-                      .to_index()
-                      .map_key(
-                          |_x| {
-                              Point2::new(0, 0)
-                          },
-                          |p| {
-                              if *p == Point2::new(0,0) { Some(()) } else { None }
-                          })
-            )
-                */
-            .set_editor(Arc::new(RwLock::new(buf)))
+//            .set_editor(Arc::new(RwLock::new(buf)))
     }
 
     
@@ -160,11 +148,6 @@ impl NestedNode {
     
     pub fn set_editor(mut self, editor: Arc<dyn Any + Send + Sync>) -> Self {
         self.editor.set(Some(editor));
-        self
-    }
-
-    pub fn set_view(mut self, view: Arc<RwLock<ReprTree>>) -> Self {
-        self.view = Some(view);
         self
     }
 
@@ -189,10 +172,6 @@ impl NestedNode {
         self.diag.clone().unwrap_or(ViewPort::new().into_outer())
     }
 
-    pub fn get_view(&self) -> Option< Arc<RwLock<ReprTree>> > {
-        self.view.clone()
-    }
-    
     pub fn get_data_port<'a, V: View + ?Sized + 'static>(&'a self, type_str: impl Iterator<Item = &'a str>) -> Option<OuterViewPort<V>>
     where V::Msg: Clone {
         let ctx = self.ctx.clone();
@@ -245,29 +224,6 @@ impl TreeType for NestedNode {
 }
  */
 
-/* TODO: remove that at some point
-*/
-/*
-impl TerminalEditor for NestedNode {
-    fn get_term_view(&self) -> OuterViewPort<dyn TerminalView> {
-        self.get_view()
-    }
-
-    fn handle_terminal_event(&mut self, event: &TerminalEvent) -> TerminalEditorResult {
-        let buf = SingletonBuffer::new(event.clone());
-
-        if let Some(cmd) = self.cmd.get() {
-            cmd.write().unwrap().send_cmd_obj(
-                ReprTree::new_leaf(
-                    self.ctx.read().unwrap().type_term_from_str("TerminalEvent").unwrap(),
-                    AnyOuterViewPort::from(buf.get_port())
-                ));
-        }
-
-        TerminalEditorResult::Continue
-    }
-}
-*/
 impl TreeNav for NestedNode {
     fn get_cursor(&self) -> TreeCursor {
         if let Some(tn) = self.tree_nav.get() {

@@ -82,13 +82,6 @@ impl CharEditor {
             ),
             depth
         )
-            /* todo: move to lib-nested-term
-            .set_view(data
-                      .get_port()
-                      .map(move |c| TerminalAtom::from(if c == '\0' { ' ' } else { c }))
-                      .to_grid()
-            )
-                */
             .set_cmd( editor.clone() )
             .set_editor( editor.clone() )
     }

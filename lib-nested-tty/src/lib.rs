@@ -11,7 +11,8 @@ pub mod ansi_parser;
 pub mod terminal;
 pub mod tty_application;
 
-//pub mod edit_tree;
+pub mod editors;
+pub mod edit_tree;
 //pub mod widgets;
 
 // <<<<>>>><<>><><<>><<< * >>><<>><><<>><<<<>>>> \\
@@ -43,11 +44,24 @@ use std::sync::{Arc, RwLock};
 
 impl DisplaySegment for nested::edit_tree::NestedNode {
     fn display_view(&self) -> OuterViewPort<dyn TerminalView> {
-        self.view.as_ref().unwrap()
+        if let Some( tv_repr ) = self.display
             .read().unwrap()
-            .descend( Context::parse(&self.ctx, "TerminalView") ).expect("terminal backend not supported by view")
-            .read().unwrap()
-            .get_port::<dyn TerminalView>().unwrap()
+            .descend( Context::parse(&self.ctx, "TerminalView") )
+        {
+            if let Some(port) = 
+            tv_repr
+                .read().unwrap()
+                .get_port::<dyn TerminalView>() {
+                    port
+                }
+                
+                else {
+                make_label("no TerminalView port found")
+            }
+        } else {
+            make_label("TTY Display not supported")
+            .map_item(|_p,a| a.add_style_back(TerminalStyle::fg_color((220, 30, 30))))
+        }
     }
 }
 

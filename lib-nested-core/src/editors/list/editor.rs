@@ -15,7 +15,7 @@ use {
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub struct ListEditor {
-    pub(super) cursor: SingletonBuffer<ListCursor>,
+    pub cursor: SingletonBuffer<ListCursor>,
 
     // todo: (?) remove RwLock<..> around NestedNode ??
     pub data: VecBuffer< Arc<RwLock<NestedNode>> >,
@@ -27,10 +27,10 @@ pub struct ListEditor {
 
     depth: OuterViewPort<dyn SingletonView<Item = usize>>,
 
-    pub(crate) ctx: Arc<RwLock<Context>>,
+    pub ctx: Arc<RwLock<Context>>,
 
     /// item type
-    pub(super) typ: TypeTerm,
+    pub typ: TypeTerm,
 }
 
 impl ListEditor {

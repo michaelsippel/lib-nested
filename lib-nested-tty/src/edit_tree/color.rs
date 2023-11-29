@@ -1,5 +1,5 @@
 use {
-    crate::terminal::TerminalStyle,
+    crate::atom::TerminalStyle,
 };
 
 pub fn bg_style_from_depth(depth: usize) -> TerminalStyle {

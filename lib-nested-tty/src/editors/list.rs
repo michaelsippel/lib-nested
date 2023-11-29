@@ -4,23 +4,24 @@ use {
         projection::decorate_sequence::*,
     },
     nested::{
-        type_system::{Context, ReprTree},
+        repr_tree::{Context, ReprTree},
         editors::list::*,
-        tree::{TreeCursor, TreeNav, TreeNavResult},
-        tree::NestedNode,
-        PtySegment
+        edit_tree::{TreeCursor, TreeNav, TreeNavResult, NestedNode},
     },
     crate::{
-        TerminalEvent, TerminalView, make_label
-    }
+        DisplaySegment,
+        TerminalStyle,
+        TerminalEvent, TerminalView, make_label,
+        edit_tree::color::{bg_style_from_depth, fg_style_from_depth}
+    },
     std::sync::{Arc, RwLock},
     termion::event::{Event, Key}
 };
 
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-impl PtySegment for ListSegment {
-    fn pty_view(&self) -> OuterViewPort<dyn TerminalView> {
+impl DisplaySegment for ListSegment {
+    fn display_view(&self) -> OuterViewPort<dyn TerminalView> {
         match self {
             ListSegment::InsertCursor => {
                 make_label("|")
@@ -32,7 +33,7 @@ impl PtySegment for ListSegment {
             ListSegment::Item{ editor, cur_dist } => {
                 let e = editor.clone();
                 let cur_dist = *cur_dist;
-                editor.get_view().map_item(move |_pt, atom| {
+                editor.display_view().map_item(move |_pt, atom| {
                     let c = e.get_cursor();
                     let cur_depth = c.tree_addr.len();
                     let select =
@@ -71,7 +72,7 @@ impl PTYListStyle {
             editor.get_data_port()
         );
         let se = seg_seq.read().unwrap();
-        se.get_view().map(move |segment| segment.pty_view())
+        se.get_view().map(move |segment| segment.display_view())
     }
 
     pub fn pty_view(&self, editor: &ListEditor) -> OuterViewPort<dyn TerminalView> {
@@ -83,7 +84,7 @@ impl PTYListStyle {
 
         seg_seq
             .get_view()
-            .map(move |segment| segment.pty_view())
+            .map(move |segment| segment.display_view())
             .separate(make_label(&self.style.1))
             .wrap(make_label(&self.style.0), make_label(&self.style.2))
             .to_grid_horizontal()
@@ -91,12 +92,15 @@ impl PTYListStyle {
     }
 
     pub fn for_node(node: &mut NestedNode, style: (&str, &str, &str)) {
-        node.view = Some(
-            Self::new(style)
-                .pty_view(
-                    &node.get_edit::<ListEditor>().unwrap().read().unwrap()
-                )
-        );
+        node.display
+            .write().unwrap()
+            .insert_branch(ReprTree::new_leaf(
+                Context::parse(&node.ctx, "TerminalView"),
+                Self::new(style)
+                    .pty_view(
+                        &node.get_edit::<ListEditor>().unwrap().read().unwrap()
+                ).into()
+            ));
     }
 }
 
@@ -166,15 +170,22 @@ impl PTYListController {
         self.editor.read().unwrap().get_item()
     }
 
-    pub fn handle_term_event(&mut self, event: &TerminalEvent, _cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
+    pub fn handle_term_event(&mut self, event: &TerminalEvent, cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
         let mut e = self.editor.write().unwrap();
         match event {
             TerminalEvent::Input(Event::Key(Key::Insert)) => {
                 e.toggle_leaf_mode();
                 TreeNavResult::Continue
             }
-            _  => TreeNavResult::Continue
-        }        
+            TerminalEvent::Input(Event::Key(Key::Char(c))) => {
+                let ctx = e.ctx.clone();
+                drop(e);
+                self.handle_any_event(
+                    ReprTree::from_char(&ctx, *c)
+                )
+            }
+            _ => TreeNavResult::Continue
+        }
     }
 
     pub fn handle_meta_char(&mut self, c: char, child_close_char: Option<char>) -> TreeNavResult {
@@ -201,6 +212,7 @@ impl PTYListController {
     }
 
     pub fn handle_any_event(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
+        eprintln!("ANY EVENT");
         let mut e = self.editor.write().unwrap();
         let cur = e.cursor.get();
         let ctx = e.ctx.clone();
@@ -255,7 +267,7 @@ impl PTYListController {
 }
 
 use r3vi::view::singleton::SingletonView;
-use crate::commander::ObjCommander;
+use nested::editors::ObjCommander;
 
 impl ObjCommander for PTYListController {
     fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
