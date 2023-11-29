@@ -13,33 +13,31 @@ use {
     }
 };
 
-//* TODO: refactoring proposal
-/*
-
-struct NestedNodeDisplay {
+#[derive(Clone)]
+pub struct NestedNodeDisplay {
     /// display view
-    pub view: Option< Arc<RwLock<ReprTree>> >,
+    pub view: Arc<RwLock<ReprTree>>,
 
     /// diagnostics
-    pub diag: Option< OuterViewPort<dyn SequenceView<Item = diagnostics::Message>> >,
+    pub diag: Option< OuterViewPort<dyn SequenceView<Item = Message>> >,
 
     /// depth
-    pub depth: SingletonBuffer< usize >,
+    pub depth: OuterViewPort<dyn SingletonView<Item = usize>>,
 }
 
-struct NestedNodeEdit {
+#[derive(Clone)]
+pub struct NestedNodeEdit {
     /// abstract editor
     pub editor: SingletonBuffer<
                     Option< Arc<dyn Any + Send + Sync> >
-    >,
+                >,
 
-    pub spillbuf: VecBuffer< NestedNode >,
+    pub spillbuf: Arc<RwLock< Vec< Arc<RwLock< NestedNode >> > >>,
 
     /// commander & navigation
     pub cmd: SingletonBuffer<
                  Option< Arc<RwLock<dyn ObjCommander + Send + Sync>> >
              >,    /// abstract data view
-    pub data: Arc<RwLock<ReprTree>>,
 
     pub close_char: SingletonBuffer< Option< char > >,
 
@@ -49,7 +47,8 @@ struct NestedNodeEdit {
                   >,    
 }
 
-pub struct NewNestedNode {
+#[derive(Clone)]
+pub struct NestedNode {
     /// context
     pub ctx: Arc<RwLock<Context>>,
 
@@ -62,57 +61,23 @@ pub struct NewNestedNode {
     /// editor & commander objects
     pub edit: NestedNodeEdit
 }
-*/
-
-#[derive(Clone)]
-pub struct NestedNode {    
-    /// context
-    pub ctx: Arc<RwLock<Context>>,
-
-    /// abstract data view
-    pub data: Arc<RwLock<ReprTree>>,
-
-    /// display view
-    pub display: Arc<RwLock<ReprTree>>,
-
-    /// diagnostics
-    pub diag: Option< OuterViewPort<dyn SequenceView<Item = Message>> >,
-
-    /// depth
-    pub depth: OuterViewPort< dyn SingletonView<Item = usize> >,
-
-    /// abstract editor
-    pub editor: SingletonBuffer<
-                    Option< Arc<dyn Any + Send + Sync> >
-                >,
-
-    pub spillbuf: Arc<RwLock<Vec<Arc<RwLock<NestedNode>>>>>,
-
-    /// commander & navigation
-    pub cmd: SingletonBuffer<
-                 Option< Arc<RwLock<dyn ObjCommander + Send + Sync>> >
-             >,
-    pub close_char: SingletonBuffer<
-                        Option< char >
-                    >,
-    pub tree_nav: SingletonBuffer<
-                      Option< Arc<RwLock<dyn TreeNav + Send + Sync>> >
-                  >,
-}
 
 impl NestedNode {
     pub fn new(ctx: Arc<RwLock<Context>>, data: Arc<RwLock<ReprTree>>, depth: OuterViewPort<dyn SingletonView<Item = usize>>) -> Self {
         NestedNode {
+            disp: NestedNodeDisplay {
+                view: ReprTree::new_arc(Context::parse(&ctx, "Display")),
+                diag: None,
+                depth,
+            },
+            edit: NestedNodeEdit {
+                editor: SingletonBuffer::new(None),
+                spillbuf: Arc::new(RwLock::new(Vec::new())),
+                cmd: SingletonBuffer::new(None),
+                close_char: SingletonBuffer::new(None),                
+                tree_nav: SingletonBuffer::new(None),
+            },
             data,
-            display: Arc::new(RwLock::new(ReprTree::new(Context::parse(&ctx, "Display")))),
-            diag: None,
-            depth,
-            editor: SingletonBuffer::new(None),
-            spillbuf: Arc::new(RwLock::new(Vec::new())),
-            cmd: SingletonBuffer::new(None),
-            close_char: SingletonBuffer::new(None),
-            tree_nav: SingletonBuffer::new(None),
-
             ctx
         }
     }
@@ -147,29 +112,29 @@ impl NestedNode {
     //\\//\\
     
     pub fn set_editor(mut self, editor: Arc<dyn Any + Send + Sync>) -> Self {
-        self.editor.set(Some(editor));
+        self.edit.editor.set(Some(editor));
         self
     }
 
     pub fn set_cmd(mut self, cmd: Arc<RwLock<dyn ObjCommander + Send + Sync>>) -> Self {
-        self.cmd.set(Some(cmd));
+        self.edit.cmd.set(Some(cmd));
         self
     }
 
     pub fn set_nav(mut self, nav: Arc<RwLock<dyn TreeNav + Send + Sync>>) -> Self {
-        self.tree_nav.set(Some(nav));
+        self.edit.tree_nav.set(Some(nav));
         self
     }
 
     pub fn set_diag(mut self, diag: OuterViewPort<dyn SequenceView<Item = Message>>) -> Self {
-        self.diag = Some(diag);
+        self.disp.diag = Some(diag);
         self
     }
 
     //\\//\\
 
     pub fn get_diag(&self) -> OuterViewPort<dyn SequenceView<Item = Message>> {
-        self.diag.clone().unwrap_or(ViewPort::new().into_outer())
+        self.disp.diag.clone().unwrap_or(ViewPort::new().into_outer())
     }
 
     pub fn get_data_port<'a, V: View + ?Sized + 'static>(&'a self, type_str: impl Iterator<Item = &'a str>) -> Option<OuterViewPort<V>>
@@ -200,7 +165,7 @@ impl NestedNode {
      */
     
     pub fn get_edit<T: Send + Sync + 'static>(&self) -> Option<Arc<RwLock<T>>> {
-        if let Some(edit) = self.editor.get() {
+        if let Some(edit) = self.edit.editor.get() {
             if let Ok(edit) = edit.downcast::<RwLock<T>>() {
                 Some(edit)
             } else {
@@ -226,7 +191,7 @@ impl TreeType for NestedNode {
 
 impl TreeNav for NestedNode {
     fn get_cursor(&self) -> TreeCursor {
-        if let Some(tn) = self.tree_nav.get() {
+        if let Some(tn) = self.edit.tree_nav.get() {
             tn.read().unwrap().get_cursor()
         } else {
             TreeCursor::default()
@@ -234,7 +199,7 @@ impl TreeNav for NestedNode {
     }
 
     fn get_addr_view(&self) -> OuterViewPort<dyn SequenceView<Item = isize>> {
-        if let Some(tn) = self.tree_nav.get() {
+        if let Some(tn) = self.edit.tree_nav.get() {
             tn.read().unwrap().get_addr_view()
         } else {
             OuterViewPort::default()
@@ -242,7 +207,7 @@ impl TreeNav for NestedNode {
     }
 
     fn get_mode_view(&self) -> OuterViewPort<dyn SingletonView<Item = ListCursorMode>> {
-        if let Some(tn) = self.tree_nav.get() {
+        if let Some(tn) = self.edit.tree_nav.get() {
             tn.read().unwrap().get_mode_view()
         } else {
             OuterViewPort::default()
@@ -250,7 +215,7 @@ impl TreeNav for NestedNode {
     }
 
     fn get_cursor_warp(&self) -> TreeCursor {
-        if let Some(tn) = self.tree_nav.get() {
+        if let Some(tn) = self.edit.tree_nav.get() {
             tn.read().unwrap().get_cursor_warp()
         } else {
             TreeCursor::default()
@@ -258,7 +223,7 @@ impl TreeNav for NestedNode {
     }
 
     fn get_height(&self, op: &TreeHeightOp) -> usize {
-        if let Some(tn) = self.tree_nav.get() {
+        if let Some(tn) = self.edit.tree_nav.get() {
             tn.read().unwrap().get_height( op )
         } else {
             0
@@ -266,7 +231,7 @@ impl TreeNav for NestedNode {
     }
 
     fn goby(&mut self, direction: Vector2<isize>) -> TreeNavResult {
-        if let Some(tn) = self.tree_nav.get() {
+        if let Some(tn) = self.edit.tree_nav.get() {
             tn.write().unwrap().goby(direction)
         } else {
             TreeNavResult::Exit
@@ -274,7 +239,7 @@ impl TreeNav for NestedNode {
     }
 
     fn goto(&mut self, new_cursor: TreeCursor) -> TreeNavResult {
-        if let Some(tn) = self.tree_nav.get() {
+        if let Some(tn) = self.edit.tree_nav.get() {
             tn.write().unwrap().goto(new_cursor)
         } else {
             TreeNavResult::Exit
@@ -303,7 +268,7 @@ impl ObjCommander for NestedNode {
             } else {
                 TreeNavResult::Exit
             }
-        } else if let Some(cmd) = self.cmd.get() {
+        } else if let Some(cmd) = self.edit.cmd.get() {
             // todo: filter out tree-nav cmds and send them to tree_nav
             cmd.write().unwrap().send_cmd_obj(cmd_obj)
         } else {
@@ -311,6 +276,7 @@ impl ObjCommander for NestedNode {
         }
     }
 }
+
 
 impl Diagnostics for NestedNode {
     fn get_msg_port(&self) -> OuterViewPort<dyn SequenceView<Item = Message>> {

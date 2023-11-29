@@ -36,10 +36,6 @@ pub enum TreeNavCmd {
     pxev_dn_qnexd
 }
 
-impl TreeNavCmd {
-    
-}
-
 pub trait TreeNav {
     /* CORE
     */

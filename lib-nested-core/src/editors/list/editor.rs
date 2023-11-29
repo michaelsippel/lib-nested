@@ -131,7 +131,7 @@ impl ListEditor {
                       .flatten()
             );
 
-        node.spillbuf = e.spillbuf.clone();
+        node.edit.spillbuf = e.spillbuf.clone();
         node
     }
 
@@ -229,7 +229,7 @@ impl ListEditor {
 
     /// insert a new element
     pub fn insert(&mut self, item: Arc<RwLock<NestedNode>>) {
-        item.read().unwrap().depth.0.set_view(
+        item.read().unwrap().disp.depth.0.set_view(
             self.depth.map(|d| d+1).get_view()
         );
 
@@ -306,7 +306,7 @@ impl ListEditor {
                 self.set_leaf_mode(ListCursorMode::Insert);
                 self.nexd();
 
-                let mut b = item.spillbuf.write().unwrap();
+                let mut b = item.edit.spillbuf.write().unwrap();
                 let mut tail_node = Context::make_node(&self.ctx, self.typ.clone(), self.depth.map(|d| d+1)).unwrap();
                 tail_node.goto(TreeCursor::home());
 
@@ -364,7 +364,7 @@ impl ListEditor {
 
             let old_cur = pxv_editor.get_cursor();
 
-            let data = cur_editor.spillbuf.read().unwrap();
+            let data = cur_editor.edit.spillbuf.read().unwrap();
             for x in data.iter() {
                 pxv_editor.send_cmd_obj(
                     ReprTree::new_leaf(
@@ -422,7 +422,7 @@ impl ListEditor {
                 leaf_mode: ListCursorMode::Insert
             });
  
-            let data = nxd_editor.spillbuf.read().unwrap();
+            let data = nxd_editor.edit.spillbuf.read().unwrap();
 
             for x in data.iter() {
                 cur_editor.send_cmd_obj(

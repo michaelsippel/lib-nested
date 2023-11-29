@@ -260,7 +260,7 @@ impl Context {
         drop(dict);
 
         self.add_morphism(morphism_pattern, Arc::new(move |node, dst_type| {
-            mk_editor(node.ctx.clone(), dst_type, node.depth)
+            mk_editor(node.ctx.clone(), dst_type, node.disp.depth)
         }));
     }
 

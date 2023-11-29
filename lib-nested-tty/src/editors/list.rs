@@ -46,7 +46,7 @@ impl DisplaySegment for ListSegment {
                     atom
                         .add_style_back(bg_style_from_depth(select))
                         .add_style_back(TerminalStyle::bold(select==1))
-                        .add_style_back(fg_style_from_depth(e.depth.get_view().get()))
+                        .add_style_back(fg_style_from_depth(e.disp.depth.get_view().get()))
                 })
             }
         }
@@ -92,7 +92,7 @@ impl PTYListStyle {
     }
 
     pub fn for_node(node: &mut NestedNode, style: (&str, &str, &str)) {
-        node.display
+        node.disp.view
             .write().unwrap()
             .insert_branch(ReprTree::new_leaf(
                 Context::parse(&node.ctx, "TerminalView"),
@@ -152,10 +152,10 @@ impl PTYListController {
         }
         
         let editor = node.get_edit::<ListEditor>().unwrap();
-        let controller = Arc::new(RwLock::new(PTYListController::from_editor( editor, split_char, close_char, node.depth.clone() )));
+        let controller = Arc::new(RwLock::new(PTYListController::from_editor( editor, split_char, close_char, node.disp.depth.clone() )));
 
-        node.cmd.set(Some(controller.clone()));
-        node.close_char.set(close_char);
+        node.edit.cmd.set(Some(controller.clone()));
+        node.edit.close_char.set(close_char);
     }
 
     pub fn get_data_port(&self) -> OuterViewPort<dyn SequenceView<Item = NestedNode>> {
@@ -235,7 +235,7 @@ impl PTYListController {
             ListCursorMode::Select => {
                 if let Some(item) = e.get_item_mut() {
                     let res = item.write().unwrap().send_cmd_obj(cmd_obj.clone());
-                    let child_close_char = item.read().unwrap().close_char.get();
+                    let child_close_char = item.read().unwrap().edit.close_char.get();
 
                    match res {
                         TreeNavResult::Continue => TreeNavResult::Continue,

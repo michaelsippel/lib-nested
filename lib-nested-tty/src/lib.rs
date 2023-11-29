@@ -44,7 +44,7 @@ use std::sync::{Arc, RwLock};
 
 impl DisplaySegment for nested::edit_tree::NestedNode {
     fn display_view(&self) -> OuterViewPort<dyn TerminalView> {
-        if let Some( tv_repr ) = self.display
+        if let Some( tv_repr ) = self.disp.view
             .read().unwrap()
             .descend( Context::parse(&self.ctx, "TerminalView") )
         {

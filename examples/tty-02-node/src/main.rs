@@ -28,7 +28,7 @@ use {
 fn node_make_char_view(
     node: NestedNode
 ) -> NestedNode {
-    node.display
+    node.disp.view
         .write().unwrap()
         .insert_branch(ReprTree::new_leaf(
             Context::parse(&node.ctx, "TerminalView"),
@@ -45,15 +45,13 @@ fn node_make_char_view(
     node
 }
 
-fn node_make_list_view(
+fn node_make_seq_view(
     mut node: NestedNode
 ) -> NestedNode {
-    eprintln!("add list display type");
-    node.display
+    node.disp.view
         .write().unwrap()
         .insert_branch(ReprTree::new_leaf(
             Context::parse(&node.ctx, "TerminalView"),
-
             node.data
                 .read()
                 .unwrap()
@@ -65,8 +63,13 @@ fn node_make_list_view(
                 .flatten()
                 .into()
         ));
+    node
+}
 
-//    nested_tty::editors::list::PTYListStyle::for_node( &mut node, ("(", ",", ")") );
+fn node_make_list_edit(
+    mut node: NestedNode
+) -> NestedNode {
+    nested_tty::editors::list::PTYListStyle::for_node( &mut node, ("(", ",", ")") );
     nested_tty::editors::list::PTYListController::for_node( &mut node, None, None );
 
     node
@@ -78,10 +81,9 @@ fn node_make_view(
     if node.data.read().unwrap().get_type() == &Context::parse(&node.ctx, "Char") {
         node_make_char_view( node )
     } else if node.data.read().unwrap().get_type() == &Context::parse(&node.ctx, "<Seq Char>") {
-        node_make_list_view( node )
-//        node
+        node_make_seq_view( node )
     } else if node.data.read().unwrap().get_type() == &Context::parse(&node.ctx, "<List Char>") {
-        node_make_list_view( node )
+        node_make_list_edit( node )
     } else {
         eprintln!("couldnt add view");
         node
@@ -130,7 +132,7 @@ async fn main() {
         let ctx = ctx.clone();
         let mut node1 = node1.clone();
         let mut node2 = node2.clone();
-        move |ev| {
+        move |ev| {           
             let mut node1 = node1.clone();
             let mut node2 = node2.clone();
             node1.send_cmd_obj( ev.to_repr_tree(&ctx) );
@@ -150,7 +152,6 @@ async fn main() {
             })
             .offset(Vector2::new(5, 0)),
     );
-
 
     let label = ctx.read().unwrap().type_term_to_str( &node1.get_type() );
     compositor.write().unwrap()

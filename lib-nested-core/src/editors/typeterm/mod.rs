@@ -168,8 +168,8 @@ impl TypeTermEditor {
 
         node.goto(TreeCursor::home());
 
-        let _editor = node.editor.get();
-        self.close_char.set(node.close_char.get());
+        let _editor = node.edit.editor.get();
+        self.close_char.set(node.edit.close_char.get());
         self.cur_node.set(node);
         self.state = new_state;
     }
@@ -204,7 +204,7 @@ impl TypeTermEditor {
             cur_node: SingletonBuffer::new(cur_node.clone()),
             close_char: SingletonBuffer::new(None),
             spillbuf: Arc::new(RwLock::new(Vec::new())),
-            depth: cur_node.depth.clone()
+            depth: cur_node.disp.depth.clone()
         };
 /* FIXME
         let view = editor.cur_node
@@ -215,24 +215,24 @@ impl TypeTermEditor {
             .to_grid()
             .flatten();
         */
-        let _cc = editor.cur_node.get().close_char;
+        let _cc = editor.cur_node.get().edit.close_char;
         let editor = Arc::new(RwLock::new(editor));
 
-        let mut super_node = NestedNode::new(ctx, data, cur_node.depth)
+        let mut super_node = NestedNode::new(ctx, data, cur_node.disp.depth)
 //            .set_view(view)
             .set_nav(editor.clone())
             .set_cmd(editor.clone())
             .set_editor(editor.clone());
 
-        editor.write().unwrap().close_char = super_node.close_char.clone();
-        super_node.spillbuf = editor.read().unwrap().spillbuf.clone();
+        editor.write().unwrap().close_char = super_node.edit.close_char.clone();
+        super_node.edit.spillbuf = editor.read().unwrap().spillbuf.clone();
 
         super_node
     }
 
     fn forward_spill(&mut self) {
         let node = self.cur_node.get();
-        let mut buf = node.spillbuf.write().unwrap();
+        let mut buf = node.edit.spillbuf.write().unwrap();
         for n in buf.iter() {
             self.spillbuf.write().unwrap().push(n.clone());
         }
@@ -371,7 +371,7 @@ impl TypeTermEditor {
          * that has same state & child-node as current node.
          */
         let old_edit_node = TypeTermEditor::new_node( self.ctx.clone(), SingletonBuffer::new(0).get_port() );
-        old_node.depth.0.set_view( old_edit_node.depth.map(|x|x).get_view() );
+        old_node.disp.depth.0.set_view( old_edit_node.disp.depth.map(|x|x).get_view() );
         
         let old_edit_clone = old_edit_node.get_edit::<TypeTermEditor>().unwrap();
         old_edit_clone.write().unwrap().set_state( self.state );
