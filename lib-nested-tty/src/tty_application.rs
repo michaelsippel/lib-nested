@@ -58,7 +58,7 @@ impl TTYApplication {
     async fn update_loop(port: ViewPort<dyn TerminalView>) {
         loop {
             port.update();
-            async_std::task::sleep(std::time::Duration::from_millis(500)).await;
+            async_std::task::sleep(std::time::Duration::from_millis(50)).await;
         }
     }
 
