@@ -56,10 +56,10 @@ impl DisplaySegment for nested::edit_tree::NestedNode {
                 }
                 
                 else {
-                make_label("no TerminalView port found")
+                make_label("?")
             }
         } else {
-            make_label("TTY Display not supported")
+            make_label("?")
             .map_item(|_p,a| a.add_style_back(TerminalStyle::fg_color((220, 30, 30))))
         }
     }
