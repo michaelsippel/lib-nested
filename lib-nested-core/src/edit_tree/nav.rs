@@ -26,6 +26,20 @@ pub enum TreeNavResult { Continue, Exit }
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum TreeHeightOp { P, Q, Max }
 
+#[derive(Clone, Copy, Debug)]
+pub enum TreeNavCmd {
+    pxev, nexd, up, dn,
+    qpxev, qnexd, dup, qdn,
+
+    dn_pxev,
+    up_nexd,
+    pxev_dn_qnexd
+}
+
+impl TreeNavCmd {
+    
+}
+
 pub trait TreeNav {
     /* CORE
     */

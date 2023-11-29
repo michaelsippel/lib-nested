@@ -230,8 +230,6 @@ impl ListEditor {
 
     /// insert a new element
     pub fn insert(&mut self, item: Arc<RwLock<NestedNode>>) {
-        eprintln!("list insert");
-
         item.read().unwrap().depth.0.set_view(
             self.depth.map(|d| d+1).get_view()
         );

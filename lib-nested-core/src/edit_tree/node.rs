@@ -282,9 +282,28 @@ impl TreeNav for NestedNode {
     }
 }
 
+use crate::edit_tree::nav::TreeNavCmd;
+
 impl ObjCommander for NestedNode {
     fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
-        if let Some(cmd) = self.cmd.get() {
+
+        if cmd_obj.read().unwrap().get_type() == &Context::parse(&self.ctx, "TreeNavCmd") {
+            if let Some(cmd) = cmd_obj.read().unwrap().get_view::<dyn SingletonView<Item = TreeNavCmd>>() {
+                match cmd.get() {
+                    TreeNavCmd::pxev => self.pxev(),
+                    TreeNavCmd::nexd => self.nexd(),
+                    TreeNavCmd::qpxev => self.qpxev(),
+                    TreeNavCmd::qnexd => self.qnexd(),
+
+                    TreeNavCmd::up => self.up(),
+                    TreeNavCmd::dn => self.dn(),
+
+                    _ => TreeNavResult::Continue
+                }
+            } else {
+                TreeNavResult::Exit
+            }
+        } else if let Some(cmd) = self.cmd.get() {
             // todo: filter out tree-nav cmds and send them to tree_nav
             cmd.write().unwrap().send_cmd_obj(cmd_obj)
         } else {

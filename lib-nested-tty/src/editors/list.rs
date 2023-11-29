@@ -212,7 +212,6 @@ impl PTYListController {
     }
 
     pub fn handle_any_event(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
-        eprintln!("ANY EVENT");
         let mut e = self.editor.write().unwrap();
         let cur = e.cursor.get();
         let ctx = e.ctx.clone();

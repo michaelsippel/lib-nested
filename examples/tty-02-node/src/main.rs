@@ -9,6 +9,7 @@ use {
     nested::{
         edit_tree::{NestedNode, TreeCursor, TreeNav},
         repr_tree::{Context, ReprTree},
+        editors::ObjCommander
     },
     nested_tty::{
         terminal::TermOutWriter, DisplaySegment, Terminal, TerminalAtom, TerminalCompositor,
@@ -96,7 +97,7 @@ async fn main() {
 
     /* Create a Char-Node with editor & view
      */
-    let mut n1 = Context::make_node(
+    let mut node1 = Context::make_node(
         &ctx,
         // node type
         Context::parse(&ctx, "Char"),
@@ -105,7 +106,7 @@ async fn main() {
     ).unwrap();
 
     // add a display view to the node
-    n1 = node_make_view( n1 );
+    node1 = node_make_view( node1 );
 
     /* Create a <List Char>-Node with editor & view
      */
@@ -127,32 +128,13 @@ async fn main() {
          */
 
         let ctx = ctx.clone();
-        let mut node = n1.clone();
-        node.goto(TreeCursor::home());
-
-
-        let node2 = node2.clone();
+        let mut node1 = node1.clone();
+        let mut node2 = node2.clone();
         move |ev| {
-
-            if let Some(cmd) =node2.cmd.get() {
-                cmd.write().unwrap().send_cmd_obj(
-                    ReprTree::new_leaf(
-                        Context::parse(&ctx, "TerminalEvent"),
-                        SingletonBuffer::new(ev.clone()).get_port().into()
-                    )
-                );
-            }
-            
-            match ev {
-                TerminalEvent::Input(Event::Key(Key::Char(c))) => {
-                    if let Some(cmd) = node.cmd.get() {
-                        cmd.write().unwrap().send_cmd_obj(
-                            ReprTree::from_char(&ctx, c)
-                        );
-                    }
-               }
-                _ => {}
-            }
+            let mut node1 = node1.clone();
+            let mut node2 = node2.clone();
+            node1.send_cmd_obj( ev.to_repr_tree(&ctx) );
+            node2.send_cmd_obj( ev.to_repr_tree(&ctx) );
         }
     });
 
@@ -170,12 +152,12 @@ async fn main() {
     );
 
 
-    let label = ctx.read().unwrap().type_term_to_str( &n1.get_type() );
+    let label = ctx.read().unwrap().type_term_to_str( &node1.get_type() );
     compositor.write().unwrap()
         .push(nested_tty::make_label( &label ).offset(Vector2::new(0, 2)));
 
     compositor.write().unwrap()
-        .push(n1.display_view().offset(Vector2::new(15, 2)));
+        .push(node1.display_view().offset(Vector2::new(15, 2)));
 
 
     let label2 = ctx.read().unwrap().type_term_to_str( &node2.get_type() );
