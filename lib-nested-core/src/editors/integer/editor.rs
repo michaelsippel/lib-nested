@@ -89,7 +89,7 @@ impl DigitEditor {
         let ed = editor.write().unwrap();
         let r = ed.radix;
 
-        NestedNode::new(ed.ctx.clone(), data, depth)
+        NestedNode::new(ed.ctx.clone(), /*data,*/ depth)
             .set_cmd(editor.clone())
             /*
             .set_view(
@@ -144,6 +144,7 @@ pub struct PosIntEditor {
 
 impl PosIntEditor {
     pub fn new(ctx: Arc<RwLock<Context>>, radix: u32) -> Self {
+        /*
         let mut node = Context::make_node(
             &ctx,
             Context::parse(&ctx, format!("<List <Digit {}>>", radix).as_str()),
@@ -159,6 +160,7 @@ impl PosIntEditor {
                 TypeTerm::TypeID(ctx.read().unwrap().get_typeid("BigEndian").unwrap())
             ]
         ));
+        */
 /*
         PTYListController::for_node( &mut node, Some(' '), None );
         PTYListStyle::for_node( &mut node,
@@ -177,7 +179,10 @@ impl PosIntEditor {
 */
         PosIntEditor {
             radix,
-            digits: node
+            digits: NestedNode::new(
+                ctx,
+                r3vi::buffer::singleton::SingletonBuffer::new(0).get_port()
+            )
         }
     }
 

@@ -43,7 +43,7 @@ impl MorphismBase {
     pub fn add_morphism(
         &mut self,
         morph_type: MorphismType,
-        repr_tree_op: impl Fn( Arc<RwLock<ReprTree>>, &HashMap<TypeID, TypeTerm> ) + Send + Sync
+        repr_tree_op: impl Fn( Arc<RwLock<ReprTree>>, &HashMap<TypeID, TypeTerm> ) + Send + Sync + 'static
     ) {
         self.morphisms.push(
             GenericReprTreeMorphism {
@@ -82,7 +82,7 @@ impl MorphismBase {
         target_type: &TypeTerm
     ) {
         if let Some((m, σ)) = self.find_morphism( repr_tree.read().unwrap().get_type(), target_type ) {
-            (m.repr_tree_op)( repr_tree, &σ );
+            (m.repr_tree_op)( repr_tree.clone(), &σ );
         } else {
             eprintln!("could not find morphism");
         }

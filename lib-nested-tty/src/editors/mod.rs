@@ -16,7 +16,7 @@ use {
         atom::TerminalAtom
     }
 };
-
+/*
 pub fn node_make_char_view(
     node: NestedNode
 ) -> NestedNode {
@@ -81,4 +81,4 @@ pub fn node_make_tty_view(
         node
     }
 }
-
+*/

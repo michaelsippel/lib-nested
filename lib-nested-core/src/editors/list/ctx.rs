@@ -13,7 +13,7 @@ use {
 pub fn init_ctx(ctx: &mut Context) {
     ctx.add_typename("ListCmd".into());
     ctx.add_list_typename("List".into());
-
+/*
     ctx.add_node_ctor(
         "List", Arc::new(
             |ctx: Arc<RwLock<Context>>, ty: TypeTerm, depth: OuterViewPort<dyn SingletonView<Item = usize>>| {
@@ -37,5 +37,6 @@ pub fn init_ctx(ctx: &mut Context) {
             }
         )
     );
+    */
 }
 

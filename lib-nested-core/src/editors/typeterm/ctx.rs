@@ -25,6 +25,7 @@ pub fn init_ctx(ctx: &mut Context) {
     ctx.add_list_typename("Type::App".into()); // = <T1 T2 ...>
     ctx.add_list_typename("Type::Ladder".into()); // = T1~T2~...
 
+/*
     ctx.add_morphism(
         MorphismType { src_tyid: Context::parse(&ctx, "<List T>"), dst_tyid: Context::parse(&ctx, "Type") },
         Arc::new(move |node, _dst_type:_| {
@@ -34,6 +35,7 @@ pub fn init_ctx(ctx: &mut Context) {
             let new_node = TypeTermEditor::with_node( ctx, node.clone(), State::Any );
             Some(new_node)
         }));
+    */
 /*
     ctx.add_morphism(
         MorphismTypePattern { src_tyid: ctx.get_typeid("List"), dst_tyid: ctx.get_typeid("Type::Ladder").unwrap() },

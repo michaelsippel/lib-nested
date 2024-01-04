@@ -66,6 +66,12 @@ impl Context {
         }
     }
 
+    pub fn make_repr(ctx: &Arc<RwLock<Self>>, t: &TypeTerm) -> Arc<RwLock<ReprTree>> {
+        let rt = Arc::new(RwLock::new(ReprTree::new( TypeTerm::unit() )));
+        ctx.read().unwrap().morphisms.morph( rt.clone(), t );
+        rt
+    }
+
     pub fn parse(ctx: &Arc<RwLock<Self>>, s: &str) -> TypeTerm {
         ctx.read().unwrap().type_term_from_str(s).expect("could not parse type term")
     }

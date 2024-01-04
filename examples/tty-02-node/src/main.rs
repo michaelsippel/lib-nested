@@ -8,19 +8,21 @@ use {
     cgmath::Vector2,
     nested::{
         editors::ObjCommander,
-        repr_tree::{Context},
+        repr_tree::{Context, ReprTree},
+        edit_tree::{NestedNode}
     },
     nested_tty::{
         DisplaySegment, TTYApplication,
         TerminalCompositor, TerminalStyle, TerminalView,
     },
     r3vi::{
-        buffer::singleton::*,
+        buffer::{singleton::*, vec::*},
     },
     std::sync::{Arc, RwLock},
 };
 
-struct ParseDigit { radix: u32 };
+/*
+struct ParseDigit { radix: u32 }
 impl Morphism for ParseDigit {
     fn new(
         ctx: &Arc<RwLock<Context>>
@@ -38,24 +40,25 @@ impl Morphism for ParseDigit {
 get_morphism( ) -> Morphism {
     
 }
-
+*/
 #[async_std::main]
 async fn main() {
     /* setup context & create Editor-Tree
      */
-    let ctx = Arc::new(RwLock::new(Context::default()));
+    let ctx = Arc::new(RwLock::new(Context::new()));
 
     /* Create a Char-Node with editor & view
      */
+
     let mut char_obj = ReprTree::make_leaf(
         Context::parse(&ctx, "Char"),
         SingletonBuffer::new('X').get_port().into()
     );
-
+/*
     char_obj.insert_branch(
         Context::parse(&ctx, "EditTree"),
         SingletonBuffer::new(
-            
+            NestedNode::new()
         )
     );
 
@@ -72,12 +75,14 @@ async fn main() {
         SingletonBuffer::new(0).get_port(),
     )
     .unwrap();
-
+*/
     // add a display view to the node
-    node1 = nested_tty::editors::node_make_tty_view(node1);
+    //node1 = nested_tty::editors::node_make_tty_view(node1);
 
     /* Create a <List Char>-Node with editor & view
      */
+
+/*
     let mut node2 = Context::make_node(
         &ctx,
         // node type
@@ -86,12 +91,13 @@ async fn main() {
         SingletonBuffer::new(0).get_port(),
     )
     .unwrap();
-
+*/
     // add a display view to the node
-    node2 = nested_tty::editors::node_make_tty_view(node2);
+    //node2 = nested_tty::editors::node_make_tty_view(node2);
 
     /* Create a <List Char>-Node with editor & view
      */
+/*
     let mut node3 = Context::make_node(
         &ctx,
         // node type
@@ -100,10 +106,10 @@ async fn main() {
         SingletonBuffer::new(0).get_port(),
     )
     .unwrap();
-
+*/
     // add a display view to the node
-    node3 = nested_tty::editors::node_make_tty_view(node3);
-
+    //node3 = nested_tty::editors::node_make_tty_view(node3);
+ 
     /* setup terminal
      */
     let app = TTYApplication::new({
@@ -111,16 +117,16 @@ async fn main() {
          */
 
         let ctx = ctx.clone();
-        let node1 = node1.clone();
-        let node2 = node2.clone();
-        let node3 = node3.clone();
+ //       let node1 = node1.clone();
+//        let node2 = node2.clone();
+//        let node3 = node3.clone();
         move |ev| {
-            let mut node1 = node1.clone();
-            let mut node2 = node2.clone();
-            let mut node3 = node3.clone();
-            node1.send_cmd_obj(ev.to_repr_tree(&ctx));
-            node2.send_cmd_obj(ev.to_repr_tree(&ctx));
-            node3.send_cmd_obj(ev.to_repr_tree(&ctx));
+//            let mut node1 = node1.clone();
+//            let mut node2 = node2.clone();
+//            let mut node3 = node3.clone();
+//            node1.send_cmd_obj(ev.to_repr_tree(&ctx));
+//            node2.send_cmd_obj(ev.to_repr_tree(&ctx));
+//            node3.send_cmd_obj(ev.to_repr_tree(&ctx));
         }
     });
 
@@ -137,7 +143,7 @@ async fn main() {
             .offset(Vector2::new(5, 0)),
     );
 
-    let label = ctx.read().unwrap().type_term_to_str(&node1.get_type());
+/*    let label = ctx.read().unwrap().type_term_to_str(&node1.get_type());
     compositor
         .write()
         .unwrap()
@@ -147,7 +153,8 @@ async fn main() {
         .write()
         .unwrap()
         .push(node1.display_view().offset(Vector2::new(15, 2)));
-
+*/
+    /*
     let label2 = ctx.read().unwrap().type_term_to_str(&node2.get_type());
     compositor
         .write()
@@ -170,7 +177,7 @@ async fn main() {
         .write()
         .unwrap()
         .push(node3.display_view().offset(Vector2::new(25, 4)));
-
+*/
     /* write the changes in the view of `term_port` to the terminal
      */
     app.show().await.expect("output error!");

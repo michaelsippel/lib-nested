@@ -17,11 +17,13 @@ use {
 };
 
 pub fn init_ctx( ctx: &mut Context ) {
+    /*
     ctx.add_node_ctor(
         "Char",
         Arc::new(|ctx: Arc<RwLock<Context>>, _ty: TypeTerm, depth: OuterViewPort<dyn SingletonView<Item = usize>>| {
             Some(CharEditor::new_node(ctx, depth))
         }));
+    */
 }
 
 pub struct CharEditor {
@@ -76,10 +78,12 @@ impl CharEditor {
 
         NestedNode::new(
             ctx0.clone(),
+            /*
             ReprTree::new_leaf(
                 ctx0.read().unwrap().type_term_from_str("Char").unwrap(),
                 data.get_port().into()
             ),
+            */
             depth
         )
             .set_cmd( editor.clone() )

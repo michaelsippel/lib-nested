@@ -307,7 +307,7 @@ impl ListEditor {
                 self.nexd();
 
                 let mut b = item.edit.spillbuf.write().unwrap();
-
+/* TODO
                 let mut tail_node = Context::make_node(&self.ctx, self.typ.clone(), self.depth.map(|d| d+1)).unwrap();
                 tail_node.goto(TreeCursor::home());
 
@@ -322,6 +322,7 @@ impl ListEditor {
                             )
                         );
                 }
+
                 b.clear();
                 drop(b);
                 drop(item);
@@ -334,7 +335,7 @@ impl ListEditor {
                 self.insert(
                     Arc::new(RwLock::new(tail_node))
                 );
-
+*/
             } else {
                 self.up();
                 self.listlist_split();

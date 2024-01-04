@@ -219,6 +219,7 @@ impl PTYListController {
 
         match cur.mode {
             ListCursorMode::Insert => {
+                /* TODO
                 let mut new_edit = Context::make_node(&e.ctx, e.typ.clone(), self.depth.map(|d| d+1)).unwrap();
                 new_edit.goto(TreeCursor::home());
 
@@ -231,6 +232,8 @@ impl PTYListController {
                         TreeNavResult::Exit
                     }
                 }
+                */
+                TreeNavResult::Continue
             },
             ListCursorMode::Select => {
                 if let Some(item) = e.get_item_mut() {

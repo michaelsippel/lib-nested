@@ -47,6 +47,9 @@ pub struct NestedNodeEdit {
                   >,    
 }
 
+/*
+ * TODO: rename to EditNode
+ */
 #[derive(Clone)]
 pub struct NestedNode {
     /// context
