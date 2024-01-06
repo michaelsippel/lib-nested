@@ -7,7 +7,7 @@ pub use {
 };
 
 use {
-    r3vi::view::{AnyOuterViewPort, OuterViewPort, View},
+    r3vi::view::{AnyOuterViewPort, OuterViewPort, View, singleton::*},
     laddertypes::{TypeTerm},
     std::{
         collections::HashMap,
@@ -99,7 +99,14 @@ impl ReprTree {
 
     //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
-    
+
+    pub fn view_char(&self) -> OuterViewPort<dyn SingletonView<Item = char>> {
+        self.get_port::<dyn SingletonView<Item = char>>().expect("no char-view available")
+    }
+
+    pub fn view_u64(&self) -> OuterViewPort<dyn SingletonView<Item = u64>> {
+        self.get_port::<dyn SingletonView<Item = u64>>().expect("no u64-view available")
+    }
 
     pub fn get_port<V: View + ?Sized + 'static>(&self) -> Option<OuterViewPort<V>>
     where

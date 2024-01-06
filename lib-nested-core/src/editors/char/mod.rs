@@ -71,19 +71,16 @@ impl CharEditor {
         self.get_port().get_view().unwrap().get()
     }
 
-    pub fn new_node(ctx0: Arc<RwLock<Context>>, depth: OuterViewPort<dyn SingletonView<Item = usize>>) -> NestedNode {
+    pub fn new_edit_tree(
+        ctx0: Arc<RwLock<Context>>,
+        depth: OuterViewPort<dyn SingletonView<Item = usize>>
+    ) -> NestedNode {
         let data = SingletonBuffer::new('\0');
         let ctx = ctx0.clone();
         let editor = Arc::new(RwLock::new(CharEditor{ ctx, data: data.clone() }));
 
         NestedNode::new(
             ctx0.clone(),
-            /*
-            ReprTree::new_leaf(
-                ctx0.read().unwrap().type_term_from_str("Char").unwrap(),
-                data.get_port().into()
-            ),
-            */
             depth
         )
             .set_cmd( editor.clone() )

@@ -13,22 +13,22 @@ use {
     crate::{
         make_label,
         DisplaySegment,
-        atom::TerminalAtom
+        atom::{TerminalAtom, TerminalStyle}
     }
 };
-/*
-pub fn node_make_char_view(
+
+pub fn edittree_make_char_view(
     node: NestedNode
 ) -> NestedNode {
     node.disp.view
         .write().unwrap()
         .insert_branch(ReprTree::new_leaf(
             Context::parse(&node.ctx, "TerminalView"),
-            node.data
+            node.get_edit::< nested::editors::char::CharEditor >()
+                .unwrap()
                 .read()
                 .unwrap()
-                .get_port::<dyn SingletonView<Item = char>>()
-                .expect("unable to get Char-view")
+                .get_port()
                 .map(move |c| TerminalAtom::from(if c == '\0' { ' ' } else { c }))
                 .to_grid()
                 .into(),
@@ -37,6 +37,32 @@ pub fn node_make_char_view(
     node
 }
 
+pub fn edittree_make_digit_view(
+    node: NestedNode
+) -> NestedNode {
+    node.disp.view
+        .write().unwrap()
+        .insert_branch(ReprTree::new_leaf(
+            Context::parse(&node.ctx, "TerminalView"),
+            node.get_edit::< nested::editors::integer::DigitEditor >()
+                .unwrap()
+                .read()
+                .unwrap()
+                .get_data_port()
+                .map(move |digit|
+                    match digit {
+                        Ok(digit) => TerminalAtom::new( char::from_digit(digit, 16).unwrap_or('?'), TerminalStyle::fg_color((220, 220, 0)) ),
+                        Err(c) => TerminalAtom::new( c, TerminalStyle::fg_color((220, 0, 0)) )
+                    }
+                )
+                .to_grid()
+                .into(),
+        ));
+
+    node
+}
+
+/*
 pub fn node_make_seq_view(
     mut node: NestedNode
 ) -> NestedNode {

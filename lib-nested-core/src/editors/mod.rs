@@ -4,7 +4,7 @@ pub mod list;
 //pub mod sum;
 
 pub mod char;
-//pub mod integer;
+pub mod integer;
 //pub mod typeterm;
 
 
@@ -23,4 +23,5 @@ use crate::{
 pub trait ObjCommander {
     fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult;
 }
+
 

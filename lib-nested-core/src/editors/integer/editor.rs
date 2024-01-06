@@ -49,9 +49,7 @@ impl ObjCommander for DigitEditor {
                     /* in case the character c is not in the range of digit-chars,
                        add a message to the diagnostics view
                      */
-
 /*
-
                     let message = IndexBuffer::from_iter(vec![
                         (Point2::new(1, 0), make_label("invalid digit '")),
                         (Point2::new(2, 0), make_label(&format!("{}", c))
@@ -61,7 +59,7 @@ impl ObjCommander for DigitEditor {
 
                     self.msg.push(crate::diagnostics::make_error(message.get_port().flatten()));
 */
-                    
+
                     self.data.set(Some(c));
                 } else {
                     self.data.set(Some(c));
@@ -89,34 +87,33 @@ impl DigitEditor {
         let ed = editor.write().unwrap();
         let r = ed.radix;
 
-        NestedNode::new(ed.ctx.clone(), /*data,*/ depth)
+        NestedNode::new(ed.ctx.clone(), depth)
+            .set_editor(editor.clone())
             .set_cmd(editor.clone())
-            /*
-            .set_view(
-                ed.data
-                    .get_port()
-                    .map(move |c| {
-                        TerminalAtom::new(
-                            c.unwrap_or('?'),
-                            if c.unwrap_or('?').to_digit(r).is_some() {
-                                TerminalStyle::fg_color((90, 160, 90))
-                            } else {
-                                //TerminalStyle::bg_color((90, 10, 10))
-                                TerminalStyle::fg_color((200, 40, 40))
-                            },
-                        )
-                    })
-                    .to_grid()
-            )
             .set_diag(
                 ed.msg.get_port().to_sequence()
             )
+    }
+
+    pub fn attach_to(&mut self, source: OuterViewPort<dyn SingletonView<Item = u32>>) {
+        /*
+        source.add_observer(
+            Arc::new(NotifyFnObserver::new(|_msg| {
+                self.data.set( source.get() )
+            }))
+        );
         */
     }
 
-    pub fn get_data_port(&self) -> OuterViewPort<dyn SingletonView<Item = Option<u32>>> {
+    pub fn get_data_port(&self) -> OuterViewPort<dyn SingletonView<Item = Result<u32, char>>> {
         let radix = self.radix;
-        self.data.get_port().map(move |c| c?.to_digit(radix))
+        self.data.get_port().map(move |c|
+            if let Some(d) = c.unwrap_or('?').to_digit(radix) {
+                Ok(d)
+            } else {
+                Err(c.unwrap_or('?'))
+            }
+        )
     }
 
     pub fn get_type(&self) -> TypeTerm {
@@ -133,7 +130,6 @@ impl DigitEditor {
         )
     }
 }
-
 
 pub struct PosIntEditor {
     radix: u32,

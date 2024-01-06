@@ -14,6 +14,7 @@ use {
     nested_tty::{
         DisplaySegment, TTYApplication,
         TerminalCompositor, TerminalStyle, TerminalView,
+        TerminalAtom
     },
     r3vi::{
         buffer::{singleton::*, vec::*},
@@ -21,112 +22,126 @@ use {
     std::sync::{Arc, RwLock},
 };
 
-/*
-struct ParseDigit { radix: u32 }
-impl Morphism for ParseDigit {
-    fn new(
-        ctx: &Arc<RwLock<Context>>
-    ) -> Self {
-        
-    }
-
-    fn setup_projection(&self, repr_tree: Arc<RwLock<ReprTree>>) {
-        if let Some( char_view ) = repr_tree.get_out(Context::parse(&ctx, "Char~")) {
-            
-        }
-    }
-}
-
-get_morphism( ) -> Morphism {
-    
-}
-*/
 #[async_std::main]
 async fn main() {
     /* setup context & create Editor-Tree
      */
     let ctx = Arc::new(RwLock::new(Context::new()));
 
-    /* Create a Char-Node with editor & view
+    /* structure of Repr-Tree
+     *
+     *   === Repr-Tree ===
+     *
+     *        <Digit 10>
+     *         /   |     \
+     *        /    |        \
+     *       /     |          \
+     *     u32  [ EditTree ]  Char
+     *           - Editor         \
+     *           - Display      [ EditTree ]
+     *         /     |    \      - Editor
+     *        /      |     \     - Display
+     *      TTY  PixelBuf  SDF  /    |     \
+     *                         /     |      \
+     *                       TTY  PixelBuf  SDF
+     */
+    let rt_digit = ReprTree::new_arc( Context::parse(&ctx, "<Digit 10>") );
+    let port_char = r3vi::view::ViewPort::<dyn r3vi::view::singleton::SingletonView<Item = char>>::new();
+    let port_u32 = r3vi::view::ViewPort::<dyn r3vi::view::singleton::SingletonView<Item = u32>>::new();
+    let port_edit = r3vi::view::ViewPort::<dyn r3vi::view::singleton::SingletonView<Item = NestedNode>>::new();
+    let port_char_edit = r3vi::view::ViewPort::<dyn r3vi::view::singleton::SingletonView<Item = NestedNode>>::new();
+
+    rt_digit.write().unwrap()
+        .insert_leaf(
+            vec![ Context::parse(&ctx, "Char") ].into_iter(),
+            port_char.outer().into()
+        );
+
+    rt_digit.write().unwrap()
+        .insert_leaf(
+            vec![ Context::parse(&ctx, "Char"), Context::parse(&ctx, "EditTree") ].into_iter(),
+            port_char_edit.outer().into()
+        );
+
+    rt_digit.write().unwrap()
+        .insert_leaf(
+            vec![ Context::parse(&ctx, "EditTree") ].into_iter(),
+            port_edit.outer().into()
+        );
+
+    rt_digit.write().unwrap()
+        .insert_leaf(
+            vec![ Context::parse(&ctx, "u32") ].into_iter(),
+            port_u32.outer().into()
+        );
+
+    /* setup projections between representations
      */
 
-    let mut char_obj = ReprTree::make_leaf(
-        Context::parse(&ctx, "Char"),
-        SingletonBuffer::new('X').get_port().into()
-    );
+    // created by  Char  ==>  Char~EditTree
+    let mut edittree_char =
+        nested::editors::char::CharEditor::new_edit_tree(
+            ctx.clone(),
+            r3vi::buffer::singleton::SingletonBuffer::<usize>::new(0).get_port()
+        );
+
+    node_edit_char = nested_tty::editors::edittree_make_char_view( edittree_char );
+    let mut edit_char = node_edit_char.get_edit::< nested::editors::char::CharEditor >().unwrap();
+    port_char.attach_to( edit_char.read().unwrap().get_port() );
+
+    let buf_edit_char = r3vi::buffer::singleton::SingletonBuffer::new( node_edit_char.clone() );
+    port_char_edit.attach_to( buf_edit_char.get_port() );
+
+
+
+    // created by   <Digit 10>   ==>  <Digit 10>~EditTree
+    let mut node_edit_digit =
+        nested::editors::integer::DigitEditor::new(
+            ctx.clone(),
+            16
+        ).into_node(
+            r3vi::buffer::singleton::SingletonBuffer::<usize>::new(0).get_port()
+        );
+
+    node_edit_digit = nested_tty::editors::edittree_make_digit_view( node_edit_digit );
+    let mut edit_digit = node_edit_digit.get_edit::< nested::editors::integer::DigitEditor >().unwrap();
+
+    // created by   <Digit 10> ==> <Digit 10>~U32
+    port_u32.attach_to(  port_char.outer().map(|c| c.to_digit(16).unwrap_or(0)) );
+ //    port_u32.attach_to( edit_digit.read().unwrap().get_data_port().map(|d| d.unwrap_or(0)) );
+
+    let port_proj_u32_to_char = port_u32.outer().map(|val| char::from_digit(val, 16).unwrap_or('?') );
+    
+    let buf_edit_digit = r3vi::buffer::singleton::SingletonBuffer::new( node_edit_digit );
+    port_edit.attach_to( buf_edit_digit.get_port() );
+
 /*
-    char_obj.insert_branch(
-        Context::parse(&ctx, "EditTree"),
-        SingletonBuffer::new(
-            NestedNode::new()
+    ctx.write().unwrap()
+        .morphisms
+        .add_morphism(
+            MorphismType {
+                src_type: Context::parse(&ctx, "Char"),
+                dst_type: Context::parse(&ctx, "Char~EditTree")
+            },
+
+            |rt, _σ| {
+                rt.write().unwrap()
+                    .insert_branch(
+                        Context::parse(&ctx, "")
+                    );
+            }
         )
-    );
-
-    let mut vec_obj = ReprTree::make_leaf(
-        Context::parse(&ctx, "<Vec Char>"),
-        VecBuffer::new(vec!['a', 'b', 'c']).get_port().into()
-    );
-
-    let mut char_edit = Context::new_edit_tree(
-        &ctx,
-        // node type
-        Context::parse(&ctx, "Char"),
-        // depth
-        SingletonBuffer::new(0).get_port(),
-    )
-    .unwrap();
 */
-    // add a display view to the node
-    //node1 = nested_tty::editors::node_make_tty_view(node1);
 
-    /* Create a <List Char>-Node with editor & view
-     */
-
-/*
-    let mut node2 = Context::make_node(
-        &ctx,
-        // node type
-        Context::parse(&ctx, "<List Char>"),
-        // depth
-        SingletonBuffer::new(0).get_port(),
-    )
-    .unwrap();
-*/
-    // add a display view to the node
-    //node2 = nested_tty::editors::node_make_tty_view(node2);
-
-    /* Create a <List Char>-Node with editor & view
-     */
-/*
-    let mut node3 = Context::make_node(
-        &ctx,
-        // node type
-        Context::parse(&ctx, "<List <List Char>>"),
-        // depth
-        SingletonBuffer::new(0).get_port(),
-    )
-    .unwrap();
-*/
-    // add a display view to the node
-    //node3 = nested_tty::editors::node_make_tty_view(node3);
- 
     /* setup terminal
      */
     let app = TTYApplication::new({
         /* event handler
          */
-
         let ctx = ctx.clone();
- //       let node1 = node1.clone();
-//        let node2 = node2.clone();
-//        let node3 = node3.clone();
+        let node1 = buf_edit_digit.clone();
         move |ev| {
-//            let mut node1 = node1.clone();
-//            let mut node2 = node2.clone();
-//            let mut node3 = node3.clone();
-//            node1.send_cmd_obj(ev.to_repr_tree(&ctx));
-//            node2.send_cmd_obj(ev.to_repr_tree(&ctx));
-//            node3.send_cmd_obj(ev.to_repr_tree(&ctx));
+            node1.get().send_cmd_obj(ev.to_repr_tree(&ctx));
         }
     });
 
@@ -142,6 +157,7 @@ async fn main() {
             })
             .offset(Vector2::new(5, 0)),
     );
+    compositor.write().unwrap().push( buf_edit_digit.get().display_view().offset(Vector2::new(0,2)) );
 
 /*    let label = ctx.read().unwrap().type_term_to_str(&node1.get_type());
     compositor
@@ -153,30 +169,6 @@ async fn main() {
         .write()
         .unwrap()
         .push(node1.display_view().offset(Vector2::new(15, 2)));
-*/
-    /*
-    let label2 = ctx.read().unwrap().type_term_to_str(&node2.get_type());
-    compositor
-        .write()
-        .unwrap()
-        .push(nested_tty::make_label(&label2).offset(Vector2::new(0, 3)));
-
-    compositor
-        .write()
-        .unwrap()
-        .push(node2.display_view().offset(Vector2::new(15, 3)));
-
-
-    let label3 = ctx.read().unwrap().type_term_to_str(&node3.get_type());
-    compositor
-        .write()
-        .unwrap()
-        .push(nested_tty::make_label(&label3).offset(Vector2::new(0, 4)));
-
-    compositor
-        .write()
-        .unwrap()
-        .push(node3.display_view().offset(Vector2::new(25, 4)));
 */
     /* write the changes in the view of `term_port` to the terminal
      */
