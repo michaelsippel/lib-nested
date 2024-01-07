@@ -99,11 +99,12 @@ impl TerminalEvent {
                 }
             }
             _ => {
-                                ReprTree::new_leaf(
-                                    Context::parse(&ctx, "TerminalEvent"),
-                                    SingletonBuffer::new(self.clone()).get_port().into()
-                                )
+                ReprTree::new_leaf(
+                    Context::parse(&ctx, "TerminalEvent"),
+                    SingletonBuffer::new(self.clone()).get_port().into()
+                )
             }
         }
     }
 }
+

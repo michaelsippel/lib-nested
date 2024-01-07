@@ -42,7 +42,7 @@ pub trait DisplaySegment {
 use nested::repr_tree::Context;
 use std::sync::{Arc, RwLock};
 
-impl DisplaySegment for nested::edit_tree::NestedNode {
+impl DisplaySegment for nested::edit_tree::EditTree {
     fn display_view(&self) -> OuterViewPort<dyn TerminalView> {
         if let Some( tv_repr ) = self.disp.view
             .read().unwrap()

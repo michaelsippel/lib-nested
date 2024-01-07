@@ -5,7 +5,7 @@ use {
     crate::{
         editors::{list::{ListEditor, ListCursor, ListCursorMode}, ObjCommander},
         repr_tree::{Context, ReprTree},
-        edit_tree::{NestedNode, TreeNav, TreeNavResult, TreeCursor},
+        edit_tree::{EditTree, TreeNav, TreeNavResult, TreeCursor},
     },
     std::sync::{Arc, RwLock}
 };
@@ -35,7 +35,7 @@ impl ObjCommander for ListEditor {
     fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
         let cmd_repr = cmd_obj.read().unwrap();
 
-        if let Some(view) = cmd_repr.get_view::<dyn SingletonView<Item = NestedNode>>() {
+        if let Some(view) = cmd_repr.get_view::<dyn SingletonView<Item = EditTree>>() {
             let node = view.get();
             let cur = self.cursor.get();
 

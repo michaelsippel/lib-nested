@@ -6,7 +6,7 @@ use {
     nested::{
         repr_tree::{Context, ReprTree},
         editors::list::*,
-        edit_tree::{TreeCursor, TreeNav, TreeNavResult, NestedNode},
+        edit_tree::{TreeCursor, TreeNav, TreeNavResult, EditTree},
     },
     crate::{
         DisplaySegment,
@@ -91,7 +91,7 @@ impl PTYListStyle {
             .flatten()
     }
 
-    pub fn for_node(node: &mut NestedNode, style: (&str, &str, &str)) {
+    pub fn for_node(node: &mut EditTree, style: (&str, &str, &str)) {
         node.disp.view
             .write().unwrap()
             .insert_branch(ReprTree::new_leaf(
@@ -135,7 +135,7 @@ impl PTYListController {
     }
 
     pub fn for_node(
-        node: &mut NestedNode,
+        node: &mut EditTree,
         split_char: Option<char>,
         close_char: Option<char>
     ) {
@@ -154,11 +154,11 @@ impl PTYListController {
         let editor = node.get_edit::<ListEditor>().unwrap();
         let controller = Arc::new(RwLock::new(PTYListController::from_editor( editor, split_char, close_char, node.disp.depth.clone() )));
 
-        node.edit.cmd.set(Some(controller.clone()));
-        node.edit.close_char.set(close_char);
+        node.ctrl.cmd.set(Some(controller.clone()));
+        node.ctrl.close_char.set(close_char);
     }
 
-    pub fn get_data_port(&self) -> OuterViewPort<dyn SequenceView<Item = NestedNode>> {
+    pub fn get_data_port(&self) -> OuterViewPort<dyn SequenceView<Item = EditTree>> {
         self.editor.read().unwrap().get_data_port()
     }
 
@@ -166,7 +166,7 @@ impl PTYListController {
         self.editor.write().unwrap().clear();
     }
 
-    pub fn get_item(&self) -> Option<NestedNode> {
+    pub fn get_item(&self) -> Option<EditTree> {
         self.editor.read().unwrap().get_item()
     }
 
@@ -238,7 +238,7 @@ impl PTYListController {
             ListCursorMode::Select => {
                 if let Some(item) = e.get_item_mut() {
                     let res = item.write().unwrap().send_cmd_obj(cmd_obj.clone());
-                    let child_close_char = item.read().unwrap().edit.close_char.get();
+                    let child_close_char = item.read().unwrap().ctrl.close_char.get();
 
                    match res {
                         TreeNavResult::Continue => TreeNavResult::Continue,

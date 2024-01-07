@@ -1,7 +1,7 @@
 use {
     cgmath::Vector2,
     nested::{
-        edit_tree::NestedNode,
+        edit_tree::EditTree,
         repr_tree::{Context, ReprTree},
     },
     crate::{

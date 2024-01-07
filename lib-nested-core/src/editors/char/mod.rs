@@ -9,7 +9,7 @@ use {
     laddertypes::{TypeTerm},
     crate::{
         repr_tree::{Context, ReprTree},
-        edit_tree::{NestedNode, TreeNavResult},
+        edit_tree::{EditTree, TreeNavResult},
         editors::ObjCommander,
     },
     std::sync::Arc,
@@ -74,12 +74,12 @@ impl CharEditor {
     pub fn new_edit_tree(
         ctx0: Arc<RwLock<Context>>,
         depth: OuterViewPort<dyn SingletonView<Item = usize>>
-    ) -> NestedNode {
+    ) -> EditTree {
         let data = SingletonBuffer::new('\0');
         let ctx = ctx0.clone();
         let editor = Arc::new(RwLock::new(CharEditor{ ctx, data: data.clone() }));
 
-        NestedNode::new(
+        EditTree::new(
             ctx0.clone(),
             depth
         )

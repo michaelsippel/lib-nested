@@ -10,6 +10,6 @@ pub use {
     cursor::TreeCursor,
     nav::{TreeNav, TreeNavResult, TreeHeightOp},
     treetype::{TreeType},
-    node::NestedNode
+    node::EditTree
 };
 

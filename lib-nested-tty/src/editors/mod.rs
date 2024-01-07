@@ -3,7 +3,7 @@ pub mod list;
 
 use {
     nested::{
-        edit_tree::{NestedNode},
+        edit_tree::{EditTree},
         repr_tree::{ReprTree, Context}
     },
     r3vi::{
@@ -18,8 +18,8 @@ use {
 };
 
 pub fn edittree_make_char_view(
-    node: NestedNode
-) -> NestedNode {
+    node: EditTree
+) -> EditTree {
     node.disp.view
         .write().unwrap()
         .insert_branch(ReprTree::new_leaf(
@@ -38,8 +38,8 @@ pub fn edittree_make_char_view(
 }
 
 pub fn edittree_make_digit_view(
-    node: NestedNode
-) -> NestedNode {
+    node: EditTree
+) -> EditTree {
     node.disp.view
         .write().unwrap()
         .insert_branch(ReprTree::new_leaf(

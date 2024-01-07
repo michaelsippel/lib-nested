@@ -6,7 +6,7 @@ use {
     laddertypes::{TypeTerm},
     crate::{
         repr_tree::{Context, ReprTree},
-        edit_tree::{NestedNode, TreeNav, TreeCursor, diagnostics::Diagnostics},
+        edit_tree::{EditTree, TreeNav, TreeCursor, diagnostics::Diagnostics},
         editors::{list::{ListCursor, ListCursorMode, ListCmd}, ObjCommander},
     },
     std::sync::{Arc, RwLock}
@@ -18,9 +18,9 @@ pub struct ListEditor {
     pub cursor: SingletonBuffer<ListCursor>,
 
     // todo: (?) remove RwLock<..> around NestedNode ??
-    pub data: VecBuffer< Arc<RwLock<NestedNode>> >,
+    pub data: VecBuffer< Arc<RwLock<EditTree>> >,
 
-    pub spillbuf: Arc<RwLock<Vec<Arc<RwLock<NestedNode>>>>>,
+    pub spillbuf: Arc<RwLock<Vec<Arc<RwLock<EditTree>>>>>,
 
     pub(super) addr_port: OuterViewPort<dyn SequenceView<Item = isize>>,
     pub(super) mode_port: OuterViewPort<dyn SingletonView<Item = ListCursorMode>>,
@@ -39,7 +39,7 @@ impl ListEditor {
         typ: TypeTerm,
     ) -> Self {
         let cursor = SingletonBuffer::new(ListCursor::default());
-        let data : VecBuffer<Arc<RwLock<NestedNode>>> = VecBuffer::new();
+        let data : VecBuffer<Arc<RwLock<EditTree>>> = VecBuffer::new();
 
         ListEditor {
             mode_port: cursor
@@ -100,7 +100,7 @@ impl ListEditor {
         }
     }
 
-    pub fn into_node(mut self, depth: OuterViewPort<dyn SingletonView<Item = usize>>) -> NestedNode {
+    pub fn into_node(mut self, depth: OuterViewPort<dyn SingletonView<Item = usize>>) -> EditTree {
         let data = self.get_data();
         let ctx = self.ctx.clone();
 
@@ -109,7 +109,7 @@ impl ListEditor {
 
         let e = editor.read().unwrap();
 
-        let mut node = NestedNode::new(ctx, depth)
+        let mut node = EditTree::new(ctx, depth)
             .set_editor(editor.clone())
             .set_nav(editor.clone())
             .set_cmd(editor.clone())
@@ -131,7 +131,7 @@ impl ListEditor {
                       .flatten()
             );
 
-        node.edit.spillbuf = e.spillbuf.clone();
+        node.ctrl.spillbuf = e.spillbuf.clone();
         node
     }
 
@@ -150,7 +150,7 @@ impl ListEditor {
         self.cursor.get_port()
     }
 
-    pub fn get_data_port(&self) -> OuterViewPort<dyn SequenceView<Item = NestedNode>> {
+    pub fn get_data_port(&self) -> OuterViewPort<dyn SequenceView<Item = EditTree>> {
         self.data.get_port().to_sequence().map(
             |x| x.read().unwrap().clone()
         )
@@ -164,7 +164,7 @@ impl ListEditor {
         )
     }
 
-    pub fn get_item(&self) -> Option<NestedNode> {
+    pub fn get_item(&self) -> Option<EditTree> {
         if let Some(idx) = self.cursor.get().idx {
             let idx = crate::utils::modulo(idx as isize, self.data.len() as isize) as usize;
             if idx < self.data.len() {
@@ -177,7 +177,7 @@ impl ListEditor {
         }
     }
 
-    pub fn get_item_mut(&mut self) -> Option<MutableVecAccess<Arc<RwLock<NestedNode>>>> {
+    pub fn get_item_mut(&mut self) -> Option<MutableVecAccess<Arc<RwLock<EditTree>>>> {
         if let Some(idx) = self.cursor.get().idx {
             let idx = crate::utils::modulo(idx as isize, self.data.len() as isize) as usize;
             if idx < self.data.len() {
@@ -228,7 +228,7 @@ impl ListEditor {
     }
 
     /// insert a new element
-    pub fn insert(&mut self, item: Arc<RwLock<NestedNode>>) {
+    pub fn insert(&mut self, item: Arc<RwLock<EditTree>>) {
         item.read().unwrap().disp.depth.0.set_view(
             self.depth.map(|d| d+1).get_view()
         );
@@ -306,7 +306,7 @@ impl ListEditor {
                 self.set_leaf_mode(ListCursorMode::Insert);
                 self.nexd();
 
-                let mut b = item.edit.spillbuf.write().unwrap();
+                let mut b = item.ctrl.spillbuf.write().unwrap();
 /* TODO
                 let mut tail_node = Context::make_node(&self.ctx, self.typ.clone(), self.depth.map(|d| d+1)).unwrap();
                 tail_node.goto(TreeCursor::home());
@@ -366,12 +366,12 @@ impl ListEditor {
 
             let old_cur = pxv_editor.get_cursor();
 
-            let data = cur_editor.edit.spillbuf.read().unwrap();
+            let data = cur_editor.ctrl.spillbuf.read().unwrap();
             for x in data.iter() {
                 pxv_editor.send_cmd_obj(
                     ReprTree::new_leaf(
                         Context::parse(&self.ctx, "NestedNode"),
-                        SingletonBuffer::<NestedNode>::new(
+                        SingletonBuffer::<EditTree>::new(
                             x.read().unwrap().clone()
                         ).get_port().into()
                     )
@@ -424,13 +424,13 @@ impl ListEditor {
                 leaf_mode: ListCursorMode::Insert
             });
  
-            let data = nxd_editor.edit.spillbuf.read().unwrap();
+            let data = nxd_editor.ctrl.spillbuf.read().unwrap();
 
             for x in data.iter() {
                 cur_editor.send_cmd_obj(
                     ReprTree::new_leaf(
                         Context::parse(&self.ctx, "NestedNode"),
-                        SingletonBuffer::<NestedNode>::new(
+                        SingletonBuffer::<EditTree>::new(
                             x.read().unwrap().clone()
                         ).get_port().into()
                     )

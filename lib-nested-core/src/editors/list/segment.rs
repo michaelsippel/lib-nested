@@ -9,7 +9,7 @@ use {
     },
     crate::{
         editors::list::{ListCursor, ListCursorMode},
-        edit_tree::{NestedNode}
+        edit_tree::{EditTree}
     },
     std::sync::Arc,
     std::sync::RwLock,
@@ -18,13 +18,13 @@ use {
 pub enum ListSegment {
     InsertCursor,
     Item {
-        editor: NestedNode,
+        editor: EditTree,
         cur_dist: isize,
     }
 }
 
 pub struct ListSegmentSequence {
-    data: Arc<dyn SequenceView<Item = NestedNode>>,
+    data: Arc<dyn SequenceView<Item = EditTree>>,
     cursor: Arc<dyn SingletonView<Item = ListCursor>>,
 
     cur_cursor: ListCursor,
@@ -88,7 +88,7 @@ impl SequenceView for ListSegmentSequence {
 impl ListSegmentSequence {
     pub fn new(
         cursor_port: OuterViewPort<dyn SingletonView<Item = ListCursor>>,
-        data_port: OuterViewPort<dyn SequenceView<Item = NestedNode>>,
+        data_port: OuterViewPort<dyn SequenceView<Item = EditTree>>,
     ) -> Arc<RwLock<Self>> {
         let out_port = ViewPort::new();
         let mut proj_helper = ProjectionHelper::new(out_port.update_hooks.clone());

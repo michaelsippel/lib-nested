@@ -9,7 +9,7 @@ use {
     nested::{
         editors::ObjCommander,
         repr_tree::{Context, ReprTree},
-        edit_tree::{NestedNode}
+        edit_tree::{EditTree}
     },
     nested_tty::{
         DisplaySegment, TTYApplication,
@@ -48,8 +48,8 @@ async fn main() {
     let rt_digit = ReprTree::new_arc( Context::parse(&ctx, "<Digit 10>") );
     let port_char = r3vi::view::ViewPort::<dyn r3vi::view::singleton::SingletonView<Item = char>>::new();
     let port_u32 = r3vi::view::ViewPort::<dyn r3vi::view::singleton::SingletonView<Item = u32>>::new();
-    let port_edit = r3vi::view::ViewPort::<dyn r3vi::view::singleton::SingletonView<Item = NestedNode>>::new();
-    let port_char_edit = r3vi::view::ViewPort::<dyn r3vi::view::singleton::SingletonView<Item = NestedNode>>::new();
+    let port_edit = r3vi::view::ViewPort::<dyn r3vi::view::singleton::SingletonView<Item = EditTree>>::new();
+    let port_char_edit = r3vi::view::ViewPort::<dyn r3vi::view::singleton::SingletonView<Item = EditTree>>::new();
 
     rt_digit.write().unwrap()
         .insert_leaf(
@@ -85,13 +85,12 @@ async fn main() {
             r3vi::buffer::singleton::SingletonBuffer::<usize>::new(0).get_port()
         );
 
-    node_edit_char = nested_tty::editors::edittree_make_char_view( edittree_char );
-    let mut edit_char = node_edit_char.get_edit::< nested::editors::char::CharEditor >().unwrap();
+    edittree_char = nested_tty::editors::edittree_make_char_view( edittree_char );
+    let mut edit_char = edittree_char.get_edit::< nested::editors::char::CharEditor >().unwrap();
     port_char.attach_to( edit_char.read().unwrap().get_port() );
 
-    let buf_edit_char = r3vi::buffer::singleton::SingletonBuffer::new( node_edit_char.clone() );
+    let buf_edit_char = r3vi::buffer::singleton::SingletonBuffer::new( edittree_char.clone() );
     port_char_edit.attach_to( buf_edit_char.get_port() );
-
 
 
     // created by   <Digit 10>   ==>  <Digit 10>~EditTree

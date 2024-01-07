@@ -3,7 +3,7 @@ use {
     laddertypes::{TypeDict, TypeTerm, TypeID},
     crate::{
         repr_tree::{ReprTree, MorphismType, GenericReprTreeMorphism, MorphismBase},
-        edit_tree::NestedNode
+        edit_tree::EditTree
     },
     std::{
         collections::HashMap,

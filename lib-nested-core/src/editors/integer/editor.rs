@@ -14,7 +14,7 @@ use {
     crate::{
         editors::{list::{ListCmd}, ObjCommander},
         repr_tree::{Context, ReprTree},
-        edit_tree::{NestedNode, TreeNav, TreeNavResult, TreeCursor, diagnostics::{Message}},
+        edit_tree::{EditTree, TreeNav, TreeNavResult, TreeCursor, diagnostics::{Message}},
     },
     std::sync::Arc,
     std::sync::RwLock,
@@ -81,13 +81,13 @@ impl DigitEditor {
         }
     }
 
-    pub fn into_node(self, depth: OuterViewPort<dyn SingletonView<Item = usize>>) -> NestedNode {
+    pub fn into_node(self, depth: OuterViewPort<dyn SingletonView<Item = usize>>) -> EditTree { 
         let data = self.get_data();        
         let editor = Arc::new(RwLock::new(self));
         let ed = editor.write().unwrap();
         let r = ed.radix;
 
-        NestedNode::new(ed.ctx.clone(), depth)
+        EditTree::new(ed.ctx.clone(), depth)
             .set_editor(editor.clone())
             .set_cmd(editor.clone())
             .set_diag(
@@ -133,7 +133,7 @@ impl DigitEditor {
 
 pub struct PosIntEditor {
     radix: u32,
-    digits: NestedNode,
+    digits: EditTree,
 
     // todo: endianness
 }
@@ -175,7 +175,7 @@ impl PosIntEditor {
 */
         PosIntEditor {
             radix,
-            digits: NestedNode::new(
+            digits: EditTree::new(
                 ctx,
                 r3vi::buffer::singleton::SingletonBuffer::new(0).get_port()
             )
@@ -203,7 +203,7 @@ impl PosIntEditor {
         self.digits.goto(TreeCursor::none());
     }
 
-    pub fn into_node(self) -> NestedNode {
+    pub fn into_node(self) -> EditTree {
         self.digits
     }
 
