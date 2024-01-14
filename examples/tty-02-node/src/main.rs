@@ -46,7 +46,7 @@ async fn main() {
      *                       TTY  PixelBuf  SDF
      */
     let rt_digit = ReprTree::new_arc( Context::parse(&ctx, "<Digit 10>") );
-    let port_char = r3vi::view::ViewPort::<dyn r3vi::view::singleton::SingletonView<Item = char>>::new();
+//    let port_char = r3vi::view::ViewPort::<dyn r3vi::view::singleton::SingletonView<Item = char>>::new();
     let port_u32 = r3vi::view::ViewPort::<dyn r3vi::view::singleton::SingletonView<Item = u32>>::new();
     let port_edit = r3vi::view::ViewPort::<dyn r3vi::view::singleton::SingletonView<Item = EditTree>>::new();
     let port_char_edit = r3vi::view::ViewPort::<dyn r3vi::view::singleton::SingletonView<Item = EditTree>>::new();
@@ -54,14 +54,12 @@ async fn main() {
     rt_digit.write().unwrap()
         .insert_leaf(
             vec![ Context::parse(&ctx, "Char") ].into_iter(),
-            port_char.outer().into()
+            SingletonBuffer::new('x').get_port().into()
         );
 
-    rt_digit.write().unwrap()
-        .insert_leaf(
-            vec![ Context::parse(&ctx, "Char"), Context::parse(&ctx, "EditTree") ].into_iter(),
-            port_char_edit.outer().into()
-        );
+    let port_char = rt_digit.read().unwrap()
+        .descend(Context::parse(&ctx, "Char")).unwrap().read().unwrap()
+        .get_port::<dyn r3vi::view::singleton::SingletonView<Item = char>>().unwrap().0;
 
     rt_digit.write().unwrap()
         .insert_leaf(
@@ -75,23 +73,87 @@ async fn main() {
             port_u32.outer().into()
         );
 
+    let morphtype =
+            nested::repr_tree::MorphismType {
+                src_type: Context::parse(&ctx, "Char"),
+                dst_type: Context::parse(&ctx, "Char~EditTree")
+            };
+
+    ctx.write().unwrap()
+        .morphisms
+        .add_morphism(
+            morphtype,
+            {
+                let ctx =ctx.clone();
+                move |rt, σ| {
+                    /* Create EditTree object
+                     */
+                    let mut edittree_char = nested::editors::char::CharEditor::new_edit_tree(
+                        ctx.clone(),
+                        r3vi::buffer::singleton::SingletonBuffer::<usize>::new(0).get_port()
+                    );
+                    edittree_char = nested_tty::editors::edittree_make_char_view( edittree_char );
+
+                    /* Insert EditTree into ReprTree
+                     */
+                    rt.write().unwrap()
+                        .insert_leaf(
+                            vec![ Context::parse(&ctx, "EditTree") ].into_iter(),
+                            SingletonBuffer::new(edittree_char).get_port().into()
+                        );
+                }
+            }
+        );
+/*
+    let rt_string = ReprTree::new_arc( Context::parse(&ctx, "<Seq Char>") );
+
+    let vec_string = Arc::new(RwLock::new(Vec::new()));
+    
+    rt_string.write().unwrap()
+        .insert_leaf(
+            vec![ Context::parse(&ctx, "<Vec Char>") ].into_iter(),
+            r3vi::view::ViewPort::with_view(vec_string).into_outer()
+        );
+*/
+
     /* setup projections between representations
      */
-
+    /*
     // created by  Char  ==>  Char~EditTree
     let mut edittree_char =
         nested::editors::char::CharEditor::new_edit_tree(
             ctx.clone(),
             r3vi::buffer::singleton::SingletonBuffer::<usize>::new(0).get_port()
         );
+*/
 
-    edittree_char = nested_tty::editors::edittree_make_char_view( edittree_char );
+    eprintln!("morph [ Char ==> Char~EditTree ]");
+    ctx.read().unwrap()
+        .morphisms
+        .morph(
+            rt_digit.read().unwrap()
+                .descend(Context::parse(&ctx, "Char"))
+                .unwrap().clone(),
+            &Context::parse(&ctx, "Char~EditTree")
+        );
+
+    let edittree_char =
+        ReprTree::descend_ladder(
+            &rt_digit,
+            vec![
+                Context::parse(&ctx, "Char"),
+                Context::parse(&ctx, "EditTree")
+            ].into_iter()
+        ).unwrap()
+        .read().unwrap()
+        .get_view::<dyn r3vi::view::singleton::SingletonView<Item = EditTree>>().unwrap()
+        .get();
+
     let mut edit_char = edittree_char.get_edit::< nested::editors::char::CharEditor >().unwrap();
     port_char.attach_to( edit_char.read().unwrap().get_port() );
 
     let buf_edit_char = r3vi::buffer::singleton::SingletonBuffer::new( edittree_char.clone() );
     port_char_edit.attach_to( buf_edit_char.get_port() );
-
 
     // created by   <Digit 10>   ==>  <Digit 10>~EditTree
     let mut node_edit_digit =
@@ -110,7 +172,7 @@ async fn main() {
  //    port_u32.attach_to( edit_digit.read().unwrap().get_data_port().map(|d| d.unwrap_or(0)) );
 
     let port_proj_u32_to_char = port_u32.outer().map(|val| char::from_digit(val, 16).unwrap_or('?') );
-    
+
     let buf_edit_digit = r3vi::buffer::singleton::SingletonBuffer::new( node_edit_digit );
     port_edit.attach_to( buf_edit_digit.get_port() );
 
@@ -158,12 +220,12 @@ async fn main() {
     );
     compositor.write().unwrap().push( buf_edit_digit.get().display_view().offset(Vector2::new(0,2)) );
 
-/*    let label = ctx.read().unwrap().type_term_to_str(&node1.get_type());
+    let label = ctx.read().unwrap().type_term_to_str(&rt_digit.read().unwrap().get_type());
     compositor
         .write()
         .unwrap()
         .push(nested_tty::make_label(&label).offset(Vector2::new(0, 2)));
-
+/*
     compositor
         .write()
         .unwrap()
