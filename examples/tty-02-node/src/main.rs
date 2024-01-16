@@ -29,6 +29,8 @@ async fn main() {
     let ctx = Arc::new(RwLock::new(Context::new()));
 
     nested::editors::char::init_ctx( ctx.clone() );
+    nested::editors::integer::editor::init_ctx( ctx.clone() );
+    nested::editors::list::init_ctx( ctx.clone() );
 
     /* structure of Repr-Tree
      *
@@ -47,12 +49,11 @@ async fn main() {
      *                         /     |      \
      *                       TTY  PixelBuf  SDF
      */
-    let rt_digit = ReprTree::new_arc( Context::parse(&ctx, "<Digit 10>") );
-//    let port_char = r3vi::view::ViewPort::<dyn r3vi::view::singleton::SingletonView<Item = char>>::new();
-    let port_u32 = r3vi::view::ViewPort::<dyn r3vi::view::singleton::SingletonView<Item = u32>>::new();
-    let port_edit = r3vi::view::ViewPort::<dyn r3vi::view::singleton::SingletonView<Item = EditTree>>::new();
-    let port_char_edit = r3vi::view::ViewPort::<dyn r3vi::view::singleton::SingletonView<Item = EditTree>>::new();
+   let rt_digit = ReprTree::new_arc( Context::parse(&ctx, "<Digit 16>") );
 
+    /* add initial representation
+     *  <Digit 16> ~ Char
+     */
     rt_digit.write().unwrap()
         .insert_leaf(
             vec![ Context::parse(&ctx, "Char") ].into_iter(),
@@ -63,83 +64,63 @@ async fn main() {
         .descend(Context::parse(&ctx, "Char")).unwrap().read().unwrap()
         .get_port::<dyn r3vi::view::singleton::SingletonView<Item = char>>().unwrap().0;
 
-    rt_digit.write().unwrap()
-        .insert_leaf(
-            vec![ Context::parse(&ctx, "EditTree") ].into_iter(),
-            port_edit.outer().into()
+    ctx.read().unwrap()
+        .morphisms
+        .morph(
+            rt_digit.clone(),
+            &Context::parse(&ctx, "<Digit 16>~EditTree")
         );
 
-/*
-    let rt_string = ReprTree::new_arc( Context::parse(&ctx, "<Seq Char>") );
+    let port_edit = rt_digit.read().unwrap()
+        .descend(Context::parse(&ctx, "EditTree")).unwrap()
+        .read().unwrap()
+        .get_port::<dyn r3vi::view::singleton::SingletonView<Item = Arc<RwLock<EditTree>> >>().unwrap();
 
-    let vec_string = Arc::new(RwLock::new(Vec::new()));
+    /* setup TTY-Display for DigitEditor
+     */
+    {
+        let et = port_edit.get_view().unwrap().get().clone();
+        let mut et = et.write().unwrap();
+        *et = nested_tty::editors::edittree_make_digit_view(et.clone());
+    }
+
+    //---
+    let rt_string = ReprTree::new_arc( Context::parse(&ctx, "<List <Digit 10>>") );
+    ctx.read().unwrap()
+        .morphisms
+        .morph(
+            rt_string.clone(),
+            &Context::parse(&ctx, "<List <Digit 10>>~EditTree")
+        );
+
+    let editport_string = rt_string.read().unwrap()
+        .descend(Context::parse(&ctx, "EditTree")).unwrap()
+        .read().unwrap()
+        .get_port::<dyn r3vi::view::singleton::SingletonView<Item = Arc<RwLock<EditTree>>> >().unwrap();
+
+    /* setup TTY-Display for ListEditor
+     */
+    {
+        let et = editport_string.get_view().unwrap().get().clone();
+        let mut et = et.write().unwrap();
+        *et = nested_tty::editors::edittree_make_list_edit(et.clone());
+    }
+/*
+    let vec_string = Arc::new(RwLock::new(Vec::<char>::new()));
     
     rt_string.write().unwrap()
         .insert_leaf(
             vec![ Context::parse(&ctx, "<Vec Char>") ].into_iter(),
-            r3vi::view::ViewPort::with_view(vec_string).into_outer()
+            r3vi::view::ViewPort::with_view(vec_string).into_outer().into()
+        );
+
+    
+    rt_string.write().unwrap()
+        .insert_leaf(
+            vec![ Context::parse(&ctx, "EditTree") ].into_iter(),
+            r3vi::view::ViewPort::with_view()
         );
 */
-
-    /* setup projections between representations
-     */
-    eprintln!("rt_digit = {:?}", rt_digit);
-    eprintln!("morph [ Char ==> Char~EditTree ]");
-
-    let rt_char = rt_digit.read().unwrap()
-                .descend(Context::parse(&ctx, "Char"))
-        .unwrap().clone();
-
-    eprintln!("rt_char = {:?}", rt_char);
-
-    ctx.read().unwrap()
-        .morphisms
-        .morph(
-            rt_char.clone(),
-            &Context::parse(&ctx, "Char~EditTree")
-        );
-
-    eprintln!("rt_digit = {:?}", rt_char);
-
-    let edittree_char =
-        ReprTree::descend_ladder(
-            &rt_digit,
-            vec![
-                Context::parse(&ctx, "Char"),
-                Context::parse(&ctx, "EditTree")
-            ].into_iter()
-        ).unwrap()
-        .read().unwrap()
-        .get_view::<dyn r3vi::view::singleton::SingletonView<Item = EditTree>>().unwrap()
-        .get();
-
-    let mut edit_char = edittree_char.get_edit::< nested::editors::char::CharEditor >().unwrap();
-    port_char.attach_to( edit_char.read().unwrap().get_port() );
-
-    let buf_edit_char = r3vi::buffer::singleton::SingletonBuffer::new( edittree_char.clone() );
-    port_char_edit.attach_to( buf_edit_char.get_port() );
-
-    // created by   <Digit 10>   ==>  <Digit 10>~EditTree
-    let mut node_edit_digit =
-        nested::editors::integer::DigitEditor::new(
-            ctx.clone(),
-            16
-        ).into_node(
-            r3vi::buffer::singleton::SingletonBuffer::<usize>::new(0).get_port()
-        );
-
-    node_edit_digit = nested_tty::editors::edittree_make_digit_view( node_edit_digit );
-    let mut edit_digit = node_edit_digit.get_edit::< nested::editors::integer::DigitEditor >().unwrap();
-/*
-    // created by   <Digit 10> ==> <Digit 10>~U32
-    port_u32.attach_to(  port_char.outer().map(|c| c.to_digit(16).unwrap_or(0)) );
- //    port_u32.attach_to( edit_digit.read().unwrap().get_data_port().map(|d| d.unwrap_or(0)) );
-
-    let port_proj_u32_to_char = port_u32.outer().map(|val| char::from_digit(val, 16).unwrap_or('?') );
-     */
-
-    let buf_edit_digit = r3vi::buffer::singleton::SingletonBuffer::new( node_edit_digit );
-    port_edit.attach_to( buf_edit_digit.get_port() );
 
     /* setup terminal
      */
@@ -147,9 +128,9 @@ async fn main() {
         /* event handler
          */
         let ctx = ctx.clone();
-        let node1 = buf_edit_digit.clone();
+        let et1 = editport_string.clone();
         move |ev| {
-            node1.get().send_cmd_obj(ev.to_repr_tree(&ctx));
+            et1.get_view().unwrap().get().write().unwrap().send_cmd_obj(ev.to_repr_tree(&ctx));
         }
     });
 
@@ -165,19 +146,22 @@ async fn main() {
             })
             .offset(Vector2::new(5, 0)),
     );
-    compositor.write().unwrap().push( buf_edit_digit.get().display_view().offset(Vector2::new(0,2)) );
+    compositor.write().unwrap().push( port_edit.get_view().unwrap().get().read().unwrap().display_view().offset(Vector2::new(0,2)) );
 
     let label = ctx.read().unwrap().type_term_to_str(&rt_digit.read().unwrap().get_type());
     compositor
         .write()
         .unwrap()
         .push(nested_tty::make_label(&label).offset(Vector2::new(0, 1)));
-/*
+
+    compositor.write().unwrap().push( editport_string.get_view().unwrap().get().read().unwrap().display_view().offset(Vector2::new(0,4)) );
+
+    let label = ctx.read().unwrap().type_term_to_str(&rt_string.read().unwrap().get_type());
     compositor
         .write()
         .unwrap()
-        .push(node1.display_view().offset(Vector2::new(15, 2)));
-*/
+        .push(nested_tty::make_label(&label).offset(Vector2::new(0, 3)));
+
     /* write the changes in the view of `term_port` to the terminal
      */
     app.show().await.expect("output error!");

@@ -22,6 +22,51 @@ use {
     cgmath::{Point2}
 };
 
+
+pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
+
+    // todo: proper scoping of Radix variable
+    ctx.write().unwrap().add_varname("Radix");
+    let morphtype =
+            crate::repr_tree::MorphismType {
+                src_type: Context::parse(&ctx, "<Digit Radix>"),
+                dst_type: Context::parse(&ctx, "<Digit Radix>~EditTree")
+            };
+
+    ctx.write().unwrap()
+        .morphisms
+        .add_morphism(
+            morphtype,
+            {
+                let ctx = ctx.clone();
+                move |rt, σ| {
+                    let radix =
+                        match σ.get( &laddertypes::TypeID::Var(ctx.read().unwrap().get_var_typeid("Radix").unwrap()) ) {
+                            Some(TypeTerm::Num(n)) => *n as u32,
+                            _ => 0
+                        };
+
+                    /* Create EditTree object
+                     */
+                    let mut edittree_digit = DigitEditor::new(
+                        ctx.clone(),
+                        radix
+                    ).into_node(
+                        r3vi::buffer::singleton::SingletonBuffer::<usize>::new(0).get_port()
+                    );
+
+                    /* Insert EditTree into ReprTree
+                     */
+                    let mut rt = rt.write().unwrap();
+                    rt.insert_leaf(
+                        vec![ Context::parse(&ctx, "EditTree") ].into_iter(),
+                        SingletonBuffer::new( Arc::new(RwLock::new(edittree_digit)) ).get_port().into()
+                    );
+                }
+            }
+        );
+}
+
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub struct DigitEditor {

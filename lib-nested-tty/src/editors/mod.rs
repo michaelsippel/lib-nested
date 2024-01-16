@@ -61,21 +61,21 @@ pub fn edittree_make_digit_view(
 
     node
 }
-
 /*
-pub fn node_make_seq_view(
-    mut node: NestedNode
-) -> NestedNode {
+pub fn edittree_make_seq_view(
+    mut node: EditTree
+) -> EditTree {
     node.disp.view
         .write().unwrap()
         .insert_branch(ReprTree::new_leaf(
             Context::parse(&node.ctx, "TerminalView"),
-            node.data
-                .read()
+            node.get_edit::< nested::editors::list::ListEditor >()
                 .unwrap()
-                .get_port::<dyn SequenceView<Item = NestedNode>>()
-                .expect("unable to get Seq-view")
-                .map(move |char_node| node_make_tty_view(char_node.clone()).display_view() )
+                .read().unwrap()
+                .get_data_port()
+                .map(move |item_edittree|
+                    edittree_make_tty_view( item_edittree ).display_view()
+                )
                 .wrap(make_label("("), make_label(")"))
                 .to_grid_horizontal()
                 .flatten()
@@ -83,24 +83,25 @@ pub fn node_make_seq_view(
         ));
     node
 }
+*/
 
-pub fn node_make_list_edit(
-    mut node: NestedNode
-) -> NestedNode {
+pub fn edittree_make_list_edit(
+    mut node: EditTree
+) -> EditTree {
     list::PTYListStyle::for_node( &mut node, ("(", "", ")") );
     list::PTYListController::for_node( &mut node, None, None );
 
     node
 }
-
-pub fn node_make_tty_view(
-    node: NestedNode
-) -> NestedNode {
-    if node.data.read().unwrap().get_type() == &Context::parse(&node.ctx, "Char") {
+/*
+pub fn edittree_make_tty_view(
+    et: EditTree
+) -> EditTree {
+    if et.data.read().unwrap().get_type() == &Context::parse(&node.ctx, "Char") {
         node_make_char_view( node )
-    } else if node.data.read().unwrap().get_type() == &Context::parse(&node.ctx, "<Seq Char>") {
+    } else if et.data.read().unwrap().get_type() == &Context::parse(&node.ctx, "<Seq Char>") {
         node_make_seq_view( node )
-    } else if node.data.read().unwrap().get_type() == &Context::parse(&node.ctx, "<List Char>") {
+    } else if et.data.read().unwrap().get_type() == &Context::parse(&node.ctx, "<List Char>") {
         node_make_list_edit( node )
     } else {
         eprintln!("couldnt add view");

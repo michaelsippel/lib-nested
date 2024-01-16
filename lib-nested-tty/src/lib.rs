@@ -56,10 +56,10 @@ impl DisplaySegment for nested::edit_tree::EditTree {
                 }
                 
                 else {
-                make_label("?")
+                make_label("# could not get ViewPort #")
             }
         } else {
-            make_label("?")
+            make_label("# No TTY View available #")
             .map_item(|_p,a| a.add_style_back(TerminalStyle::fg_color((220, 30, 30))))
         }
     }

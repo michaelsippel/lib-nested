@@ -37,17 +37,13 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
                         ctx.clone(),
                         r3vi::buffer::singleton::SingletonBuffer::<usize>::new(0).get_port()
                     );
-/*
-                    /* setup tty-view for EditTree
-                     */
-                    edittree_char = nested_tty::editors::edittree_make_char_view( edittree_char );
-*/
+
                     /* Insert EditTree into ReprTree
                      */
                     let mut rt = rt.write().unwrap();
                     rt.insert_leaf(
                         vec![ Context::parse(&ctx, "EditTree") ].into_iter(),
-                        SingletonBuffer::new(edittree_char).get_port().into()
+                        SingletonBuffer::new( Arc::new(RwLock::new( edittree_char )) ).get_port().into()
                     );
                 }
             }
