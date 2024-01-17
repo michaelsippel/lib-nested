@@ -90,7 +90,6 @@ pub fn edittree_make_list_edit(
 ) -> EditTree {
     list::PTYListStyle::for_node( &mut node, ("(", "", ")") );
     list::PTYListController::for_node( &mut node, None, None );
-
     node
 }
 /*

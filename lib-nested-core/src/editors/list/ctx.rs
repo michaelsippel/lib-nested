@@ -11,7 +11,7 @@ use {
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
-
+    ctx.write().unwrap().add_list_typename("List".into());
     ctx.write().unwrap().add_varname("Item");
     let mt = crate::repr_tree::MorphismType {
         src_type: Context::parse(&ctx, "<List Item>"),
@@ -24,7 +24,6 @@ pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
             move |rt, σ| {
                 let item_id = laddertypes::TypeID::Var( ctx.read().unwrap().get_var_typeid("Item").unwrap() );
                 if let Some( item_type ) = σ.get( &item_id ) {
-                    eprintln!("create list of {:?}", item_type);
                     let mut edittree_list = ListEditor::new(
                         ctx.clone(),
                         item_type.clone()
@@ -43,33 +42,5 @@ pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
             }
         }
     );
-/*
-    
-    ctx.add_typename("ListCmd".into());
-    ctx.add_list_typename("List".into());
-    ctx.add_node_ctor(
-        "List", Arc::new(
-            |ctx: Arc<RwLock<Context>>, ty: TypeTerm, depth: OuterViewPort<dyn SingletonView<Item = usize>>| {
-                match ty {
-                    TypeTerm::App(args) => {
-                        if args.len() > 1 {
-                            let typ = args[1].clone();
-
-                            let mut node = ListEditor::new(ctx.clone(), typ).into_node(depth);
-
-//                            PTYListController::for_node( &mut node, Some(','), Some('}') );
-//                            PTYListStyle::for_node( &mut node, ("{",", ","}") );
-
-                            Some(node)
-                        } else {
-                            None
-                        }
-                    }
-                    _ => None
-                }
-            }
-        )
-    );
-    */
 }
 

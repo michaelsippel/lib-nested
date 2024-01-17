@@ -29,12 +29,16 @@ pub struct Context {
     pub list_types: Vec< TypeID >,
     pub meta_chars: Vec< char >,
 
+    edittree_hook: Arc< dyn Fn(Arc<RwLock<EditTree>>, TypeTerm) + Send +Sync +'static >,
+
     /// recursion
     parent: Option<Arc<RwLock<Context>>>,
 }
 
 impl Context {
-    pub fn with_parent(parent: Option<Arc<RwLock<Context>>>) -> Self {
+    pub fn with_parent(
+        parent: Option<Arc<RwLock<Context>>>
+    ) -> Self {
         Context {
             type_dict: match parent.as_ref() {
                 Some(p) => p.read().unwrap().type_dict.clone(),
@@ -51,11 +55,17 @@ impl Context {
                 None => Vec::new()
             },
             parent,
+
+            edittree_hook: Arc::new(|_et, _t| {})
         }
     }
 
     pub fn new() -> Self {
         Context::with_parent(None)
+    }
+
+    pub fn set_edittree_hook(&mut self, hook: Arc< dyn Fn(Arc<RwLock<EditTree>>, TypeTerm) + Send +Sync +'static >) {
+        self.edittree_hook = hook;
     }
 
     pub fn depth(&self) -> usize {
@@ -164,6 +174,36 @@ impl Context {
         } else {
             None
         }
+    }
+
+    pub fn setup_edittree(
+        &self,
+        rt: Arc<RwLock<ReprTree>>,
+        depth: OuterViewPort<dyn SingletonView<Item = usize>>
+    ) -> Arc<RwLock<EditTree>> {
+        let ladder = TypeTerm::Ladder(vec![
+                rt.read().unwrap().get_type().clone(),
+                self.type_term_from_str("EditTree").expect("")
+            ]);
+        
+        self.morphisms.morph(
+            rt.clone(),
+            &ladder
+        );
+
+        let new_edittree = rt
+            .read().unwrap()
+            .descend(
+            self.type_term_from_str("EditTree").expect("")
+        ).unwrap()
+            .read().unwrap()
+            .get_view::<dyn SingletonView<Item = Arc<RwLock<EditTree>> >>()
+            .unwrap()
+            .get();
+
+        (*self.edittree_hook)( new_edittree.clone(), rt.read().unwrap().get_type().clone() );
+
+        new_edittree
     }
 }
 

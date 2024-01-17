@@ -139,6 +139,7 @@ impl PTYListController {
         split_char: Option<char>,
         close_char: Option<char>
     ) {
+        /*
         {
             let ctx = node.ctx.as_ref();
             let mut ctx = ctx.write().unwrap();
@@ -150,7 +151,7 @@ impl PTYListController {
                 ctx.meta_chars.push(*c);
             }
         }
-        
+        */
         let editor = node.get_edit::<ListEditor>().unwrap();
         let controller = Arc::new(RwLock::new(PTYListController::from_editor( editor, split_char, close_char, node.disp.depth.clone() )));
 
@@ -219,21 +220,22 @@ impl PTYListController {
 
         match cur.mode {
             ListCursorMode::Insert => {
-                /* TODO
-                let mut new_edit = Context::make_node(&e.ctx, e.typ.clone(), self.depth.map(|d| d+1)).unwrap();
-                new_edit.goto(TreeCursor::home());
-
-                match new_edit.send_cmd_obj(cmd_obj.clone()) {
+                let rt = ReprTree::new_arc(e.typ.clone());
+                let new_edittree = ctx.setup_edittree(
+                    rt,
+                    self.depth.map(|d| d+1)
+                );
+                let mut ne = new_edittree.write().unwrap();
+                match ne.send_cmd_obj(cmd_obj.clone()) {
                     TreeNavResult::Continue => {
-                        e.insert(Arc::new(RwLock::new(new_edit.clone())));
+                        drop(ne);
+                        e.insert(new_edittree.clone());
                         TreeNavResult::Continue
                     }
                     TreeNavResult::Exit => {
                         TreeNavResult::Exit
                     }
                 }
-                */
-                TreeNavResult::Continue
             },
             ListCursorMode::Select => {
                 if let Some(item) = e.get_item_mut() {

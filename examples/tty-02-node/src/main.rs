@@ -32,6 +32,32 @@ async fn main() {
     nested::editors::integer::editor::init_ctx( ctx.clone() );
     nested::editors::list::init_ctx( ctx.clone() );
 
+
+    let char_type = Context::parse(&ctx, "Char");
+    let digit_type = Context::parse(&ctx, "<Digit Radix>");
+    let list_type = Context::parse(&ctx, "<List Item>");
+
+    ctx.write().unwrap().set_edittree_hook(
+        Arc::new(
+            move |et: Arc<RwLock<EditTree>>, t: laddertypes::TypeTerm| {
+                if let Ok(σ) = laddertypes::unify(&t, &char_type) {
+                    let mut et = et.write().unwrap();
+                    *et = nested_tty::editors::edittree_make_char_view(et.clone());
+                }
+                else if let Ok(σ) = laddertypes::unify(&t, &digit_type) {
+                    let mut et = et.write().unwrap();
+                    *et = nested_tty::editors::edittree_make_digit_view(et.clone());
+                }
+                else if let Ok(σ) = laddertypes::unify(&t, &list_type) {
+                    let mut et = et.write().unwrap();
+                    nested_tty::editors::list::PTYListStyle::for_node( &mut *et, ("(", ",", ")"));
+                    nested_tty::editors::list::PTYListController::for_node( &mut *et, None, None );
+                    *et = nested_tty::editors::edittree_make_list_edit(et.clone());
+                }
+            }
+        ) 
+    );
+
     /* structure of Repr-Tree
      *
      *   === Repr-Tree ===
@@ -60,67 +86,13 @@ async fn main() {
             SingletonBuffer::new('x').get_port().into()
         );
 
-    let port_char = rt_digit.read().unwrap()
-        .descend(Context::parse(&ctx, "Char")).unwrap().read().unwrap()
-        .get_port::<dyn r3vi::view::singleton::SingletonView<Item = char>>().unwrap().0;
-
-    ctx.read().unwrap()
-        .morphisms
-        .morph(
-            rt_digit.clone(),
-            &Context::parse(&ctx, "<Digit 16>~EditTree")
-        );
-
-    let port_edit = rt_digit.read().unwrap()
-        .descend(Context::parse(&ctx, "EditTree")).unwrap()
-        .read().unwrap()
-        .get_port::<dyn r3vi::view::singleton::SingletonView<Item = Arc<RwLock<EditTree>> >>().unwrap();
-
     /* setup TTY-Display for DigitEditor
      */
-    {
-        let et = port_edit.get_view().unwrap().get().clone();
-        let mut et = et.write().unwrap();
-        *et = nested_tty::editors::edittree_make_digit_view(et.clone());
-    }
+    let edittree_digit = ctx.read().unwrap().setup_edittree(rt_digit.clone(), r3vi::buffer::singleton::SingletonBuffer::new(0).get_port());
 
     //---
-    let rt_string = ReprTree::new_arc( Context::parse(&ctx, "<List <Digit 10>>") );
-    ctx.read().unwrap()
-        .morphisms
-        .morph(
-            rt_string.clone(),
-            &Context::parse(&ctx, "<List <Digit 10>>~EditTree")
-        );
-
-    let editport_string = rt_string.read().unwrap()
-        .descend(Context::parse(&ctx, "EditTree")).unwrap()
-        .read().unwrap()
-        .get_port::<dyn r3vi::view::singleton::SingletonView<Item = Arc<RwLock<EditTree>>> >().unwrap();
-
-    /* setup TTY-Display for ListEditor
-     */
-    {
-        let et = editport_string.get_view().unwrap().get().clone();
-        let mut et = et.write().unwrap();
-        *et = nested_tty::editors::edittree_make_list_edit(et.clone());
-    }
-/*
-    let vec_string = Arc::new(RwLock::new(Vec::<char>::new()));
-    
-    rt_string.write().unwrap()
-        .insert_leaf(
-            vec![ Context::parse(&ctx, "<Vec Char>") ].into_iter(),
-            r3vi::view::ViewPort::with_view(vec_string).into_outer().into()
-        );
-
-    
-    rt_string.write().unwrap()
-        .insert_leaf(
-            vec![ Context::parse(&ctx, "EditTree") ].into_iter(),
-            r3vi::view::ViewPort::with_view()
-        );
-*/
+    let rt_string = ReprTree::new_arc( Context::parse(&ctx, "<List <List <Digit 16>>>") );
+    let edittree = ctx.read().unwrap().setup_edittree(rt_string.clone(), r3vi::buffer::singleton::SingletonBuffer::new(0).get_port());
 
     /* setup terminal
      */
@@ -128,9 +100,9 @@ async fn main() {
         /* event handler
          */
         let ctx = ctx.clone();
-        let et1 = editport_string.clone();
+        let et1 = edittree.clone();
         move |ev| {
-            et1.get_view().unwrap().get().write().unwrap().send_cmd_obj(ev.to_repr_tree(&ctx));
+            et1.write().unwrap().send_cmd_obj(ev.to_repr_tree(&ctx));
         }
     });
 
@@ -146,7 +118,7 @@ async fn main() {
             })
             .offset(Vector2::new(5, 0)),
     );
-    compositor.write().unwrap().push( port_edit.get_view().unwrap().get().read().unwrap().display_view().offset(Vector2::new(0,2)) );
+    compositor.write().unwrap().push( edittree_digit.read().unwrap().display_view().offset(Vector2::new(0,2)) );
 
     let label = ctx.read().unwrap().type_term_to_str(&rt_digit.read().unwrap().get_type());
     compositor
@@ -154,7 +126,7 @@ async fn main() {
         .unwrap()
         .push(nested_tty::make_label(&label).offset(Vector2::new(0, 1)));
 
-    compositor.write().unwrap().push( editport_string.get_view().unwrap().get().read().unwrap().display_view().offset(Vector2::new(0,4)) );
+    compositor.write().unwrap().push( edittree.read().unwrap().display_view().offset(Vector2::new(0,4)) );
 
     let label = ctx.read().unwrap().type_term_to_str(&rt_string.read().unwrap().get_type());
     compositor
