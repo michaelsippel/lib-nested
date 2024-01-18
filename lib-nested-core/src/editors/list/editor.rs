@@ -307,8 +307,14 @@ impl ListEditor {
                 self.nexd();
 
                 let mut b = item.ctrl.spillbuf.write().unwrap();
-/* TODO
-                let mut tail_node = Context::make_node(&self.ctx, self.typ.clone(), self.depth.map(|d| d+1)).unwrap();
+
+                let rt = ReprTree::new_arc(self.typ.clone());
+                let new_edittree = self.ctx.read().unwrap()
+                    .setup_edittree(
+                        rt,
+                        self.depth.map(|d| d+1)
+                    );
+                let mut tail_node = new_edittree.write().unwrap();
                 tail_node.goto(TreeCursor::home());
 
                 for node in b.iter() {
@@ -316,7 +322,7 @@ impl ListEditor {
                         .send_cmd_obj(
                             ReprTree::new_leaf(
                                 Context::parse(&self.ctx, "NestedNode"),
-                                SingletonBuffer::<NestedNode>::new(
+                                SingletonBuffer::<EditTree>::new(
                                     node.read().unwrap().clone()
                                 ).get_port().into()
                             )
@@ -331,11 +337,12 @@ impl ListEditor {
                 if cur.tree_addr.len() > 1 {
                     tail_node.dn();
                 }
+                drop(tail_node);
 
                 self.insert(
-                    Arc::new(RwLock::new(tail_node))
+                    new_edittree
                 );
-*/
+
             } else {
                 self.up();
                 self.listlist_split();
