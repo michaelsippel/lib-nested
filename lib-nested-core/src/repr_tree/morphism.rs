@@ -80,7 +80,8 @@ impl MorphismBase {
         repr_tree: Arc<RwLock<ReprTree>>,
         target_type: &TypeTerm
     ) {
-        if let Some((m, σ)) = self.find_morphism( repr_tree.read().unwrap().get_type(), target_type ) {
+        let t = repr_tree.read().unwrap().get_type().clone();
+        if let Some((m, σ)) = self.find_morphism( &t, target_type ) {
             (m.repr_tree_op)( repr_tree.clone(), &σ );
         } else {
             eprintln!("could not find morphism");
