@@ -1,7 +1,9 @@
 pub mod context;
+pub mod morphism;
 
 pub use {
-    context::{Context, MorphismMode, MorphismType, MorphismTypePattern},
+    context::{Context},
+    morphism::{MorphismType, GenericReprTreeMorphism, MorphismBase}
 };
 
 use {
@@ -16,7 +18,7 @@ use {
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 #[derive(Clone)]
-pub struct ReprTree {
+pub struct ReprTree {    
     type_tag: TypeTerm,
     port: Option<AnyOuterViewPort>,
     branches: HashMap<TypeTerm, Arc<RwLock<ReprTree>>>,
@@ -97,6 +99,8 @@ impl ReprTree {
 
     //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
+    
+
     pub fn get_port<V: View + ?Sized + 'static>(&self) -> Option<OuterViewPort<V>>
     where
         V::Msg: Clone,
@@ -137,110 +141,5 @@ impl ReprTree {
         n.insert_branch(rt.clone());
         Arc::new(RwLock::new(n))
     }
-
-/*
-    pub fn add_iso_repr(
-        &self,
-        type_ladder: impl Iterator<Item = TypeTerm>,
-        morphism_constructors: &HashMap<MorphismType, Box<dyn Fn(Object) -> Object>>,
-    ) {
-        let mut cur_repr = self.repr.clone();
-
-        for dst_type in type_ladder {
-            if let Some(next_repr) = self.repr.read().unwrap().branches.get(&dst_type) {
-                // go deeper
-                cur_repr = next_repr.clone();
-            } else {
-                // search for morphism constructor and insert new repr
-                let mut obj = None;
-
-                for src_type in cur_repr.read().unwrap().branches.keys() {
-                    if let Some(ctor) = morphism_constructors.get(&MorphismType {
-                        mode: MorphismMode::Iso,
-                        src_type: src_type.clone(),
-                        dst_type: dst_type.clone(),
-                    }) {
-                        let new_obj = ctor(Object {
-                            type_tag: src_type.clone(),
-                            repr: cur_repr
-                                .read()
-                                .unwrap()
-                                .branches
-                                .get(&src_type)
-                                .unwrap()
-                                .clone(),
-                        });
-
-                        assert!(new_obj.type_tag == dst_type);
-
-                        obj = Some(new_obj);
-                        break;
-                    }
-                }
-
-                if let Some(obj) = obj {
-                    cur_repr
-                        .write()
-                        .unwrap()
-                        .insert_branch(obj.type_tag, obj.repr);
-                } else {
-                    panic!("could not find matching isomorphism!");
-                }
-            }
-        }
-    }
-
-    pub fn add_mono_repr<'a>(
-        &self,
-        type_ladder: impl Iterator<Item = TypeTerm>,
-        morphism_constructors: &HashMap<MorphismType, Box<dyn Fn(Object) -> Object>>,
-    ) {
-        let mut cur_type = self.type_tag.clone();
-        let mut cur_repr = self.repr.clone();   
-
-        for dst_type in type_ladder {
-            if let Some(next_repr) = self.repr.read().unwrap().branches.get(&dst_type) {
-                // go deeper
-                cur_type = dst_type;
-                cur_repr = next_repr.clone();
-            } else {
-                if let Some(constructor) = morphism_constructors.get(&MorphismType {
-                    mode: MorphismMode::Mono,
-                    src_type: cur_type.clone(),
-                    dst_type: dst_type.clone(),
-                }) {
-                    let new_obj = constructor(Object {
-                        type_tag: cur_type.clone(),
-                        repr: cur_repr
-                            .read()
-                            .unwrap()
-                            .branches
-                            .get(&cur_type)
-                            .unwrap()
-                            .clone(),
-                    });
-
-                    assert!(new_obj.type_tag == dst_type);
-                    cur_repr
-                        .write()
-                        .unwrap()
-                        .insert_branch(new_obj.type_tag.clone(), new_obj.repr.clone());
-
-                    cur_type = new_obj.type_tag;
-                    cur_repr = new_obj.repr;
-                }
-            }
-        }
-    }
-
-    // replace with higher-level type in which self is a repr branch
-    pub fn epi_cast<'a>(
-        &self,
-        _type_ladder: impl Iterator<Item = TypeTerm>,
-        _morphism_constructors: &HashMap<MorphismType, Box<dyn Fn(Object) -> Object>>,
-    ) {
-        // todo        
-}
-    */
 }
 

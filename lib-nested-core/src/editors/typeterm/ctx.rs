@@ -4,7 +4,7 @@ use {
     },
     laddertypes::{TypeTerm},
     crate::{
-        repr_tree::{Context, MorphismTypePattern},
+        repr_tree::{Context, MorphismType},
         editors::{
             list::{ListEditor, ListSegmentSequence},
             typeterm::{State, TypeTermEditor}
@@ -26,7 +26,7 @@ pub fn init_ctx(ctx: &mut Context) {
     ctx.add_list_typename("Type::Ladder".into()); // = T1~T2~...
 
     ctx.add_morphism(
-        MorphismTypePattern { src_tyid: ctx.get_typeid("List"), dst_tyid: ctx.get_typeid("Type").unwrap() },
+        MorphismType { src_tyid: Context::parse(&ctx, "<List T>"), dst_tyid: Context::parse(&ctx, "Type") },
         Arc::new(move |node, _dst_type:_| {
             let ctx : Arc<RwLock<Context>> = Arc::new(RwLock::new(Context::with_parent(Some(node.ctx.clone()))));
             ctx.write().unwrap().meta_chars.push('~');

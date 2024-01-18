@@ -52,9 +52,6 @@ pub struct NestedNode {
     /// context
     pub ctx: Arc<RwLock<Context>>,
 
-    /// abstract data view
-    pub data: Arc<RwLock<ReprTree>>,
-
     /// viewports for terminal display
     pub disp: NestedNodeDisplay,
 
@@ -63,7 +60,7 @@ pub struct NestedNode {
 }
 
 impl NestedNode {
-    pub fn new(ctx: Arc<RwLock<Context>>, data: Arc<RwLock<ReprTree>>, depth: OuterViewPort<dyn SingletonView<Item = usize>>) -> Self {
+    pub fn new(ctx: Arc<RwLock<Context>>, depth: OuterViewPort<dyn SingletonView<Item = usize>>) -> Self {
         NestedNode {
             disp: NestedNodeDisplay {
                 view: ReprTree::new_arc(Context::parse(&ctx, "Display")),
@@ -74,43 +71,13 @@ impl NestedNode {
                 editor: SingletonBuffer::new(None),
                 spillbuf: Arc::new(RwLock::new(Vec::new())),
                 cmd: SingletonBuffer::new(None),
-                close_char: SingletonBuffer::new(None),                
+                close_char: SingletonBuffer::new(None),            
                 tree_nav: SingletonBuffer::new(None),
             },
-            data,
             ctx
         }
     }
-
-    /* TODO: move into separate file/module
-    */
-    pub fn from_char(ctx: Arc<RwLock<Context>>, c: char) -> NestedNode {
-        let buf = r3vi::buffer::singleton::SingletonBuffer::<char>::new(c);
-
-        NestedNode::new(
-            ctx.clone(),
-            ReprTree::new_leaf(
-                Context::parse(&ctx, "Char"),
-                buf.get_port().into()
-            ),
-            SingletonBuffer::new(0).get_port()
-      )
-//            .set_editor(Arc::new(RwLock::new(buf)))
-    }
-
-    
-    //\\//\\
-
-    pub fn morph(self, ty: TypeTerm) -> NestedNode {
-        Context::morph_node(self, ty)
-    }
-
-    pub fn get_type(&self) -> TypeTerm {
-        self.data.read().unwrap().get_type().clone()
-    }
-
-    //\\//\\
-    
+   
     pub fn set_editor(mut self, editor: Arc<dyn Any + Send + Sync>) -> Self {
         self.edit.editor.set(Some(editor));
         self
@@ -137,33 +104,6 @@ impl NestedNode {
         self.disp.diag.clone().unwrap_or(ViewPort::new().into_outer())
     }
 
-    pub fn get_data_port<'a, V: View + ?Sized + 'static>(&'a self, type_str: impl Iterator<Item = &'a str>) -> Option<OuterViewPort<V>>
-    where V::Msg: Clone {
-        let ctx = self.ctx.clone();
-        let type_ladder = type_str.map(|s| Context::parse(&ctx, s));
-
-        let repr_tree = ReprTree::descend_ladder(&self.data, type_ladder)?;
-        repr_tree.clone().read().unwrap()
-            .get_port::<V>().clone()
-    }
-
-    pub fn get_data_view<'a, V: View + ?Sized + 'static>(&'a self, type_str: impl Iterator<Item = &'a str>) -> Option<Arc<V>>
-    where V::Msg: Clone {
-        self.get_data_port::<V>(type_str)?.get_view()
-    }
-
-    /* TODO
-    pub fn get_seq_view<'a, T: Clone>(&self, type_str: impl Iterator<Item = &'a str>) -> Option<OuterViewPort<dyn SingletonView<Item = T>>> {
-        self.get_data_view::<dyn SequenceView<Item = NestedNode>>(type_str)
-            .unwrap()
-            .map({
-                move |node| {
-                    node.get_data_view::<dyn SingletonView<Item = T>>().get()
-                }
-            })
-    }
-     */
-    
     pub fn get_edit<T: Send + Sync + 'static>(&self) -> Option<Arc<RwLock<T>>> {
         if let Some(edit) = self.edit.editor.get() {
             if let Ok(edit) = edit.downcast::<RwLock<T>>() {
@@ -187,7 +127,7 @@ impl TreeType for NestedNode {
         }
     }
 }
- */
+*/
 
 impl TreeNav for NestedNode {
     fn get_cursor(&self) -> TreeCursor {

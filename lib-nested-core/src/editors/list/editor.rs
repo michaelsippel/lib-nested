@@ -109,7 +109,7 @@ impl ListEditor {
 
         let e = editor.read().unwrap();
 
-        let mut node = NestedNode::new(ctx, data, depth)
+        let mut node = NestedNode::new(ctx, depth)
             .set_editor(editor.clone())
             .set_nav(editor.clone())
             .set_cmd(editor.clone())
@@ -307,6 +307,7 @@ impl ListEditor {
                 self.nexd();
 
                 let mut b = item.edit.spillbuf.write().unwrap();
+
                 let mut tail_node = Context::make_node(&self.ctx, self.typ.clone(), self.depth.map(|d| d+1)).unwrap();
                 tail_node.goto(TreeCursor::home());
 

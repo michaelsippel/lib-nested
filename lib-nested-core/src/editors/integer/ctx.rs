@@ -6,7 +6,7 @@ use {
     laddertypes::{TypeTerm},
     crate::{
         repr_tree::{Context},
-        repr_tree::{MorphismTypePattern},
+        repr_tree::{MorphismType},
         editors::{
             list::*,
             integer::*
@@ -16,6 +16,7 @@ use {
 };
 
 pub fn init_ctx(ctx: &mut Context) {
+    /*
     ctx.add_typename("MachineInt".into());
     ctx.add_typename("u32".into());
     ctx.add_typename("u64".into());
@@ -126,7 +127,7 @@ pub fn init_ctx(ctx: &mut Context) {
             }
         )
     );
-    
+*/    
     ctx.add_typename("Date".into());
     ctx.add_typename("ISO-8601".into());
     ctx.add_typename("TimeSince".into());

@@ -7,87 +7,36 @@ extern crate termion;
 use {
     cgmath::Vector2,
     nested::{
-        edit_tree::{NestedNode, TreeCursor, TreeNav},
-        repr_tree::{Context, ReprTree},
-        editors::ObjCommander
+        editors::ObjCommander,
+        repr_tree::{Context},
     },
     nested_tty::{
-        terminal::TermOutWriter, DisplaySegment, Terminal, TerminalAtom, TerminalCompositor,
-        TerminalEvent, TerminalStyle, TerminalView,
-        TTYApplication
+        DisplaySegment, TTYApplication,
+        TerminalCompositor, TerminalStyle, TerminalView,
     },
     r3vi::{
         buffer::singleton::*,
-        view::{port::UpdateTask, singleton::*, sequence::*, ViewPort},
-        projection::decorate_sequence::*
     },
-    std::sync::{Arc, Mutex, RwLock},
-    termion::event::{Event, Key},
+    std::sync::{Arc, RwLock},
 };
 
-fn node_make_char_view(
-    node: NestedNode
-) -> NestedNode {
-    node.disp.view
-        .write().unwrap()
-        .insert_branch(ReprTree::new_leaf(
-            Context::parse(&node.ctx, "TerminalView"),
-            node.data
-                .read()
-                .unwrap()
-                .get_port::<dyn SingletonView<Item = char>>()
-                .expect("unable to get Char-view")
-                .map(move |c| TerminalAtom::from(if c == '\0' { ' ' } else { c }))
-                .to_grid()
-                .into(),
-        ));
-
-    node
-}
-
-fn node_make_seq_view(
-    mut node: NestedNode
-) -> NestedNode {
-    node.disp.view
-        .write().unwrap()
-        .insert_branch(ReprTree::new_leaf(
-            Context::parse(&node.ctx, "TerminalView"),
-            node.data
-                .read()
-                .unwrap()
-                .get_port::< dyn SequenceView<Item = NestedNode> >()
-                .expect("unable to get Seq-view")
-                .map(move |char_node| node_make_view(char_node.clone()).display_view() )
-                .wrap(nested_tty::make_label("("), nested_tty::make_label(")"))
-                .to_grid_horizontal()
-                .flatten()
-                .into()
-        ));
-    node
-}
-
-fn node_make_list_edit(
-    mut node: NestedNode
-) -> NestedNode {
-    nested_tty::editors::list::PTYListStyle::for_node( &mut node, ("(", ",", ")") );
-    nested_tty::editors::list::PTYListController::for_node( &mut node, None, None );
-
-    node
-}
-
-fn node_make_view(
-    node: NestedNode
-) -> NestedNode {
-    if node.data.read().unwrap().get_type() == &Context::parse(&node.ctx, "Char") {
-        node_make_char_view( node )
-    } else if node.data.read().unwrap().get_type() == &Context::parse(&node.ctx, "<Seq Char>") {
-        node_make_seq_view( node )
-    } else if node.data.read().unwrap().get_type() == &Context::parse(&node.ctx, "<List Char>") {
-        node_make_list_edit( node )
-    } else {
-        eprintln!("couldnt add view");
-        node
+struct ParseDigit { radix: u32 };
+impl Morphism for ParseDigit {
+    fn new(
+        ctx: &Arc<RwLock<Context>>
+    ) -> Self {
+        
     }
+
+    fn setup_projection(&self, repr_tree: Arc<RwLock<ReprTree>>) {
+        if let Some( char_view ) = repr_tree.get_out(Context::parse(&ctx, "Char~")) {
+            
+        }
+    }
+}
+
+get_morphism( ) -> Morphism {
+    
 }
 
 #[async_std::main]
@@ -96,19 +45,36 @@ async fn main() {
      */
     let ctx = Arc::new(RwLock::new(Context::default()));
 
-
     /* Create a Char-Node with editor & view
      */
-    let mut node1 = Context::make_node(
+    let mut char_obj = ReprTree::make_leaf(
+        Context::parse(&ctx, "Char"),
+        SingletonBuffer::new('X').get_port().into()
+    );
+
+    char_obj.insert_branch(
+        Context::parse(&ctx, "EditTree"),
+        SingletonBuffer::new(
+            
+        )
+    );
+
+    let mut vec_obj = ReprTree::make_leaf(
+        Context::parse(&ctx, "<Vec Char>"),
+        VecBuffer::new(vec!['a', 'b', 'c']).get_port().into()
+    );
+
+    let mut char_edit = Context::new_edit_tree(
         &ctx,
         // node type
         Context::parse(&ctx, "Char"),
         // depth
         SingletonBuffer::new(0).get_port(),
-    ).unwrap();
+    )
+    .unwrap();
 
     // add a display view to the node
-    node1 = node_make_view( node1 );
+    node1 = nested_tty::editors::node_make_tty_view(node1);
 
     /* Create a <List Char>-Node with editor & view
      */
@@ -118,10 +84,25 @@ async fn main() {
         Context::parse(&ctx, "<List Char>"),
         // depth
         SingletonBuffer::new(0).get_port(),
-    ).unwrap();
+    )
+    .unwrap();
 
     // add a display view to the node
-    node2 = node_make_view( node2 );
+    node2 = nested_tty::editors::node_make_tty_view(node2);
+
+    /* Create a <List Char>-Node with editor & view
+     */
+    let mut node3 = Context::make_node(
+        &ctx,
+        // node type
+        Context::parse(&ctx, "<List <List Char>>"),
+        // depth
+        SingletonBuffer::new(0).get_port(),
+    )
+    .unwrap();
+
+    // add a display view to the node
+    node3 = nested_tty::editors::node_make_tty_view(node3);
 
     /* setup terminal
      */
@@ -130,13 +111,16 @@ async fn main() {
          */
 
         let ctx = ctx.clone();
-        let mut node1 = node1.clone();
-        let mut node2 = node2.clone();
-        move |ev| {           
+        let node1 = node1.clone();
+        let node2 = node2.clone();
+        let node3 = node3.clone();
+        move |ev| {
             let mut node1 = node1.clone();
             let mut node2 = node2.clone();
-            node1.send_cmd_obj( ev.to_repr_tree(&ctx) );
-            node2.send_cmd_obj( ev.to_repr_tree(&ctx) );
+            let mut node3 = node3.clone();
+            node1.send_cmd_obj(ev.to_repr_tree(&ctx));
+            node2.send_cmd_obj(ev.to_repr_tree(&ctx));
+            node3.send_cmd_obj(ev.to_repr_tree(&ctx));
         }
     });
 
@@ -144,7 +128,7 @@ async fn main() {
      */
     let compositor = TerminalCompositor::new(app.port.inner());
 
-    // add some views to the display compositor 
+    // add some views to the display compositor
     compositor.write().unwrap().push(
         nested_tty::make_label("Hello World")
             .map_item(|p, a| {
@@ -153,20 +137,39 @@ async fn main() {
             .offset(Vector2::new(5, 0)),
     );
 
-    let label = ctx.read().unwrap().type_term_to_str( &node1.get_type() );
-    compositor.write().unwrap()
-        .push(nested_tty::make_label( &label ).offset(Vector2::new(0, 2)));
+    let label = ctx.read().unwrap().type_term_to_str(&node1.get_type());
+    compositor
+        .write()
+        .unwrap()
+        .push(nested_tty::make_label(&label).offset(Vector2::new(0, 2)));
 
-    compositor.write().unwrap()
+    compositor
+        .write()
+        .unwrap()
         .push(node1.display_view().offset(Vector2::new(15, 2)));
 
+    let label2 = ctx.read().unwrap().type_term_to_str(&node2.get_type());
+    compositor
+        .write()
+        .unwrap()
+        .push(nested_tty::make_label(&label2).offset(Vector2::new(0, 3)));
 
-    let label2 = ctx.read().unwrap().type_term_to_str( &node2.get_type() );
-    compositor.write().unwrap()
-        .push(nested_tty::make_label( &label2 ).offset(Vector2::new(0, 3)));
-
-    compositor.write().unwrap()
+    compositor
+        .write()
+        .unwrap()
         .push(node2.display_view().offset(Vector2::new(15, 3)));
+
+
+    let label3 = ctx.read().unwrap().type_term_to_str(&node3.get_type());
+    compositor
+        .write()
+        .unwrap()
+        .push(nested_tty::make_label(&label3).offset(Vector2::new(0, 4)));
+
+    compositor
+        .write()
+        .unwrap()
+        .push(node3.display_view().offset(Vector2::new(25, 4)));
 
     /* write the changes in the view of `term_port` to the terminal
      */
