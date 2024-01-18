@@ -175,7 +175,7 @@ impl ListEditor {
         } else {
             None
         }
-    }
+   }
 
     pub fn get_item_mut(&mut self) -> Option<MutableVecAccess<Arc<RwLock<EditTree>>>> {
         if let Some(idx) = self.cursor.get().idx {

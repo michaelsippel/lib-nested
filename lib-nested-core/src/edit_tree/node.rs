@@ -74,13 +74,13 @@ impl EditTree {
                 editor: SingletonBuffer::new(None),
                 spillbuf: Arc::new(RwLock::new(Vec::new())),
                 cmd: SingletonBuffer::new(None),
-                close_char: SingletonBuffer::new(None),            
+                close_char: SingletonBuffer::new(None),
                 tree_nav: SingletonBuffer::new(None),
             },
             ctx
         }
     }
-   
+
     pub fn set_editor(mut self, editor: Arc<dyn Any + Send + Sync>) -> Self {
         self.ctrl.editor.set(Some(editor));
         self

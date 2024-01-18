@@ -61,6 +61,7 @@ pub fn edittree_make_digit_view(
 
     node
 }
+
 /*
 pub fn edittree_make_seq_view(
     mut node: EditTree
@@ -82,29 +83,5 @@ pub fn edittree_make_seq_view(
                 .into()
         ));
     node
-}
-*/
-
-pub fn edittree_make_list_edit(
-    mut node: EditTree
-) -> EditTree {
-    list::PTYListStyle::for_node( &mut node, ("(", "", ")") );
-    list::PTYListController::for_node( &mut node, None, None );
-    node
-}
-/*
-pub fn edittree_make_tty_view(
-    et: EditTree
-) -> EditTree {
-    if et.data.read().unwrap().get_type() == &Context::parse(&node.ctx, "Char") {
-        node_make_char_view( node )
-    } else if et.data.read().unwrap().get_type() == &Context::parse(&node.ctx, "<Seq Char>") {
-        node_make_seq_view( node )
-    } else if et.data.read().unwrap().get_type() == &Context::parse(&node.ctx, "<List Char>") {
-        node_make_list_edit( node )
-    } else {
-        eprintln!("couldnt add view");
-        node
-    }
 }
 */

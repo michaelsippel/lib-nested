@@ -139,7 +139,7 @@ impl PTYListController {
         split_char: Option<char>,
         close_char: Option<char>
     ) {
-        /*
+/*
         {
             let ctx = node.ctx.as_ref();
             let mut ctx = ctx.write().unwrap();
@@ -151,7 +151,7 @@ impl PTYListController {
                 ctx.meta_chars.push(*c);
             }
         }
-        */
+*/
         let editor = node.get_edit::<ListEditor>().unwrap();
         let controller = Arc::new(RwLock::new(PTYListController::from_editor( editor, split_char, close_char, node.disp.depth.clone() )));
 

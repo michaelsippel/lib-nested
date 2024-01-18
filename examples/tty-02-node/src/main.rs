@@ -32,15 +32,18 @@ async fn main() {
     nested::editors::integer::editor::init_ctx( ctx.clone() );
     nested::editors::list::init_ctx( ctx.clone() );
 
-
     let char_type = Context::parse(&ctx, "Char");
     let digit_type = Context::parse(&ctx, "<Digit Radix>");
     let list_type = Context::parse(&ctx, "<List Item>");
+    let posint_type = Context::parse(&ctx, "<PosInt Radix>");
+    let item_tyid = ctx.read().unwrap().get_var_typeid("Item").unwrap();
 
+    ctx.write().unwrap().meta_chars.push(',');
+    ctx.write().unwrap().meta_chars.push('\"');
     ctx.write().unwrap().set_edittree_hook(
         Arc::new(
             move |et: Arc<RwLock<EditTree>>, t: laddertypes::TypeTerm| {
-                if let Ok(σ) = laddertypes::unify(&t, &char_type) {
+                if let Ok(σ) = laddertypes::unify(&t, &char_type.clone()) {
                     let mut et = et.write().unwrap();
                     *et = nested_tty::editors::edittree_make_char_view(et.clone());
                 }
@@ -48,14 +51,25 @@ async fn main() {
                     let mut et = et.write().unwrap();
                     *et = nested_tty::editors::edittree_make_digit_view(et.clone());
                 }
+                else if let Ok(σ) = laddertypes::unify(&t, &posint_type) {
+                    let mut et = et.write().unwrap();
+                    nested_tty::editors::list::PTYListStyle::for_node( &mut *et, ("0d", "", ""));
+                    nested_tty::editors::list::PTYListController::for_node( &mut *et, None, None );
+                }
                 else if let Ok(σ) = laddertypes::unify(&t, &list_type) {
                     let mut et = et.write().unwrap();
-                    nested_tty::editors::list::PTYListStyle::for_node( &mut *et, ("(", ",", ")"));
-                    nested_tty::editors::list::PTYListController::for_node( &mut *et, None, None );
-                    *et = nested_tty::editors::edittree_make_list_edit(et.clone());
+                    let item_type = σ.get( &laddertypes::TypeID::Var(item_tyid) ).unwrap();
+                    if item_type == &char_type {
+                        nested_tty::editors::list::PTYListStyle::for_node( &mut *et, ("\"", "", "\""));
+                        nested_tty::editors::list::PTYListController::for_node( &mut *et, None, Some('\"') );
+                    } else {
+                        nested_tty::editors::list::PTYListStyle::for_node( &mut *et, ("{", ", ", "}"));
+                        nested_tty::editors::list::PTYListController::for_node( &mut *et, Some(','), Some('}') );
+                    }
+                    //*et = nested_tty::editors::edittree_make_list_edit(et.clone());
                 }
             }
-        ) 
+        )
     );
 
     /* structure of Repr-Tree
@@ -91,7 +105,7 @@ async fn main() {
     let edittree_digit = ctx.read().unwrap().setup_edittree(rt_digit.clone(), r3vi::buffer::singleton::SingletonBuffer::new(0).get_port());
 
     //---
-    let rt_string = ReprTree::new_arc( Context::parse(&ctx, "<List <List <Digit 16>>>") );
+    let rt_string = ReprTree::new_arc( Context::parse(&ctx, "<List <List Char>>") );
     let edittree = ctx.read().unwrap().setup_edittree(rt_string.clone(), r3vi::buffer::singleton::SingletonBuffer::new(0).get_port());
 
     /* setup terminal
