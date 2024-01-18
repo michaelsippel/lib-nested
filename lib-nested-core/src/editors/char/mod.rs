@@ -16,14 +16,42 @@ use {
     std::sync::RwLock
 };
 
-pub fn init_ctx( ctx: &mut Context ) {
-    /*
-    ctx.add_node_ctor(
-        "Char",
-        Arc::new(|ctx: Arc<RwLock<Context>>, _ty: TypeTerm, depth: OuterViewPort<dyn SingletonView<Item = usize>>| {
-            Some(CharEditor::new_node(ctx, depth))
-        }));
-    */
+pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
+    
+    let morphtype =
+            crate::repr_tree::MorphismType {
+                src_type: Context::parse(&ctx, "Char"),
+                dst_type: Context::parse(&ctx, "Char~EditTree")
+            };
+
+    ctx.write().unwrap()
+        .morphisms
+        .add_morphism(
+            morphtype,
+            {
+                let ctx = ctx.clone();
+                move |rt, σ| {
+                    /* Create EditTree object
+                     */
+                    let mut edittree_char = CharEditor::new_edit_tree(
+                        ctx.clone(),
+                        r3vi::buffer::singleton::SingletonBuffer::<usize>::new(0).get_port()
+                    );
+/*
+                    /* setup tty-view for EditTree
+                     */
+                    edittree_char = nested_tty::editors::edittree_make_char_view( edittree_char );
+*/
+                    /* Insert EditTree into ReprTree
+                     */
+                    let mut rt = rt.write().unwrap();
+                    rt.insert_leaf(
+                        vec![ Context::parse(&ctx, "EditTree") ].into_iter(),
+                        SingletonBuffer::new(edittree_char).get_port().into()
+                    );
+                }
+            }
+        );
 }
 
 pub struct CharEditor {

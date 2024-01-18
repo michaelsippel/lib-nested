@@ -26,10 +26,10 @@ pub struct ReprTree {
 
 impl std::fmt::Debug for ReprTree {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "type: {:?}", self.type_tag)?;
+        writeln!(f, "| type: {:?}", self.type_tag)?;
 
         for (_k,x) in self.branches.iter() {
-            write!(f, "child: {:?}", x)?;
+            writeln!(f, "|--> child: {:?}", x)?;
         }
 
         Ok(())

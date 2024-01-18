@@ -28,6 +28,8 @@ async fn main() {
      */
     let ctx = Arc::new(RwLock::new(Context::new()));
 
+    nested::editors::char::init_ctx( ctx.clone() );
+
     /* structure of Repr-Tree
      *
      *   === Repr-Tree ===
@@ -67,43 +69,6 @@ async fn main() {
             port_edit.outer().into()
         );
 
-    rt_digit.write().unwrap()
-        .insert_leaf(
-            vec![ Context::parse(&ctx, "u32") ].into_iter(),
-            port_u32.outer().into()
-        );
-
-    let morphtype =
-            nested::repr_tree::MorphismType {
-                src_type: Context::parse(&ctx, "Char"),
-                dst_type: Context::parse(&ctx, "Char~EditTree")
-            };
-
-    ctx.write().unwrap()
-        .morphisms
-        .add_morphism(
-            morphtype,
-            {
-                let ctx =ctx.clone();
-                move |rt, σ| {
-                    /* Create EditTree object
-                     */
-                    let mut edittree_char = nested::editors::char::CharEditor::new_edit_tree(
-                        ctx.clone(),
-                        r3vi::buffer::singleton::SingletonBuffer::<usize>::new(0).get_port()
-                    );
-                    edittree_char = nested_tty::editors::edittree_make_char_view( edittree_char );
-
-                    /* Insert EditTree into ReprTree
-                     */
-                    rt.write().unwrap()
-                        .insert_leaf(
-                            vec![ Context::parse(&ctx, "EditTree") ].into_iter(),
-                            SingletonBuffer::new(edittree_char).get_port().into()
-                        );
-                }
-            }
-        );
 /*
     let rt_string = ReprTree::new_arc( Context::parse(&ctx, "<Seq Char>") );
 
@@ -118,24 +83,23 @@ async fn main() {
 
     /* setup projections between representations
      */
-    /*
-    // created by  Char  ==>  Char~EditTree
-    let mut edittree_char =
-        nested::editors::char::CharEditor::new_edit_tree(
-            ctx.clone(),
-            r3vi::buffer::singleton::SingletonBuffer::<usize>::new(0).get_port()
-        );
-*/
-
+    eprintln!("rt_digit = {:?}", rt_digit);
     eprintln!("morph [ Char ==> Char~EditTree ]");
+
+    let rt_char = rt_digit.read().unwrap()
+                .descend(Context::parse(&ctx, "Char"))
+        .unwrap().clone();
+
+    eprintln!("rt_char = {:?}", rt_char);
+
     ctx.read().unwrap()
         .morphisms
         .morph(
-            rt_digit.read().unwrap()
-                .descend(Context::parse(&ctx, "Char"))
-                .unwrap().clone(),
+            rt_char.clone(),
             &Context::parse(&ctx, "Char~EditTree")
         );
+
+    eprintln!("rt_digit = {:?}", rt_char);
 
     let edittree_char =
         ReprTree::descend_ladder(
@@ -166,33 +130,16 @@ async fn main() {
 
     node_edit_digit = nested_tty::editors::edittree_make_digit_view( node_edit_digit );
     let mut edit_digit = node_edit_digit.get_edit::< nested::editors::integer::DigitEditor >().unwrap();
-
+/*
     // created by   <Digit 10> ==> <Digit 10>~U32
     port_u32.attach_to(  port_char.outer().map(|c| c.to_digit(16).unwrap_or(0)) );
  //    port_u32.attach_to( edit_digit.read().unwrap().get_data_port().map(|d| d.unwrap_or(0)) );
 
     let port_proj_u32_to_char = port_u32.outer().map(|val| char::from_digit(val, 16).unwrap_or('?') );
+     */
 
     let buf_edit_digit = r3vi::buffer::singleton::SingletonBuffer::new( node_edit_digit );
     port_edit.attach_to( buf_edit_digit.get_port() );
-
-/*
-    ctx.write().unwrap()
-        .morphisms
-        .add_morphism(
-            MorphismType {
-                src_type: Context::parse(&ctx, "Char"),
-                dst_type: Context::parse(&ctx, "Char~EditTree")
-            },
-
-            |rt, _σ| {
-                rt.write().unwrap()
-                    .insert_branch(
-                        Context::parse(&ctx, "")
-                    );
-            }
-        )
-*/
 
     /* setup terminal
      */
@@ -224,7 +171,7 @@ async fn main() {
     compositor
         .write()
         .unwrap()
-        .push(nested_tty::make_label(&label).offset(Vector2::new(0, 2)));
+        .push(nested_tty::make_label(&label).offset(Vector2::new(0, 1)));
 /*
     compositor
         .write()

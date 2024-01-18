@@ -68,7 +68,6 @@ impl MorphismBase {
             );
 
             if let Ok(σ) = unification_problem.solve() {
-                eprintln!("found matching morphism");
                 return Some((m, σ));
             }
         }
