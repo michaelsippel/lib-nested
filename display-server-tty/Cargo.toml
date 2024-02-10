@@ -1,11 +1,12 @@
 [package]
 authors = ["Michael Sippel <micha@fragmental.art>"]
-name = "display_server"
+name = "display-server-tty"
 version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-nested = { path = "../../nested" }
+nested = { path = "../lib-nested-core" }
+nested-tty  = { path = "../lib-nested-tty" }
 termion = "1.5.5"
 cgmath = { version = "0.18.0", features = ["serde"] }
 serde = { version = "1.0", features = ["serde_derive"] }
