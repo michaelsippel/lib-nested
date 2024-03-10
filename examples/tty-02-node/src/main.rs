@@ -40,26 +40,31 @@ async fn main() {
 
     ctx.write().unwrap().meta_chars.push(',');
     ctx.write().unwrap().meta_chars.push('\"');
+    ctx.write().unwrap().meta_chars.push('}');
+
+    // Define a hook which is executed when a new editTree of type `t` is created.
+    // this will setup the display and navigation elements of the editor.
+    // It provides the necessary bridge to the rendering- & input-backend.
     ctx.write().unwrap().set_edittree_hook(
         Arc::new(
             move |et: Arc<RwLock<EditTree>>, t: laddertypes::TypeTerm| {
+                let mut et = et.write().unwrap();
+
                 if let Ok(σ) = laddertypes::unify(&t, &char_type.clone()) {
-                    let mut et = et.write().unwrap();
                     *et = nested_tty::editors::edittree_make_char_view(et.clone());
                 }
                 else if let Ok(σ) = laddertypes::unify(&t, &digit_type) {
-                    let mut et = et.write().unwrap();
                     *et = nested_tty::editors::edittree_make_digit_view(et.clone());
                 }
                 else if let Ok(σ) = laddertypes::unify(&t, &posint_type) {
-                    let mut et = et.write().unwrap();
                     nested_tty::editors::list::PTYListStyle::for_node( &mut *et, ("0d", "", ""));
                     nested_tty::editors::list::PTYListController::for_node( &mut *et, None, None );
                 }
                 else if let Ok(σ) = laddertypes::unify(&t, &list_type) {
-                    let mut et = et.write().unwrap();
                     let item_type = σ.get( &laddertypes::TypeID::Var(item_tyid) ).unwrap();
-                    if item_type == &char_type {
+
+                    // choose style based on element type
+                    if *item_type == char_type {
                         nested_tty::editors::list::PTYListStyle::for_node( &mut *et, ("\"", "", "\""));
                         nested_tty::editors::list::PTYListController::for_node( &mut *et, None, Some('\"') );
                     } else {
@@ -97,16 +102,23 @@ async fn main() {
     rt_digit.write().unwrap()
         .insert_leaf(
             vec![ Context::parse(&ctx, "Char") ].into_iter(),
-            SingletonBuffer::new('x').get_port().into()
+            SingletonBuffer::new('4').get_port().into()
         );
 
     /* setup TTY-Display for DigitEditor
      */
-    let edittree_digit = ctx.read().unwrap().setup_edittree(rt_digit.clone(), r3vi::buffer::singleton::SingletonBuffer::new(0).get_port());
+    let edittree_digit = ctx.read().unwrap()
+        .setup_edittree(
+            rt_digit
+                .read().unwrap()
+                .descend( Context::parse(&ctx, "Char") ).unwrap()
+                .clone(),
+            r3vi::buffer::singleton::SingletonBuffer::new(0).get_port());
 
     //---
-    let rt_string = ReprTree::new_arc( Context::parse(&ctx, "<List <List Char>>") );
-    let edittree = ctx.read().unwrap().setup_edittree(rt_string.clone(), r3vi::buffer::singleton::SingletonBuffer::new(0).get_port());
+    let rt_string = ReprTree::new_arc( Context::parse(&ctx, "<List <Digit 10>>") );
+    let edittree = ctx.read().unwrap()
+        .setup_edittree(rt_string.clone(), r3vi::buffer::singleton::SingletonBuffer::new(0).get_port());
 
     /* setup terminal
      */
@@ -125,28 +137,39 @@ async fn main() {
     let compositor = TerminalCompositor::new(app.port.inner());
 
     // add some views to the display compositor
-    compositor.write().unwrap().push(
-        nested_tty::make_label("Hello World")
-            .map_item(|p, a| {
-                a.add_style_back(TerminalStyle::fg_color(((25 * p.x % 255) as u8, 200, 0)))
-            })
-            .offset(Vector2::new(5, 0)),
-    );
-    compositor.write().unwrap().push( edittree_digit.read().unwrap().display_view().offset(Vector2::new(0,2)) );
+    {
+        let mut comp = compositor.write().unwrap();
 
-    let label = ctx.read().unwrap().type_term_to_str(&rt_digit.read().unwrap().get_type());
-    compositor
-        .write()
-        .unwrap()
-        .push(nested_tty::make_label(&label).offset(Vector2::new(0, 1)));
+        comp.push(
+            nested_tty::make_label("Hello World")
+                .map_item(|p, a| {
+                    a.add_style_back(TerminalStyle::fg_color(((25 * p.x % 255) as u8, 200, 0)))
+                })
+                .offset(Vector2::new(5, 0)),
+        );
 
-    compositor.write().unwrap().push( edittree.read().unwrap().display_view().offset(Vector2::new(0,4)) );
+        comp.push(
+            edittree_digit.read().unwrap().display_view()
+            .offset(Vector2::new(0,2))
+        );
 
-    let label = ctx.read().unwrap().type_term_to_str(&rt_string.read().unwrap().get_type());
-    compositor
-        .write()
-        .unwrap()
-        .push(nested_tty::make_label(&label).offset(Vector2::new(0, 3)));
+        let label_str = ctx.read().unwrap().type_term_to_str(&rt_digit.read().unwrap().get_type());
+        comp.push(
+            nested_tty::make_label(&label_str)
+            .offset(Vector2::new(0, 1))
+        );
+
+        comp.push(
+            edittree.read().unwrap().display_view()
+            .offset(Vector2::new(0,4))
+        );
+
+        let label_str = ctx.read().unwrap().type_term_to_str(&rt_string.read().unwrap().get_type());
+        comp.push(
+            nested_tty::make_label(&label_str)
+            .offset(Vector2::new(0, 3))
+        );
+    }
 
     /* write the changes in the view of `term_port` to the terminal
      */

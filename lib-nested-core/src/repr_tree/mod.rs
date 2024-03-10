@@ -24,6 +24,8 @@ pub struct ReprTree {
     branches: HashMap<TypeTerm, Arc<RwLock<ReprTree>>>,
 }
 
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
+
 impl std::fmt::Debug for ReprTree {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "| type: {:?}", self.type_tag)?;
@@ -35,6 +37,8 @@ impl std::fmt::Debug for ReprTree {
         Ok(())
     }
 }
+
+//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 impl ReprTree {
     pub fn new(type_tag: impl Into<TypeTerm>) -> Self {

@@ -185,39 +185,6 @@ pub struct PosIntEditor {
 
 impl PosIntEditor {
     pub fn new(ctx: Arc<RwLock<Context>>, radix: u32) -> Self {
-        /*
-        let mut node = Context::make_node(
-            &ctx,
-            Context::parse(&ctx, format!("<List <Digit {}>>", radix).as_str()),
-            r3vi::buffer::singleton::SingletonBuffer::new(0).get_port()
-        ).unwrap();
-
-        // Set Type
-        node.data = ReprTree::ascend(
-            &node.data.clone(),
-            TypeTerm::App(vec![
-                TypeTerm::TypeID(ctx.read().unwrap().get_typeid("PosInt").unwrap()),
-                TypeTerm::Num(radix as i64).into(),
-                TypeTerm::TypeID(ctx.read().unwrap().get_typeid("BigEndian").unwrap())
-            ]
-        ));
-        */
-/*
-        PTYListController::for_node( &mut node, Some(' '), None );
-        PTYListStyle::for_node( &mut node,
-            (
-                match radix {
-                    2 => "0b".into(),
-                    8 => "0o".into(),
-                    10 => "0d".into(),
-                    16 => "0x".into(),
-                    _ => "".into()
-                },
-                "".into(),
-                "".into()
-            )
-        );
-*/
         PosIntEditor {
             radix,
             digits: EditTree::new(

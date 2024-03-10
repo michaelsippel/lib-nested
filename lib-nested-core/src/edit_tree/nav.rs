@@ -38,7 +38,7 @@ pub enum TreeNavCmd {
 
 pub trait TreeNav {
     /* CORE
-    */
+     */
     fn get_cursor(&self) -> TreeCursor {
         TreeCursor::default()
     }

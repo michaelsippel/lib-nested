@@ -32,7 +32,9 @@ pub struct EdittreeControl {
                     Option< Arc<dyn Any + Send + Sync> >
                 >,
 
-    pub spillbuf: Arc<RwLock< Vec< Arc<RwLock< EditTree >> > >>,
+    pub spillbuf: Arc<RwLock<
+                    Vec< Arc<RwLock< EditTree >> >
+                  >>,
 
     /// commander & navigation
     pub cmd: SingletonBuffer<
@@ -47,9 +49,6 @@ pub struct EdittreeControl {
                   >,    
 }
 
-/*
- * TODO: rename to EditNode
- */
 #[derive(Clone)]
 pub struct EditTree {
     /// context

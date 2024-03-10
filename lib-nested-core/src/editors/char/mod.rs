@@ -31,10 +31,15 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
             {
                 let ctx = ctx.clone();
                 move |rt, σ| {
+                    if let Some(v) = rt.read().unwrap().get_view::<dyn SingletonView<Item = char>>() {
+                        eprintln!("prev value: {}", v.get());
+                    }
+
                     /* Create EditTree object
                      */
                     let mut edittree_char = CharEditor::new_edit_tree(
                         ctx.clone(),
+                        SingletonBuffer::new('>'),
                         r3vi::buffer::singleton::SingletonBuffer::<usize>::new(0).get_port()
                     );
 
@@ -97,6 +102,7 @@ impl CharEditor {
 
     pub fn new_edit_tree(
         ctx0: Arc<RwLock<Context>>,
+        data: SingletonBuffer<char>,
         depth: OuterViewPort<dyn SingletonView<Item = usize>>
     ) -> EditTree {
         let data = SingletonBuffer::new('\0');

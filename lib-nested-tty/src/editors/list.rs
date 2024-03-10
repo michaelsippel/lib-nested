@@ -190,15 +190,15 @@ impl PTYListController {
     }
 
     pub fn handle_meta_char(&mut self, c: char, child_close_char: Option<char>) -> TreeNavResult {
-        eprintln!("handle meta char: got '{}', child_close={:?}, self.close={:?}, split={:?}", c, child_close_char, self.close_char, self.split_char);
+//        eprintln!("handle meta char: got '{}', child_close={:?}, self.close={:?}, split={:?}", c, child_close_char, self.close_char, self.split_char);
         let mut e = self.editor.write().unwrap();
         let cur = e.cursor.get();
-        
+
         if Some(c) == self.split_char
 //            || Some(c) == child_close_char
         {
             e.listlist_split();
-            eprintln!("done listlist split");
+ //           eprintln!("done listlist split");
             TreeNavResult::Continue
         } else if Some(c) == child_close_char {
             e.goto(TreeCursor::none());
