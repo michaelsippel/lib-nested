@@ -5,7 +5,7 @@ pub mod ctx;
 
 pub use {
     add::Add,
-    editor::{DigitEditor, PosIntEditor},
+    editor::PosIntEditor,
     radix::RadixProjection,
     ctx::init_ctx
 };

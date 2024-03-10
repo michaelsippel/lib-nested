@@ -15,39 +15,8 @@ use {
     std::sync::{Arc, RwLock}
 };
 
-pub fn init_ctx(ctx: &mut Context) {
+pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
     /*
-    ctx.add_typename("MachineInt".into());
-    ctx.add_typename("u32".into());
-    ctx.add_typename("u64".into());
-    ctx.add_typename("LittleEndian".into());
-    ctx.add_typename("BigEndian".into());
-
-    ctx.add_node_ctor(
-        "Digit", Arc::new(
-            |ctx: Arc<RwLock<Context>>, ty: TypeTerm, depth: OuterViewPort<dyn SingletonView<Item = usize>>| {
-                match ty {
-                    TypeTerm::App(args) => {
-                        if args.len() > 1 {
-                            match args[1] {
-                                TypeTerm::Num(radix) => {
-                                    let node = DigitEditor::new(ctx.clone(), radix as u32).into_node(depth);
-                                    Some(
-                                        node
-                                    )
-                                },
-                                _ => None
-                            }
-                        } else {
-                            None
-                        }
-                    }
-                    _ => None
-                }
-            }
-        )
-    );
-
     ctx.add_list_typename("PosInt".into());
     let pattern = MorphismTypePattern {
         src_tyid: ctx.get_typeid("List"),
@@ -127,7 +96,8 @@ pub fn init_ctx(ctx: &mut Context) {
             }
         )
     );
-*/    
+    */
+    /* 
     ctx.add_typename("Date".into());
     ctx.add_typename("ISO-8601".into());
     ctx.add_typename("TimeSince".into());
@@ -137,5 +107,6 @@ pub fn init_ctx(ctx: &mut Context) {
     ctx.add_typename("Duration".into());
     ctx.add_typename("Seconds".into());
     ctx.add_typename("ℕ".into());
+    */
 }
 

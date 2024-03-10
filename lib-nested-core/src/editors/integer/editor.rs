@@ -12,7 +12,11 @@ use {
     },
     laddertypes::{TypeTerm},
     crate::{
-        editors::{list::{ListCmd}, ObjCommander},
+        editors::{
+            digit::DigitEditor,
+            list::{ListCmd},
+            ObjCommander
+        },
         repr_tree::{Context, ReprTree},
         edit_tree::{EditTree, TreeNav, TreeNavResult, TreeCursor, diagnostics::{Message}},
     },
@@ -21,160 +25,6 @@ use {
     std::iter::FromIterator,
     cgmath::{Point2}
 };
-
-
-pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
-
-    // todo: proper scoping of Radix variable
-    ctx.write().unwrap().add_varname("Radix");
-    let morphtype =
-            crate::repr_tree::MorphismType {
-                src_type: Context::parse(&ctx, "<Digit Radix>"),
-                dst_type: Context::parse(&ctx, "<Digit Radix>~EditTree")
-            };
-
-    ctx.write().unwrap()
-        .morphisms
-        .add_morphism(
-            morphtype,
-            {
-                let ctx = ctx.clone();
-                move |rt, σ| {
-                    let radix =
-                        match σ.get( &laddertypes::TypeID::Var(ctx.read().unwrap().get_var_typeid("Radix").unwrap()) ) {
-                            Some(TypeTerm::Num(n)) => *n as u32,
-                            _ => 0
-                        };
-
-                    /* Create EditTree object
-                     */
-                    let mut edittree_digit = DigitEditor::new(
-                        ctx.clone(),
-                        radix
-                    ).into_node(
-                        r3vi::buffer::singleton::SingletonBuffer::<usize>::new(0).get_port()
-                    );
-
-                    /* Insert EditTree into ReprTree
-                     */
-                    let mut rt = rt.write().unwrap();
-                    rt.insert_leaf(
-                        vec![ Context::parse(&ctx, "EditTree") ].into_iter(),
-                        SingletonBuffer::new( Arc::new(RwLock::new(edittree_digit)) ).get_port().into()
-                    );
-                }
-            }
-        );
-}
-
-//<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
-
-pub struct DigitEditor {
-    ctx: Arc<RwLock<Context>>,
-    radix: u32,
-    data: SingletonBuffer<Option<char>>,
-    msg: VecBuffer<Message>,
-}
-
-impl ObjCommander for DigitEditor {
-    fn send_cmd_obj(&mut self, cmd_obj: Arc<RwLock<ReprTree>>) -> TreeNavResult {
-        let cmd_obj = cmd_obj.read().unwrap();
-        let cmd_type = cmd_obj.get_type().clone();
-
-        if cmd_type == Context::parse(&self.ctx, "Char") {
-            if let Some(cmd_view) = cmd_obj.get_view::<dyn SingletonView<Item = char>>() {
-                let c = cmd_view.get();
-
-                self.msg.clear();
-
-                if self.ctx.read().unwrap().meta_chars.contains(&c) {
-                    return TreeNavResult::Exit;
-
-                } else if c.to_digit(self.radix).is_none() {
-                    /* in case the character c is not in the range of digit-chars,
-                       add a message to the diagnostics view
-                     */
-/*
-                    let message = IndexBuffer::from_iter(vec![
-                        (Point2::new(1, 0), make_label("invalid digit '")),
-                        (Point2::new(2, 0), make_label(&format!("{}", c))
-                         .map_item(|_p,a| a.add_style_back(TerminalStyle::fg_color((140,140,250))))),
-                        (Point2::new(3, 0), make_label("'"))
-                    ]);
-
-                    self.msg.push(crate::diagnostics::make_error(message.get_port().flatten()));
-*/
-
-                    self.data.set(Some(c));
-                } else {
-                    self.data.set(Some(c));
-                }
-            }
-        }
-
-        TreeNavResult::Continue
-    }
-}
-
-impl DigitEditor {
-    pub fn new(ctx: Arc<RwLock<Context>>, radix: u32) -> Self {
-        DigitEditor {
-            ctx,
-            radix,
-            data: SingletonBuffer::new(None),
-            msg: VecBuffer::new(),
-        }
-    }
-
-    pub fn into_node(self, depth: OuterViewPort<dyn SingletonView<Item = usize>>) -> EditTree { 
-        let data = self.get_data();        
-        let editor = Arc::new(RwLock::new(self));
-        let ed = editor.write().unwrap();
-        let r = ed.radix;
-
-        EditTree::new(ed.ctx.clone(), depth)
-            .set_editor(editor.clone())
-            .set_cmd(editor.clone())
-            .set_diag(
-                ed.msg.get_port().to_sequence()
-            )
-    }
-
-    pub fn attach_to(&mut self, source: OuterViewPort<dyn SingletonView<Item = u32>>) {
-        /*
-        source.add_observer(
-            Arc::new(NotifyFnObserver::new(|_msg| {
-                self.data.set( source.get() )
-            }))
-        );
-        */
-    }
-
-    pub fn get_data_port(&self) -> OuterViewPort<dyn SingletonView<Item = Result<u32, char>>> {
-        let radix = self.radix;
-        self.data.get_port().map(move |c|
-            if let Some(d) = c.unwrap_or('?').to_digit(radix) {
-                Ok(d)
-            } else {
-                Err(c.unwrap_or('?'))
-            }
-        )
-    }
-
-    pub fn get_type(&self) -> TypeTerm {
-        TypeTerm::TypeID(self.ctx.read().unwrap().get_typeid("Digit").unwrap())
-    }
-
-    pub fn get_data(&self) -> Arc<RwLock<ReprTree>> {
-        ReprTree::ascend(
-            &ReprTree::new_leaf(
-                self.ctx.read().unwrap().type_term_from_str("<Seq u32>").unwrap(),
-                self.get_data_port().into()
-            ),
-            self.get_type()
-        )
-    }
-}
 
 pub struct PosIntEditor {
     radix: u32,

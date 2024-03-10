@@ -4,6 +4,7 @@ pub mod list;
 //pub mod sum;
 
 pub mod char;
+pub mod digit;
 pub mod integer;
 //pub mod typeterm;
 

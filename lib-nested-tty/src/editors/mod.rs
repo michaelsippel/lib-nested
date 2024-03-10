@@ -44,7 +44,7 @@ pub fn edittree_make_digit_view(
         .write().unwrap()
         .insert_branch(ReprTree::new_leaf(
             Context::parse(&node.ctx, "TerminalView"),
-            node.get_edit::< nested::editors::integer::DigitEditor >()
+            node.get_edit::< nested::editors::digit::DigitEditor >()
                 .unwrap()
                 .read()
                 .unwrap()

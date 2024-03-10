@@ -29,7 +29,8 @@ async fn main() {
     let ctx = Arc::new(RwLock::new(Context::new()));
 
     nested::editors::char::init_ctx( ctx.clone() );
-    nested::editors::integer::editor::init_ctx( ctx.clone() );
+    nested::editors::digit::init_ctx( ctx.clone() );
+    nested::editors::integer::init_ctx( ctx.clone() );
     nested::editors::list::init_ctx( ctx.clone() );
 
     let char_type = Context::parse(&ctx, "Char");
@@ -85,9 +86,9 @@ async fn main() {
      *         /   |     \
      *        /    |        \
      *       /     |          \
-     *     u32  [ EditTree ]  Char
+     *     u32   EditTree     Char
      *           - Editor         \
-     *           - Display      [ EditTree ]
+     *           - Display        EditTree
      *         /     |    \      - Editor
      *        /      |     \     - Display
      *      TTY  PixelBuf  SDF  /    |     \
