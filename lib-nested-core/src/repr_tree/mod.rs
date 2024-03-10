@@ -38,6 +38,54 @@ impl std::fmt::Debug for ReprTree {
     }
 }
 
+pub trait ReprTreeExt {
+    fn get_type(&self) -> TypeTerm;
+
+    fn insert_leaf(&mut self, type_ladder: impl Iterator<Item = TypeTerm>, port: AnyOuterViewPort);
+    fn insert_branch(&mut self, repr: Arc<RwLock<ReprTree>>);
+    
+    fn descend(&self, target_type: impl Into<TypeTerm>) -> Option<Arc<RwLock<ReprTree>>>;
+    fn descend_ladder(&self, ladder: impl Iterator<Item = TypeTerm>) -> Option<Arc<RwLock<ReprTree>>>;
+
+    fn view_char(&self) -> OuterViewPort<dyn SingletonView<Item = char>>;
+    fn view_u8(&self) -> OuterViewPort<dyn SingletonView<Item = u8>>;
+    fn view_u64(&self) -> OuterViewPort<dyn SingletonView<Item = u64>>;
+}
+
+impl ReprTreeExt for Arc<RwLock<ReprTree>> {
+    fn get_type(&self) -> TypeTerm {
+        self.read().unwrap().get_type().clone()
+    }
+
+    fn insert_leaf(&mut self, type_ladder: impl Iterator<Item = TypeTerm>, port: AnyOuterViewPort) {
+        self.write().unwrap().insert_leaf(type_ladder, port)
+    }
+
+    fn insert_branch(&mut self, repr: Arc<RwLock<ReprTree>>) {
+        self.write().unwrap().insert_branch(repr)
+    }
+
+    fn descend(&self, target_type: impl Into<TypeTerm>) -> Option<Arc<RwLock<ReprTree>>> {
+        self.read().unwrap().descend(target_type)
+    }
+
+    fn descend_ladder(&self, ladder: impl Iterator<Item = TypeTerm>) -> Option<Arc<RwLock<ReprTree>>> {
+        ReprTree::descend_ladder(self, ladder)
+    }
+
+    fn view_char(&self) -> OuterViewPort<dyn SingletonView<Item = char>> {
+        self.read().unwrap().view_char()
+    }
+
+    fn view_u8(&self) -> OuterViewPort<dyn SingletonView<Item = u8>> {
+        self.read().unwrap().view_u8()
+    }
+
+    fn view_u64(&self) -> OuterViewPort<dyn SingletonView<Item = u64>> {
+        self.read().unwrap().view_u64()
+    }
+}
+
 //<<<<>>>><<>><><<>><<<*>>><<>><><<>><<<<>>>>
 
 impl ReprTree {
@@ -106,6 +154,10 @@ impl ReprTree {
 
     pub fn view_char(&self) -> OuterViewPort<dyn SingletonView<Item = char>> {
         self.get_port::<dyn SingletonView<Item = char>>().expect("no char-view available")
+    }
+
+    pub fn view_u8(&self) -> OuterViewPort<dyn SingletonView<Item = u8>> {
+        self.get_port::<dyn SingletonView<Item = u8>>().expect("no u8-view available")
     }
 
     pub fn view_u64(&self) -> OuterViewPort<dyn SingletonView<Item = u64>> {
