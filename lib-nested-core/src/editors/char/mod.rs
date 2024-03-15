@@ -3,12 +3,13 @@ use {
         view::{
             OuterViewPort,
             singleton::*,
+            port::UpdateTask
         },
         buffer::singleton::*
     },
     laddertypes::{TypeTerm},
     crate::{
-        repr_tree::{Context, ReprTree},
+        repr_tree::{Context, ReprTree, ReprTreeExt},
         edit_tree::{EditTree, TreeNavResult},
         editors::ObjCommander,
     },
@@ -17,7 +18,6 @@ use {
 };
 
 pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
-    
     let morphtype =
             crate::repr_tree::MorphismType {
                 src_type: Context::parse(&ctx, "Char"),
@@ -37,19 +37,25 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
 
                     /* Create EditTree object
                      */
-                    let mut edittree_char = CharEditor::new_edit_tree(
+                    rt.view_char().0.update();
+
+                    let char_buf = rt.write().unwrap().singleton_buffer::<char>().unwrap();
+
+                    eprintln!("make edittree: char val = {}", char_buf.get());
+                    let mut edittree = CharEditor::new_edit_tree(
                         ctx.clone(),
-                        SingletonBuffer::new('>'),
+                        char_buf,
                         r3vi::buffer::singleton::SingletonBuffer::<usize>::new(0).get_port()
                     );
 
-                    /* Insert EditTree into ReprTree
-                     */
-                    let mut rt = rt.write().unwrap();
-                    rt.insert_leaf(
-                        vec![ Context::parse(&ctx, "EditTree") ].into_iter(),
-                        SingletonBuffer::new( Arc::new(RwLock::new( edittree_char )) ).get_port().into()
-                    );
+                    eprintln!("insert Char~EditTree");
+                    rt.write().unwrap()
+                        .insert_branch(
+                            ReprTree::from_singleton_buffer(
+                                Context::parse(&ctx, "EditTree"),
+                                SingletonBuffer::new(edittree)
+                            )
+                        );
                 }
             }
         );
@@ -105,7 +111,7 @@ impl CharEditor {
         data: SingletonBuffer<char>,
         depth: OuterViewPort<dyn SingletonView<Item = usize>>
     ) -> EditTree {
-        let data = SingletonBuffer::new('\0');
+        //let data = SingletonBuffer::new('\0');
         let ctx = ctx0.clone();
         let editor = Arc::new(RwLock::new(CharEditor{ ctx, data: data.clone() }));
 

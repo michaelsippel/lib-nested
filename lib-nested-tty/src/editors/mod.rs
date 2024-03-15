@@ -17,12 +17,14 @@ use {
     }
 };
 
+
 pub fn edittree_make_char_view(
     node: EditTree
 ) -> EditTree {
+    eprintln!("nested-tty: EditTree make char-view");
     node.disp.view
         .write().unwrap()
-        .insert_branch(ReprTree::new_leaf(
+        .insert_branch(ReprTree::from_view(
             Context::parse(&node.ctx, "TerminalView"),
             node.get_edit::< nested::editors::char::CharEditor >()
                 .unwrap()
@@ -31,7 +33,6 @@ pub fn edittree_make_char_view(
                 .get_port()
                 .map(move |c| TerminalAtom::from(if c == '\0' { ' ' } else { c }))
                 .to_grid()
-                .into(),
         ));
 
     node
@@ -42,7 +43,7 @@ pub fn edittree_make_digit_view(
 ) -> EditTree {
     node.disp.view
         .write().unwrap()
-        .insert_branch(ReprTree::new_leaf(
+        .insert_branch(ReprTree::from_view(
             Context::parse(&node.ctx, "TerminalView"),
             node.get_edit::< nested::editors::digit::DigitEditor >()
                 .unwrap()
@@ -56,7 +57,6 @@ pub fn edittree_make_digit_view(
                     }
                 )
                 .to_grid()
-                .into(),
         ));
 
     node

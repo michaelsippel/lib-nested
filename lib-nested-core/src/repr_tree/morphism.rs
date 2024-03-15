@@ -1,7 +1,8 @@
 use {
     laddertypes::{TypeTerm, TypeID},
+    r3vi::view::AnyOuterViewPort,
     crate::{
-        repr_tree::{ReprTree},
+        repr_tree::{ReprTree, ReprTreeExt, ReprLeaf},
     },
     std::{
         sync::{Arc, RwLock},
@@ -20,8 +21,9 @@ pub struct MorphismType {
 #[derive(Clone)]
 pub struct GenericReprTreeMorphism {
     morph_type: MorphismType,
-    repr_tree_op: Arc<
-        dyn Fn( Arc<RwLock<ReprTree>>, &HashMap<TypeID, TypeTerm> )
+    setup_projection: Arc<
+        dyn Fn( &mut Arc<RwLock<ReprTree>>, &HashMap<TypeID, TypeTerm> )
+//            -> Result< ReprLeaf, () >
         + Send + Sync
     >
 }
@@ -43,12 +45,15 @@ impl MorphismBase {
     pub fn add_morphism(
         &mut self,
         morph_type: MorphismType,
-        repr_tree_op: impl Fn( Arc<RwLock<ReprTree>>, &HashMap<TypeID, TypeTerm> ) + Send + Sync + 'static
+        setup_projection:
+            impl Fn( &mut Arc<RwLock<ReprTree>>, &HashMap<TypeID, TypeTerm> )
+//                -> Result< ReprLeaf, () /* TODO: error */ >
+            + Send + Sync + 'static
     ) {
         self.morphisms.push(
             GenericReprTreeMorphism {
                 morph_type,
-                repr_tree_op: Arc::new(repr_tree_op)
+                setup_projection: Arc::new(setup_projection)
             }
         );
     }
@@ -75,14 +80,15 @@ impl MorphismBase {
         None
     }
 
-    pub fn morph(
+    pub fn apply_morphism(
         &self,
-        repr_tree: Arc<RwLock<ReprTree>>,
-        target_type: &TypeTerm
+        mut repr_tree: Arc<RwLock<ReprTree>>,
+        src_type: &TypeTerm,
+        dst_type: &TypeTerm
     ) {
-        let t = repr_tree.read().unwrap().get_type().clone();
-        if let Some((m, σ)) = self.find_morphism( &t, target_type ) {
-            (m.repr_tree_op)( repr_tree.clone(), &σ );
+//        let t = repr_tree.read().unwrap().get_type().clone();
+        if let Some((m, σ)) = self.find_morphism( &src_type, dst_type ) {
+            (m.setup_projection)( &mut repr_tree, &σ );
         } else {
             eprintln!("could not find morphism");
         }

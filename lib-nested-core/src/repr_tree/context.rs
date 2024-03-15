@@ -2,7 +2,7 @@ use {
     r3vi::{view::{OuterViewPort, singleton::*}, buffer::{singleton::*}},
     laddertypes::{TypeDict, TypeTerm, TypeID},
     crate::{
-        repr_tree::{ReprTree, MorphismType, GenericReprTreeMorphism, MorphismBase},
+        repr_tree::{ReprTree, ReprTreeExt, MorphismType, GenericReprTreeMorphism, MorphismBase},
         edit_tree::EditTree
     },
     std::{
@@ -29,7 +29,7 @@ pub struct Context {
     pub list_types: Vec< TypeID >,
     pub meta_chars: Vec< char >,
 
-    edittree_hook: Arc< dyn Fn(Arc<RwLock<EditTree>>, TypeTerm) + Send +Sync +'static >,
+    edittree_hook: Arc< dyn Fn(&mut EditTree, TypeTerm) + Send +Sync +'static >,
 
     /// recursion
     parent: Option<Arc<RwLock<Context>>>,
@@ -64,7 +64,7 @@ impl Context {
         Context::with_parent(None)
     }
 
-    pub fn set_edittree_hook(&mut self, hook: Arc< dyn Fn(Arc<RwLock<EditTree>>, TypeTerm) + Send +Sync +'static >) {
+    pub fn set_edittree_hook(&mut self, hook: Arc< dyn Fn(&mut EditTree, TypeTerm) + Send +Sync +'static >) {
         self.edittree_hook = hook;
     }
 
@@ -78,7 +78,7 @@ impl Context {
 
     pub fn make_repr(ctx: &Arc<RwLock<Self>>, t: &TypeTerm) -> Arc<RwLock<ReprTree>> {
         let rt = Arc::new(RwLock::new(ReprTree::new( TypeTerm::unit() )));
-        ctx.read().unwrap().morphisms.morph( rt.clone(), t );
+        ctx.read().unwrap().morphisms.apply_morphism( rt.clone(), &TypeTerm::unit(), t );
         rt
     }
 
@@ -180,30 +180,32 @@ impl Context {
         &self,
         rt: Arc<RwLock<ReprTree>>,
         depth: OuterViewPort<dyn SingletonView<Item = usize>>
-    ) -> Arc<RwLock<EditTree>> {
+    ) -> SingletonBuffer<EditTree> {
         let ladder = TypeTerm::Ladder(vec![
                 rt.read().unwrap().get_type().clone(),
                 self.type_term_from_str("EditTree").expect("")
             ]);
-        
-        self.morphisms.morph(
+
+        eprintln!("setp_edittree: apply morphism T -> T~EditTree");
+        self.morphisms.apply_morphism(
             rt.clone(),
+            &rt.get_type(),
             &ladder
         );
 
-        let new_edittree = rt
-            .read().unwrap()
-            .descend(
-            self.type_term_from_str("EditTree").expect("")
-        ).unwrap()
-            .read().unwrap()
-            .get_view::<dyn SingletonView<Item = Arc<RwLock<EditTree>> >>()
-            .unwrap()
-            .get();
-
-        (*self.edittree_hook)( new_edittree.clone(), rt.read().unwrap().get_type().clone() );
-
-        new_edittree
+        eprintln!("get repr-node of editTree");
+        if let Some(new_edittree) =
+            rt.descend(self.type_term_from_str("EditTree").unwrap())
+        {
+            let buf = new_edittree.singleton_buffer::<EditTree>();
+            (*self.edittree_hook)(
+                &mut *buf.get_mut(),
+                rt.read().unwrap().get_type().clone()
+            );
+            buf
+        } else {
+            unreachable!();
+        }
     }
 }
 

@@ -68,20 +68,20 @@ impl TerminalEvent {
         match self {
             TerminalEvent::Input(Event::Key(key)) => {
                 if let Some(tree_nav_cmd) = neo2_treenav_keymap(key) {
-                    ReprTree::new_leaf(
+                    ReprTree::from_singleton_buffer(
                         Context::parse(&ctx, "TreeNavCmd"),
-                        SingletonBuffer::new(tree_nav_cmd).get_port().into()
+                        SingletonBuffer::new(tree_nav_cmd)
                     )
                 } else if let Some(tree_nav_cmd) = universal_treenav_keymap(key) {
-                    ReprTree::new_leaf(
+                    ReprTree::from_singleton_buffer(
                         Context::parse(&ctx, "TreeNavCmd"),
-                        SingletonBuffer::new(tree_nav_cmd).get_port().into()
+                        SingletonBuffer::new(tree_nav_cmd)
                     )
                 } else {
                     if let Some(list_cmd) = tty_list_keymap(key) {
-                        ReprTree::new_leaf(
+                        ReprTree::from_singleton_buffer(
                             Context::parse(&ctx, "ListCmd"),
-                            SingletonBuffer::new(list_cmd).get_port().into()
+                            SingletonBuffer::new(list_cmd)
                         )
                     } else {
                         match key {
@@ -89,9 +89,9 @@ impl TerminalEvent {
                                 ReprTree::from_char(&ctx, *c)
                             }
                             _ => {
-                                ReprTree::new_leaf(
+                                ReprTree::from_singleton_buffer(
                                     Context::parse(&ctx, "TerminalEvent"),
-                                    SingletonBuffer::new(self.clone()).get_port().into()
+                                    SingletonBuffer::new(self.clone())
                                 )
                             }
                         }
@@ -99,9 +99,9 @@ impl TerminalEvent {
                 }
             }
             _ => {
-                ReprTree::new_leaf(
+                ReprTree::from_singleton_buffer(
                     Context::parse(&ctx, "TerminalEvent"),
-                    SingletonBuffer::new(self.clone()).get_port().into()
+                    SingletonBuffer::new(self.clone())
                 )
             }
         }

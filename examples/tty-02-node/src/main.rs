@@ -8,17 +8,19 @@ use {
     cgmath::Vector2,
     nested::{
         editors::ObjCommander,
-        repr_tree::{Context, ReprTree},
+        repr_tree::{Context, ReprTree, ReprTreeExt},
         edit_tree::{EditTree}
     },
     nested_tty::{
         DisplaySegment, TTYApplication,
         TerminalCompositor, TerminalStyle, TerminalView,
-        TerminalAtom
+        TerminalAtom, TerminalEvent
     },
     r3vi::{
         buffer::{singleton::*, vec::*},
+        view::{port::UpdateTask}
     },
+//    termion::{},
     std::sync::{Arc, RwLock},
 };
 
@@ -48,8 +50,8 @@ async fn main() {
     // It provides the necessary bridge to the rendering- & input-backend.
     ctx.write().unwrap().set_edittree_hook(
         Arc::new(
-            move |et: Arc<RwLock<EditTree>>, t: laddertypes::TypeTerm| {
-                let mut et = et.write().unwrap();
+            move |et: &mut EditTree, t: laddertypes::TypeTerm| {
+//                let mut et = et.write().unwrap();
 
                 if let Ok(σ) = laddertypes::unify(&t, &char_type.clone()) {
                     *et = nested_tty::editors::edittree_make_char_view(et.clone());
@@ -95,31 +97,49 @@ async fn main() {
      *                         /     |      \
      *                       TTY  PixelBuf  SDF
      */
-   let rt_digit = ReprTree::new_arc( Context::parse(&ctx, "<Digit 16>") );
+    let mut rt_digit = ReprTree::new_arc( Context::parse(&ctx, "<Digit 16>") );
 
     /* add initial representation
      *  <Digit 16> ~ Char
      */
-    rt_digit.write().unwrap()
-        .insert_leaf(
-            vec![ Context::parse(&ctx, "Char") ].into_iter(),
-            SingletonBuffer::new('4').get_port().into()
-        );
+    rt_digit.insert_leaf(
+        Context::parse(&ctx, "Char"),
+        nested::repr_tree::ReprLeaf::from_singleton_buffer( SingletonBuffer::new('5') )
+    );
+
+    /* furthermore, setup projections to and from u8 value,
+     * this synchronizes the buffers 
+     */
+    ctx.read().unwrap().morphisms.apply_morphism(
+        rt_digit.clone(),
+        &Context::parse(&ctx, "<Digit 16>~Char"),
+        &Context::parse(&ctx, "<Digit 16>~ℤ_256~machine::UInt8")
+    );
 
     /* setup TTY-Display for DigitEditor
+     *
+     * `setup_edittree` will setup the projection
+     *    Char -> Char~EditTree
+     *  and call the hook defined above with `set_edittree_hook()`
+     *
      */
     let edittree_digit = ctx.read().unwrap()
         .setup_edittree(
-            rt_digit
-                .read().unwrap()
-                .descend( Context::parse(&ctx, "Char") ).unwrap()
-                .clone(),
-            r3vi::buffer::singleton::SingletonBuffer::new(0).get_port());
+            rt_digit.clone(),
+            r3vi::buffer::singleton::SingletonBuffer::new(0).get_port()
+        );
+
+    let mut digit_u8_buffer = rt_digit
+        .descend(Context::parse(&ctx, "ℤ_256~machine::UInt8")).unwrap()
+        .singleton_buffer::<u8>();
 
     //---
-    let rt_string = ReprTree::new_arc( Context::parse(&ctx, "<List <Digit 10>>") );
-    let edittree = ctx.read().unwrap()
-        .setup_edittree(rt_string.clone(), r3vi::buffer::singleton::SingletonBuffer::new(0).get_port());
+    let rt_string = ReprTree::new_arc( Context::parse(&ctx, "<List Char>") );
+
+    let edittree_list = ctx.read().unwrap()
+        .setup_edittree(
+            rt_string.clone(),
+            r3vi::buffer::singleton::SingletonBuffer::new(0).get_port());
 
     /* setup terminal
      */
@@ -127,9 +147,22 @@ async fn main() {
         /* event handler
          */
         let ctx = ctx.clone();
-        let et1 = edittree.clone();
+        let mut editors = Vec::new();
+        editors.push(edittree_digit.clone());
+        editors.push(edittree_list.clone());
+
+        let edit_select = Arc::new(RwLock::new(0));
         move |ev| {
-            et1.write().unwrap().send_cmd_obj(ev.to_repr_tree(&ctx));
+            match ev {
+                TerminalEvent::Input(termion::event::Event::Key(termion::event::Key::Char('\t'))) => {
+                    let mut i = edit_select.write().unwrap();
+                    *i = (*i + 1) % editors.len();
+                }
+                _ => {
+                    let i = edit_select.read().unwrap();
+                    editors[*i].get().send_cmd_obj(ev.to_repr_tree(&ctx));
+                }
+            }
         }
     });
 
@@ -150,25 +183,37 @@ async fn main() {
         );
 
         comp.push(
-            edittree_digit.read().unwrap().display_view()
-            .offset(Vector2::new(0,2))
+            edittree_digit.get().display_view()
+            .offset(Vector2::new(2,2))
         );
 
         let label_str = ctx.read().unwrap().type_term_to_str(&rt_digit.read().unwrap().get_type());
         comp.push(
             nested_tty::make_label(&label_str)
+            .map_item(|_pt,atom| atom.add_style_front(TerminalStyle::fg_color((90,90,90))))
             .offset(Vector2::new(0, 1))
         );
 
         comp.push(
-            edittree.read().unwrap().display_view()
-            .offset(Vector2::new(0,4))
+            digit_u8_buffer.get_port().map(
+                |d| nested_tty::make_label(&format!("Digit={}", d))
+            )
+            .to_grid()
+            .flatten()
+            .offset(Vector2::new(2,3))
+        );
+
+
+        comp.push(
+            edittree_list.get().display_view()
+            .offset(Vector2::new(2,6))
         );
 
         let label_str = ctx.read().unwrap().type_term_to_str(&rt_string.read().unwrap().get_type());
         comp.push(
             nested_tty::make_label(&label_str)
-            .offset(Vector2::new(0, 3))
+            .map_item(|_pt, atom| atom.add_style_front(TerminalStyle::fg_color((90,90,90))))
+            .offset(Vector2::new(0, 5))
         );
     }
 

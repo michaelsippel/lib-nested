@@ -24,10 +24,9 @@ pub enum ListCmd {
 impl ListCmd {
     // note: cant use Into becaue of ctx (maybe global typedict?)
     pub fn into_repr_tree(self, ctx: &Arc<RwLock<Context>>) -> Arc<RwLock<ReprTree>> {
-        let buf = r3vi::buffer::singleton::SingletonBuffer::new(self);
-        ReprTree::new_leaf(
-            Context::parse(ctx, "ListCmd"),
-            buf.get_port().into()
+        ReprTree::from_singleton_buffer(
+            Context::parse(ctx, "ListCmd"),            
+            r3vi::buffer::singleton::SingletonBuffer::new(self)
         )
     }
 }

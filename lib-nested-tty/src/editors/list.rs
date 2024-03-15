@@ -94,12 +94,12 @@ impl PTYListStyle {
     pub fn for_node(node: &mut EditTree, style: (&str, &str, &str)) {
         node.disp.view
             .write().unwrap()
-            .insert_branch(ReprTree::new_leaf(
+            .insert_branch(ReprTree::from_view(
                 Context::parse(&node.ctx, "TerminalView"),
                 Self::new(style)
                     .pty_view(
                         &node.get_edit::<ListEditor>().unwrap().read().unwrap()
-                ).into()
+                )
             ));
     }
 }
@@ -225,6 +225,7 @@ impl PTYListController {
                     rt,
                     self.depth.map(|d| d+1)
                 );
+                /*
                 let mut ne = new_edittree.write().unwrap();
                 match ne.send_cmd_obj(cmd_obj.clone()) {
                     TreeNavResult::Continue => {
@@ -233,9 +234,12 @@ impl PTYListController {
                         TreeNavResult::Continue
                     }
                     TreeNavResult::Exit => {
+                */
                         TreeNavResult::Exit
+            /*
                     }
                 }
+                */
             },
             ListCursorMode::Select => {
                 if let Some(item) = e.get_item_mut() {

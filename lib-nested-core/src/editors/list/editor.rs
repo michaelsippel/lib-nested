@@ -101,7 +101,6 @@ impl ListEditor {
     }
 
     pub fn into_node(mut self, depth: OuterViewPort<dyn SingletonView<Item = usize>>) -> EditTree {
-        let data = self.get_data();
         let ctx = self.ctx.clone();
 
         self.depth = depth.clone();
@@ -155,7 +154,7 @@ impl ListEditor {
             |x| x.read().unwrap().clone()
         )
     }
-
+/*
     pub fn get_data(&self) -> Arc<RwLock<ReprTree>> {
         let data_view = self.get_data_port();
         ReprTree::new_leaf(
@@ -163,7 +162,7 @@ impl ListEditor {
             data_view.into()
         )
     }
-
+*/
     pub fn get_item(&self) -> Option<EditTree> {
         if let Some(idx) = self.cursor.get().idx {
             let idx = crate::utils::modulo(idx as isize, self.data.len() as isize) as usize;
@@ -309,22 +308,23 @@ impl ListEditor {
                 let mut b = item.ctrl.spillbuf.write().unwrap();
 
                 let rt = ReprTree::new_arc(self.typ.clone());
-                let new_edittree = self.ctx.read().unwrap()
+                let edittree = self.ctx.read().unwrap()
                     .setup_edittree(
                         rt,
                         self.depth.map(|d| d+1)
                     );
-                let mut tail_node = new_edittree.write().unwrap();
+
+                let mut tail_node = edittree.get_mut();
                 tail_node.goto(TreeCursor::home());
 
                 for node in b.iter() {
                     tail_node
                         .send_cmd_obj(
-                            ReprTree::new_leaf(
-                                Context::parse(&self.ctx, "NestedNode"),
+                            ReprTree::from_singleton_buffer(
+                                Context::parse(&self.ctx, "EditTree"),
                                 SingletonBuffer::<EditTree>::new(
                                     node.read().unwrap().clone()
-                                ).get_port().into()
+                                )
                             )
                         );
                 }
@@ -340,7 +340,7 @@ impl ListEditor {
                 drop(tail_node);
 
                 self.insert(
-                    new_edittree
+                    edittree.value.clone()
                 );
 
             } else {
@@ -376,11 +376,11 @@ impl ListEditor {
             let data = cur_editor.ctrl.spillbuf.read().unwrap();
             for x in data.iter() {
                 pxv_editor.send_cmd_obj(
-                    ReprTree::new_leaf(
-                        Context::parse(&self.ctx, "NestedNode"),
+                    ReprTree::from_singleton_buffer(
+                        Context::parse(&self.ctx, "EditTree"),
                         SingletonBuffer::<EditTree>::new(
                             x.read().unwrap().clone()
-                        ).get_port().into()
+                        )
                     )
                 );
             }
@@ -435,11 +435,11 @@ impl ListEditor {
 
             for x in data.iter() {
                 cur_editor.send_cmd_obj(
-                    ReprTree::new_leaf(
-                        Context::parse(&self.ctx, "NestedNode"),
+                    ReprTree::from_singleton_buffer(
+                        Context::parse(&self.ctx, "EditTree"),
                         SingletonBuffer::<EditTree>::new(
                             x.read().unwrap().clone()
-                        ).get_port().into()
+                        )
                     )
                 );
             }
