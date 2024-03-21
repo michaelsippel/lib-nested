@@ -3,6 +3,7 @@ members = [
     "lib-nested-core",
     "lib-nested-tty",
     "examples/tty-01-hello",
-    "examples/tty-02-node"
+    "examples/tty-02-digit",
+    "examples/tty-03-string",
 ]
 

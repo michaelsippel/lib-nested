@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 r3vi = { path = "../../lib-r3vi" }
+laddertypes = { path = "../../lib-laddertypes" }
 nested = { path = "../lib-nested-core" }
 cgmath = { version = "0.18.0", features = ["serde"] }
 serde = { version = "1.0", features = ["serde_derive"] }
