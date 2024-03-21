@@ -1,3 +1,10 @@
+//! Similarly to `tty-02-digit`, a editor is created
+//! but of type <List Char>.
+//! The contents of the editor can be retrieved by
+//! a morphism from the `EditTree` node.
+//! To demonstrate that, the values are are mapped
+//! to the TTY-display in different form.
+
 extern crate cgmath;
 extern crate nested;
 extern crate nested_tty;
@@ -100,7 +107,7 @@ async fn main() {
         comp.push(
             nested_tty::make_label(&label_str)
                 .map_item(|_pt, atom| atom.add_style_front(TerminalStyle::fg_color((90,90,90))))
-                .offset(Vector2::new(1, 1)));
+                .offset(Vector2::new(1,1)));
 
         comp.push(
             edittree_list.get()

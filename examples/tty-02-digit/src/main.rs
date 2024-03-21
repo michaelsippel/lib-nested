@@ -1,3 +1,6 @@
+//! This example demonstrates how a very simple editor for hexadecimal digits
+//! can be created with `lib-nested` and the `lib-nested-tty` backend.
+
 extern crate cgmath;
 extern crate nested;
 extern crate nested_tty;
