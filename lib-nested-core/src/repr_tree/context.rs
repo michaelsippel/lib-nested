@@ -153,12 +153,12 @@ impl Context {
     pub fn type_term_to_str(&self, t: &TypeTerm) -> String {
         self.type_dict.read().unwrap().unparse(&t)
     }
+
     /// adds an object without any representations
     pub fn add_obj(ctx: Arc<RwLock<Context>>, name: String, typename: &str) {
         let type_tag = ctx.read().unwrap()
             .type_dict.write().unwrap()
             .parse(typename).unwrap();
-
 /*
         if let Some(node) = Context::make_node(&ctx, type_tag, SingletonBuffer::new(0).get_port()) {
             ctx.write().unwrap().nodes.insert(name, node);
@@ -186,14 +186,12 @@ impl Context {
                 self.type_term_from_str("EditTree").expect("")
             ]);
 
-        eprintln!("setp_edittree: apply morphism T -> T~EditTree");
         self.morphisms.apply_morphism(
             rt.clone(),
             &rt.get_type(),
             &ladder
         );
 
-        eprintln!("get repr-node of editTree");
         if let Some(new_edittree) =
             rt.descend(self.type_term_from_str("EditTree").unwrap())
         {

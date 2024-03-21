@@ -9,7 +9,7 @@ use {
     },
     laddertypes::{TypeTerm},
     crate::{
-        repr_tree::{Context, ReprTree, ReprTreeExt},
+        repr_tree::{Context, ReprTree, ReprLeaf, ReprTreeExt},
         edit_tree::{EditTree, TreeNavResult},
         editors::ObjCommander,
     },
@@ -31,24 +31,27 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
             {
                 let ctx = ctx.clone();
                 move |rt, σ| {
-                    if let Some(v) = rt.read().unwrap().get_view::<dyn SingletonView<Item = char>>() {
-                        eprintln!("prev value: {}", v.get());
+                    {
+                        let mut rt = rt.write().unwrap();
+                        if let Some(buf) = rt.singleton_buffer::<char>() {
+                            // buffer already exists
+                        } else {
+                            rt.insert_leaf(
+                                vec![].into_iter(),
+                                ReprLeaf::from_singleton_buffer(
+                                SingletonBuffer::new('\0')
+                            ));
+                        }
                     }
 
-                    /* Create EditTree object
-                     */
-                    rt.view_char().0.update();
+                    let char_buf = rt.singleton_buffer::<char>();
 
-                    let char_buf = rt.write().unwrap().singleton_buffer::<char>().unwrap();
-
-                    eprintln!("make edittree: char val = {}", char_buf.get());
                     let mut edittree = CharEditor::new_edit_tree(
                         ctx.clone(),
                         char_buf,
-                        r3vi::buffer::singleton::SingletonBuffer::<usize>::new(0).get_port()
+                        SingletonBuffer::<usize>::new(0).get_port()
                     );
 
-                    eprintln!("insert Char~EditTree");
                     rt.write().unwrap()
                         .insert_branch(
                             ReprTree::from_singleton_buffer(

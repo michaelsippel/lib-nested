@@ -225,21 +225,18 @@ impl PTYListController {
                     rt,
                     self.depth.map(|d| d+1)
                 );
-                /*
-                let mut ne = new_edittree.write().unwrap();
+
+                let mut ne = new_edittree.get();
                 match ne.send_cmd_obj(cmd_obj.clone()) {
                     TreeNavResult::Continue => {
                         drop(ne);
-                        e.insert(new_edittree.clone());
+                        e.insert(new_edittree.value.clone());
                         TreeNavResult::Continue
                     }
                     TreeNavResult::Exit => {
-                */
                         TreeNavResult::Exit
-            /*
                     }
                 }
-                */
             },
             ListCursorMode::Select => {
                 if let Some(item) = e.get_item_mut() {
