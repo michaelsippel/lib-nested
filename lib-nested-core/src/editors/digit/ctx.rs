@@ -39,6 +39,20 @@ pub fn init_ctx( ctx: Arc<RwLock<Context>> ) {
                             _ => 0
                         };
 
+                    /* get char representation or create it if not available
+                     */
+                    let char_rt =
+                        if let Some(crt) = src_rt.descend(Context::parse(&ctx, "Char")) {
+                            crt
+                        } else {
+                            let crt = ReprTree::from_singleton_buffer(
+                                Context::parse(&ctx, "Char"),
+                                SingletonBuffer::new('\0')
+                            );
+                            src_rt.insert_branch(crt.clone());
+                            crt
+                        };
+
                     /* Create EditTree object
                      */
                     let mut edittree = DigitEditor::new(
