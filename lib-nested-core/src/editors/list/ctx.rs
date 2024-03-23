@@ -2,7 +2,9 @@ use {
     r3vi::{
         view::{
             ViewPort,
-            OuterViewPort, Observer, singleton::*
+            OuterViewPort, Observer,
+            singleton::*,
+            list::*
         },
         buffer::{singleton::*, vec::*}
     },
@@ -85,6 +87,31 @@ pub fn init_ctx(ctx: Arc<RwLock<Context>>) {
                                     .get()
                             )
                     )
+                );
+            }
+        }
+    );
+
+
+    let mt = crate::repr_tree::MorphismType {
+        src_type: Context::parse(&ctx, "<List Char>"),
+        dst_type: Context::parse(&ctx, "<List Char>~<Vec Char>")
+    };
+    ctx.write().unwrap().morphisms.add_morphism(
+        mt,
+        {
+            let ctx = ctx.clone();
+            move |src_rt, σ| {
+                let buf = VecBuffer::<char>::new();
+                let mut leaf = ReprLeaf::from_vec_buffer(buf);
+                leaf.attach_to(
+                    src_rt.read().unwrap()
+                        .get_port::<dyn ListView<char>>()
+                        .unwrap()
+                );
+                src_rt.write().unwrap().insert_leaf(
+                    vec![ Context::parse(&ctx, "<Vec Char>") ].into_iter(),
+                    leaf
                 );
             }
         }

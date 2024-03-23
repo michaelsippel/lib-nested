@@ -41,13 +41,12 @@ async fn main() {
     nested::editors::list::init_ctx( ctx.clone() );
     nested_tty::setup_edittree_hook(&ctx);
 
-
     /* Create a Representation-Tree of type <List Char>
      */
     let rt_string = ReprTree::new_arc( Context::parse(&ctx, "<List Char>") );
 
     /* Setup an Editor for this ReprTree
-     * (by adding the representation <List Char>~EditTree to the ReprTree)
+     * (this will add the representation <List Char>~EditTree to the ReprTree)
      */
     let edittree_list = ctx.read().unwrap()
         .setup_edittree(
@@ -72,7 +71,24 @@ async fn main() {
         .get_port::<dyn ListView<char>>()
         .unwrap();
 
-    /* transform ListView<char> into a TerminalView
+
+    /* Lets add another morphism which will store the values
+     * of the character-list in a `Vec<char>`
+     */
+    ctx.read().unwrap().morphisms.apply_morphism(
+        rt_string.clone(),
+        &Context::parse(&ctx, "<List Char>"),
+        &Context::parse(&ctx, "<List Char>~<Vec Char>")
+    );
+
+    /* Access the Vec<char> object (wrapped behind a VecBuffer<char>)
+     * from the ReprTree.
+     */
+    let chars_vec = rt_string
+        .descend(Context::parse(&ctx, "<Vec Char>")).unwrap()
+        .vec_buffer::<char>();
+
+    /* transform `ListView<char>` into a `TerminalView`
      */
     let string_view_tty = chars_view
         .to_sequence()
@@ -122,4 +138,16 @@ async fn main() {
     /* write the changes in the view of `term_port` to the terminal
      */
     app.show().await.expect("output error!");
+
+    /* need to call update because changes are applied lazily
+     */
+    chars_vec.get_port().0.update();
+
+    /* Vec<char> to String
+     */
+    let string = chars_vec.data
+        .read().unwrap()
+        .iter().collect::<String>();
+
+    eprintln!("value of the editor was: {}\n\n", string);
 }
